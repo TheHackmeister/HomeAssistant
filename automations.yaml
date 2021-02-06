@@ -1,0 +1,314 @@
+- id: reset_score
+  alias: reset_score
+  initial_state: true
+  trigger:
+    platform: state
+    entity_id: sensor.nhl_hockey
+    from: Scheduled
+    to: Pre-Game
+  action:
+  - service: input_number.set_value
+    entity_id: input_number.home_score
+    data:
+      value: 0
+  - service: input_number.set_value
+    entity_id: input_number.away_score
+    data:
+      value: 0
+- id: avalanche_score
+  alias: avalanche_score
+  trigger:
+  - platform: state
+    entity_id: sensor.nhl_sensor
+    attribute: away_score
+    for: 00:00:10
+  - platform: state
+    entity_id: sensor.nhl_sensor
+    attribute: home_score
+    for: 00:00:10
+  condition:
+  - condition: or
+    conditions:
+    - condition: template
+      value_template: '{{ trigger.from_state.attributes.away_score < trigger.to_state.attributes.away_score
+        }}'
+    - condition: template
+      value_template: '{{ trigger.from_state.attributes.home_score < trigger.to_state.attributes.home_score  }}'
+  action:
+  - service: system_log.write
+    data_template:
+      message: 'Aves Score Automation Trigger({{ as_timestamp(now()) }}): {{ trigger
+        }} '
+      level: warning
+  - condition: template
+    value_template: '{{ state_attr("sensor.nhl_sensor", "goal_tracked_team") }}'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  - delay: '0.2'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  - delay: '0.2'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  - delay: '0.2'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  - delay: '0.2'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  - delay: '0.2'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  - delay: '0.2'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  - delay: '0.2'
+  - service: homeassistant.toggle
+    data: {}
+    entity_id: group.nhl_lights
+  initial_state: true
+  mode: single
+- id: '1610683069089'
+  alias: Push to phone
+  description: ''
+  trigger: []
+  condition: []
+  action:
+  - service: notify.mobile_app_one_a2005
+    data:
+      title: Check this out!
+      message: Something happened at home!
+      data:
+        push:
+          category: alarm
+        action_data:
+          entity_id: switch.eb06e894f64866e076kdao
+          my_custom_data: foo_bar
+  mode: single
+- id: set_theme
+  alias: Set Theme
+  trigger:
+  - platform: homeassistant
+    event: start
+  action:
+  - service: frontend.set_theme
+    data:
+      name: ios-dark-mode
+- alias: Perform Auto Backup
+  trigger:
+    platform: time_pattern
+    hours: /3
+  action:
+    service: auto_backup.snapshot_partial
+    data_template:
+      name: 'AutoBackup: {{ now().strftime(''%a, %-I:%M %p (%d/%m/%Y)'') }}'
+      addons:
+      - core_mariadb
+      - core_mosquitto
+      folders:
+      - homeassistant
+      - share
+      - ssl
+      keep_days: 2
+  id: 5b59be520ac340168ae5457813cec372
+- alias: Perform Daily Backup
+  trigger:
+    platform: time
+    at: 02:30:00
+  condition:
+    condition: time
+    weekday:
+    - tue
+    - wed
+    - thu
+    - fri
+    - sat
+    - sun
+  action:
+    service: auto_backup.snapshot_full
+    data_template:
+      name: 'DailyBackup: {{ now().strftime(''%A, %B %-d, %Y'') }}'
+      keep_days: 7
+  id: 0488c83c127a4845994736f9fa9eb4a8
+- alias: Perform Weekly Backup
+  trigger:
+    platform: time
+    at: 02:30:00
+  condition:
+    condition: time
+    weekday:
+    - mon
+  action:
+    service: auto_backup.snapshot_full
+    data_template:
+      name: 'WeeklyBackup: {{ now().strftime(''%A, %B %-d, %Y'') }}'
+      keep_days: 28
+  id: 3ec6cfbb570941639d833212ddbb903e
+- id: '1611516702755'
+  alias: A Test Scoring - template sensors, ***_state.state
+  description: ''
+  trigger:
+  - platform: state
+    entity_id: sensor.home_team
+  - platform: state
+    entity_id: sensor.away_team
+  condition: []
+  action:
+  - type: turn_on
+    device_id: 4f29bfe1a93405f65442a6252557247a
+    entity_id: switch.eb9f3e9dade65a70a3e7vl
+    domain: switch
+  - service: system_log.write
+    data:
+      message: 'The state changed (template sensors)({{ as_timestamp(now()) }}): from
+        state: {{ trigger.from_state.state }} to state: {{ trigger.to_state.state
+        }} nhl_sensor: {{ states("sensor.nhl_sensor") }} nhl_sensor attr: {{ state_attr("sensor.nhl_sensor",
+        "goal_event_id") }} nhl_sensor attr: {{ state_attr("sensor.nhl_sensor", "goal_tracked_team")
+        }}'
+      level: warning
+  mode: parallel
+  max: 100
+- id: template_sensors
+  alias: A Test Scoring - nhl_sensor attributes, ***_state
+  description: ''
+  trigger:
+  - platform: state
+    entity_id: sensor.nhl_sensor
+    attribute: away_score
+  - platform: state
+    entity_id: sensor.nhl_sensor
+    attribute: home_score
+  condition: []
+  action:
+  - type: turn_on
+    device_id: 4f29bfe1a93405f65442a6252557247a
+    entity_id: switch.eb9f3e9dade65a70a3e7vl
+    domain: switch
+  - service: system_log.write
+    data:
+      message: 'The state changed (nhl_sensor attributes)({{ as_timestamp(now()) }}):
+        from: {{ trigger.from_state }} to: {{ trigger.to_state }} goal_tracked: {{
+        trigger.to_state.attributes.goal_tracked_team }} goal_tracked state_attr:
+        {{ state_attr("trigger.to_state", "goal_tracked_team") }}'
+      level: warning
+  mode: parallel
+  max: 100
+- id: nhl_sensor
+  alias: A Test Scoring - nhl_sensor
+  description: ''
+  trigger:
+  - platform: state
+    entity_id: sensor.nhl_sensor
+  condition:
+  - condition: or
+    conditions:
+    - condition: template
+      value_template: '{{ trigger.from_state.attributes.away_score < trigger.to_state.attributes.away_score
+        }}'
+    - condition: template
+      value_template: '{{ trigger.from_state.attributes.home_score < trigger.to_state.attributes.home_score
+        }}'
+  action:
+  - type: turn_on
+    device_id: 4f29bfe1a93405f65442a6252557247a
+    entity_id: switch.eb9f3e9dade65a70a3e7vl
+    domain: switch
+  - service: system_log.write
+    data:
+      message: 'The nhl_sensor state changed ({{ as_timestamp(now()) }}): trigger:
+        {{ trigger }} goal_tracked: {{ trigger.to_state.attributes.goal_tracked_team
+        }}'
+      level: warning
+  mode: parallel
+  max: 100
+- id: nhl_goal
+  alias: A Test Scoring - nhl_goal
+  description: ''
+  trigger:
+  - platform: state
+    entity_id: sensor.nhl_sensor
+  condition:
+  - condition: or
+    conditions:
+    - condition: template
+      value_template: '{{ trigger.from_state.attributes.away_score < trigger.to_state.attributes.away_score
+        }}'
+    - condition: template
+      value_template: '{{ trigger.from_state.attributes.home_score < trigger.to_state.attributes.home_score
+        }}'
+  action:
+  - type: turn_on
+    device_id: 4f29bfe1a93405f65442a6252557247a
+    entity_id: switch.eb9f3e9dade65a70a3e7vl
+    domain: switch
+  - service: system_log.write
+    data:
+      message: 'The nhl_goal state changed({{ as_timestamp(now()) }}): trigger: {{
+        trigger }} goal_tracked: {{ trigger.to_state.attributes.goal_tracked_team
+        }}'
+      level: warning
+  mode: parallel
+  max: 100
+- id: '1612139237148'
+  alias: New Automation
+  description: ''
+  trigger: []
+  condition: []
+  action:
+  - service: system_log.write
+    data:
+      message: 'Entity ID: {{ trigger.event.data.entity_id }}'
+      level: warning
+  mode: single
+- id: '1612306599523'
+  alias: 'TV Room Button: Single Click'
+  description: ''
+  trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_ieee: 00:12:4b:00:21:35:ac:5b
+  - platform: event
+    event_type: esphome.button_click
+    event_data:
+      entity: tv_room_side_table
+  condition: []
+  action:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.event.data.command  == "toggle" }}'
+      sequence:
+      - service: system_log.write
+        data:
+          level: warning
+          message: MADE IT
+      - service: homeassistant.toggle
+        entity_id: group.tv_room_single_click
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.event.data.command  == "on" }}'
+      sequence:
+      - service: homeassistant.toggle
+        data: {}
+        entity_id: group.tv_room_double_click
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.event.data.command  == "off" }}'
+      sequence:
+      - service: homeassistant.turn_off
+        data: {}
+        entity_id: group.tv_room_double_click,group.tv_room_single_click
+    default: []
+  - service: system_log.write
+    data:
+      level: warning
+      message: Trigger:{{ trigger.event.data.command }}
+  mode: single

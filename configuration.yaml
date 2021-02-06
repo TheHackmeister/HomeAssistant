@@ -1,0 +1,157 @@
+# Configure a default setup of Home Assistant (frontend, api, etc)
+default_config:
+
+# Text to speech
+tts:
+  - platform: picotts
+    service_name: picotts_say
+    base_url: https://home.spencerslab.com
+    language: "en-US"
+    cache: false
+notify:
+  - platform: tts
+    name: in_the_dining_room
+    tts_service: tts.picotts_say
+    media_player: media_player.dining_room_audio
+  - platform: tts
+    name: home_tts
+    tts_service: tts.picotts_say
+    media_player: media_player.home_tts
+
+light:
+  - platform: switch
+    name: Laundry Light
+    entity_id: switch.ebf12734e103a03f57j9s0
+
+  - platform: switch
+    name: Dresser Light
+    entity_id: switch.eb9f3e9dade65a70a3e7vl
+
+  - platform: switch
+    name: Cube Shelf Light
+    entity_id: switch.plant_light_01_relay
+
+http:
+  ip_ban_enabled: true
+  login_attempts_threshold: 5
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.30.33.0/24
+
+auto_backup:
+group: !include groups.yaml
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+frontend:
+  themes: !include_dir_merge_named themes
+
+# panel_iframe:
+#   router:
+#     title: "Router"
+#     url: "https://192.168.1.1"
+#   mopidy:
+#     title: "Audio"
+#     url: "https://audio.spencerslab.com/iris/"
+
+logger:
+  logs:
+    homeassistant.components.http.ban: warning
+
+sensor:
+  - platform: nhl_api
+    #team_id: 15 # Caps
+    team_id: 21
+  - platform: template
+    sensors:
+      away_team:
+        friendly_name_template: "{{ states.sensor.nhl_sensor.attributes.away_name }}"
+        value_template: "{{ states.sensor.nhl_sensor.attributes.away_score }}"
+        entity_picture_template: "{{ states.sensor.nhl_sensor.attributes.away_logo }}"
+      home_team:
+        friendly_name_template: "{{ states.sensor.nhl_sensor.attributes.home_name }}"
+        value_template: "{{ states.sensor.nhl_sensor.attributes.home_score }}"
+        entity_picture_template: "{{ states.sensor.nhl_sensor.attributes.home_logo }}"
+  - platform: fail2ban
+    jails:
+      - ssh
+      - hass-iptables
+
+media_player:
+  - platform: snapcast
+    host: 127.0.0.1
+
+  - platform: mpd
+    host: audio.spencerslab.com
+    port: 6601
+    name: Home TTS
+
+  - platform: mpd
+    host: audio.spencerslab.com
+    name: Whole House Audio
+
+  - platform: mpd
+    host: dining-room-audio.local
+    name: Dining Room Audio
+    #location: Multi-Room Controller
+#- platform: mpd
+#  server: localhost
+#  location: Room 1
+#weblink:
+#  entities:
+#  - name: Multi-Room Player
+#    url: http://home.spencerslab.com:1780/
+variable:
+  #countdown_timer:
+  #  value: 30
+  #  attributes:
+  #    friendly_name: 'Countdown'
+  #    icon: mdi:alarm
+  #countdown_trigger:
+  #  name: Countdown
+  #  value: False
+  calibration_values:
+    value: ['normal', "bad", cool]
+    attributes:
+      previous: ''
+  calibration_devices:
+    value: ["calibration": "devices"]
+    #restore: true
+  #current_power_usage:
+  #  force_update: true
+var: 
+  calibration_values:
+    friendly_name: 'Calibration Values'
+  calibration_entities:
+    friendly_name: 'Calibration Entities'
+    initial_value: 
+zwave:
+  usb_path: /dev/ttyUSB0
+  #network_key: ""
+zha:
+  usb_path: /dev/ttyUSB1
+  database_path: /config/zigbee.db
+
+
+input_number:
+  calibration_input:
+    min: 0
+    max: 500
+    mode: box
+  
+  # Will set attribute to calibration readings.
+  calibration_readings:
+    min: 0
+    max: 500
+
+
+
+
+  manual_raw:
+    min: 0
+    max: 500
+  
+#   home_score:
+#     min: 0
+#     max: 100
+

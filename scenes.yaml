@@ -1,0 +1,12 @@
+- id: '1610595286035'
+  name: Aves SCORE
+  entities:
+    switch.ebf12734e103a03f57j9s0:
+      friendly_name: Smart Socket
+      state: 'off'
+    switch.eb06e894f64866e076kdao:
+      friendly_name: Smart Socket 2
+      state: 'on'
+    switch.eb9f3e9dade65a70a3e7vl:
+      friendly_name: Smart Socket 3
+      state: 'on'

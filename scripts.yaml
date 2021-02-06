@@ -1,0 +1,55 @@
+'1610683330227':
+  alias: New Script
+  sequence:
+  - service: notify.mobile_app_one_a2005
+    data:
+      title: Check this out!
+      message: Something happened at home!
+  mode: single
+add_to_calibration_list:
+  variables:
+    entity:
+  fields:
+    added_entity:
+      description: The entity to add to the calibration list.
+      example: sensor.temp_sensor
+  alias: Add To Calibration List
+  sequence:
+  - service: var.set
+    data:
+      value_template: "{% if added_entity in states('var.calibration_entities') %}\n\
+        \  {{ states('var.calibration_values') }}\n{% else %}\n  {%- if not states('var.calibration_entities')|length\
+        \ == 0 %}{{ states('var.calibration_entities') }},{%- endif %}{{ added_entity\
+        \ }}\n{% endif %}\n"
+      entity_id: var.calibration_entities
+    entity_id: var.calibration_entities
+  mode: parallel
+  icon: mdi:home
+  max: 10
+clear_calibration_list:
+  alias: Clear Calibration List
+  sequence:
+  - service: var.set
+    data:
+      value_template: '{}'
+      entity_id: var.calibration_entities
+    entity_id: var.calibration_entities
+  mode: parallel
+  icon: mdi:home
+  max: 10
+run_calibration:
+  alias: Run Calibration
+  sequence:
+  - service: system_log.write
+    data:
+      message: Running Calibration
+      level: warning
+stop_calibration:
+  alias: Stop Calibration
+  sequence:
+  - service: system_log.write
+    data:
+      message: Stopping Calibration
+      level: warning
+  mode: single
+  icon: mdi:home
