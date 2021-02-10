@@ -69,6 +69,17 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
+async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
+    """Set up the esphome component."""
+    _LOGGER.warning(f"Made it to async_setup_entry. {entry}||{entry.data}")
+    hass.data.setdefault(DATA_COMPENSATION, {})
+
+    hass.data[DATA_COMPENSATION][CONF_ENTITY_ID] = entry.data
+
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setup(entry, "sensor")
+    )
+    return True
 
 async def async_setup(hass, config):
     """Set up the Compensation sensor."""

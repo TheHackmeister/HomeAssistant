@@ -42,6 +42,23 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             ]
         )
 
+async def async_setup_entry(hass, entry, async_add_entries):
+    """Set up the sensor platform."""
+    _LOGGER.warning(f"async_setup_entry entry: { entry }")
+    _LOGGER.warning(f"async_setup_entry data: { hass.data[DATA_COMPENSATION] }")
+    conf = hass.data[DATA_COMPENSATION][CONF_ENTITY_ID]
+    entity = CompensationSensor(
+        hass,
+        conf[CONF_ENTITY_ID],
+        conf.get(CONF_NAME),
+        conf.get(CONF_ATTRIBUTE),
+        conf[CONF_PRECISION],
+        conf[CONF_POLYNOMIAL],
+        conf.get(CONF_UNIT_OF_MEASUREMENT),
+    )
+
+    async_add_entries([entity])
+
 
 class CompensationSensor(Entity):
     """Representation of a Compensation sensor."""
