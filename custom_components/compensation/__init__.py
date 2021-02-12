@@ -7,6 +7,7 @@ import numpy as np
 import voluptuous as vol
 
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_ATTRIBUTE,
     CONF_ENTITY_ID,
@@ -15,14 +16,17 @@ from homeassistant.const import (
 )
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import async_load_platform
+from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
+    CONF_CALIBRATED_ENTITY_ID,
     CONF_COMPENSATION,
     CONF_DATAPOINTS,
     CONF_DEGREE,
     CONF_POLYNOMIAL,
     CONF_PRECISION,
     DATA_COMPENSATION,
+    DEFAULT_CALIBRATED_POSTFIX,
     DEFAULT_DEGREE,
     DEFAULT_NAME,
     DEFAULT_PRECISION,
@@ -46,7 +50,7 @@ def datapoints_greater_than_degree(value: dict) -> dict:
 COMPENSATION_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_ENTITY_ID): cv.entity_id,
-        vol.Required(CONF_DATAPOINTS): vol.All(
+        vol.Optional(CONF_DATAPOINTS): vol.All(
             cv.ensure_list(cv.matches_regex(MATCH_DATAPOINT)),
         ),
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -71,10 +75,13 @@ CONFIG_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
     """Set up the esphome component."""
-    _LOGGER.warning(f"Made it to async_setup_entry. {entry}||{entry.data}")
+    _LOGGER.warning(f"Made it to async_setup_entry. {dir(entry.data)}||{entry.data}")
     hass.data.setdefault(DATA_COMPENSATION, {})
 
     hass.data[DATA_COMPENSATION][CONF_ENTITY_ID] = entry.data
+    datapoints = [(1,1),(2,2),(3,3)]
+    hass.data[DATA_COMPENSATION][ entry.data.get(CONF_CALIBRATED_ENTITY_ID, f"{ entry.data[CONF_ENTITY_ID] }{ DEFAULT_CALIBRATED_POSTFIX }") ] = calculate_poly(entry.data, datapoints)
+    _LOGGER.warning(f"Post assignment: {hass.data[DATA_COMPENSATION]}")
 
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setup(entry, "sensor")
@@ -84,11 +91,11 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
 async def async_setup(hass, config):
     """Set up the Compensation sensor."""
     hass.data[DATA_COMPENSATION] = {}
+    _LOGGER.warning(f"Config: {hass.data[DATA_COMPENSATION]}")
 
     for compensation, conf in config.get(DOMAIN).items():
         _LOGGER.debug("Setup %s.%s", DOMAIN, compensation)
 
-        degree = conf[CONF_DEGREE]
 
         datapoints = []
         for datapoint in conf[CONF_DATAPOINTS]:
@@ -97,47 +104,50 @@ async def async_setup(hass, config):
             x_value, y_value = [float(v) for v in match.groups()]
             datapoints.append((x_value, y_value))
 
-        # get x values and y values from the x,y point pairs
-        x_values, y_values = zip(*datapoints)
+        hass.data[DATA_COMPENSATION][compensation] = calculate_poly(conf, datapoints)
 
-        # try to get valid coefficients for a polynomial
-        coefficients = None
-        with np.errstate(all="raise"):
-            with warnings.catch_warnings(record=True) as all_warnings:
-                warnings.simplefilter("always")
-                # try to catch 3 possible errors
-                try:
-                    coefficients = np.polyfit(x_values, y_values, degree)
-                except FloatingPointError as error:
-                    _LOGGER.error(
-                        "Setup of %s encountered an error, %s.",
-                        compensation,
-                        error,
-                    )
-                # raise any warnings
-                for warning in all_warnings:
-                    _LOGGER.warning(
-                        "Setup of %s encountered a warning, %s.",
-                        compensation,
-                        str(warning.message).lower(),
-                    )
-
-        if coefficients is not None:
-            data = {
-                k: v for k, v in conf.items() if k not in [CONF_DEGREE, CONF_DATAPOINTS]
-            }
-            data[CONF_POLYNOMIAL] = np.poly1d(coefficients)
-
-            hass.data[DATA_COMPENSATION][compensation] = data
-
-            hass.async_create_task(
-                async_load_platform(
-                    hass,
-                    SENSOR_DOMAIN,
-                    DOMAIN,
-                    {CONF_COMPENSATION: compensation},
-                    config,
-                )
+        hass.async_create_task(
+            async_load_platform(
+                hass,
+                SENSOR_DOMAIN,
+                DOMAIN,
+                {CONF_COMPENSATION: compensation},
+                config,
             )
-
+        )
     return True
+
+def calculate_poly(conf, datapoints):
+    # get x values and y values from the x,y point pairs
+    degree = conf[CONF_DEGREE]
+    x_values, y_values = zip(*datapoints)
+
+    # try to get valid coefficients for a polynomial
+    coefficients = None
+    with np.errstate(all="raise"):
+        with warnings.catch_warnings(record=True) as all_warnings:
+            warnings.simplefilter("always")
+            # try to catch 3 possible errors
+            try:
+                coefficients = np.polyfit(x_values, y_values, degree)
+            except FloatingPointError as error:
+                _LOGGER.error(
+                    "Setup of %s encountered an error, %s.",
+                    compensation,
+                    error,
+                )
+            # raise any warnings
+            for warning in all_warnings:
+                _LOGGER.warning(
+                    "Setup of %s encountered a warning, %s.",
+                    compensation,
+                    str(warning.message).lower(),
+                )
+
+    data = {
+        k: v for k, v in conf.items() if k not in [CONF_DEGREE, CONF_DATAPOINTS]
+    }
+    if coefficients is not None:
+        data[CONF_POLYNOMIAL] = np.poly1d(coefficients)
+
+    return data

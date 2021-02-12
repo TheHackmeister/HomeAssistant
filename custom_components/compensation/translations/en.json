@@ -1,0 +1,34 @@
+{
+  "config": {
+    "title": "Calibrate Sensor: ",
+    "step": {
+      "init": {
+        "title": "TITLE",
+        "description": "DESCRIPTION",
+        "data": {
+          "entity_id": "entity_id"
+        }
+      },
+      "user": {
+        "title": "Add Compensation Sensor",
+        "description": "Enter the following information to configure a calibrated sensor.",
+        "data": {
+          "entity_id": "Tracked entity_id",
+          "calibrated_entity_id": "Calibrated entity_id",
+          "name": "Calibrated Sensor Name",
+          "attribute": "Attribute",
+          "precision": "Precision",
+          "degree": "Degree",
+          "unit_of_measurement": "Unit Of Measurement"
+        }
+      }
+    },
+    "error": {
+      "": ""
+    },
+    "abort": {
+      "": ""
+    },
+    "create_entry": { "default": "" }
+  }
+}

@@ -4,28 +4,16 @@ import logging
 import voluptuous as vol
 
 from homeassistant import config_entries
-from .const import DOMAIN # pylint: disable=unused-import
-
-
-from homeassistant.const import (
-    CONF_ATTRIBUTE,
-    CONF_ENTITY_ID,
-    CONF_NAME,
-    CONF_UNIT_OF_MEASUREMENT,
-)
-
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.discovery import async_load_platform
-#from homeassistant.helpers.storage import Store
-from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
+    CONF_CALIBRATED_ENTITY_ID,
     CONF_COMPENSATION,
     CONF_DATAPOINTS,
     CONF_DEGREE,
     CONF_POLYNOMIAL,
     CONF_PRECISION,
     DATA_COMPENSATION,
+    DEFAULT_CALIBRATED_POSTFIX,
     DEFAULT_DEGREE,
     DEFAULT_NAME,
     DEFAULT_PRECISION,
@@ -33,10 +21,15 @@ from .const import (
     MATCH_DATAPOINT,
 )
 
-from . import COMPENSATION_SCHEMA
+from homeassistant.const import (
+    CONF_ATTRIBUTE,
+    CONF_ENTITY_ID,
+    CONF_NAME,
+    CONF_UNIT_OF_MEASUREMENT,
+)
+from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
 
-# TODO: Add TRACKED_ENTITY to const.py
-TRACKED_ENTITY = 'tracked_entity'
+from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,47 +48,46 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._errors = {}
         if user_input is not None:
             _LOGGER.warning("Made it in user_input: %s", user_input)
-            tracked_entity = user_input[CONF_ENTITY_ID]
 
-            await self.async_set_unique_id(f"{ tracked_entity }")
+            await self.async_set_unique_id( user_input.get(CONF_CALIBRATED_ENTITY_ID, f"{ user_input[CONF_ENTITY_ID] }{ DEFAULT_CALIBRATED_POSTFIX }") )
             self._abort_if_unique_id_configured()
 
             _LOGGER.warning("Made it in user_input: %s", user_input)
             return self.async_create_entry(
-                title=f"{ tracked_entity }",
+                title=f"{ self.unique_id }",
                 data={
+                    CONF_ENTITY_ID: user_input[CONF_ENTITY_ID],
+                    CONF_CALIBRATED_ENTITY_ID: self.unique_id,
+                    CONF_NAME: user_input[CONF_NAME],
+                    CONF_ATTRIBUTE: user_input.get(CONF_ATTRIBUTE,None),
+                    CONF_PRECISION: user_input[CONF_PRECISION],
+                    CONF_DEGREE: user_input[CONF_DEGREE],
+                    CONF_UNIT_OF_MEASUREMENT: user_input[CONF_UNIT_OF_MEASUREMENT],
                 },
             )
             _LOGGER.warning("Made it in user_input: %s", user_input)
         else:
             _LOGGER.warning("Not it in user_input: %s", user_input)
             user_input = {}
-            user_input[CONF_ENTITY_ID] = TRACKED_ENTITY
         
-        _LOGGER.warning(f"COMPENSATION_SCHEMA: { COMPENSATION_SCHEMA.extend({}) }")
-
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_ENTITY_ID): str, #cv.entity_id,
-                    #vol.Required(CONF_DATAPOINTS): vol.All(
-                    #    cv.ensure_list(cv.matches_regex(MATCH_DATAPOINT)),
-                    #),
-                    vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
+                    vol.Required(CONF_ENTITY_ID): vol.In(
+                        { ent.entity_id: f"{ ent.name } ({ ent.entity_id })" for ent in self.hass.states.async_all(DOMAIN_SENSOR) }
+                    ),
+                    vol.Optional(CONF_CALIBRATED_ENTITY_ID): cv.string,
+                    vol.Optional(CONF_NAME, default=f"ORIGINAL_SENSOR_NAME Calibrated"): cv.string,
                     vol.Optional(CONF_ATTRIBUTE): cv.string,
                     vol.Optional(CONF_PRECISION, default=DEFAULT_PRECISION): cv.positive_int,
                     vol.Optional(CONF_DEGREE, default=DEFAULT_DEGREE): vol.All(
                         vol.Coerce(int),
                         vol.Range(min=1, max=7),
                     ),
-                    vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
+                    vol.Optional(CONF_UNIT_OF_MEASUREMENT, default=f"ORIGINAL_SENSORS_UNIT"): cv.string,
                 }
             ),
-            #    {
-            #        vol.Required(TRACKED_ENTITY): str,
-            #    }
-            #),
             errors=self._errors,
         )
 
