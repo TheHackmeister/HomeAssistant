@@ -13,7 +13,13 @@
         "title": "Add Compensation Sensor",
         "description": "Enter the following information to configure a calibrated sensor.",
         "data": {
-          "entity_id": "Tracked entity_id",
+          "entity_id": "Tracked entity_id"
+        }
+      },
+      "configure": {
+        "title": "Add Compensation Sensor",
+        "description": "Enter the following information to configure a calibrated sensor.",
+        "data": {
           "calibrated_entity_id": "Calibrated entity_id",
           "name": "Calibrated Sensor Name",
           "attribute": "Attribute",
@@ -27,7 +33,7 @@
       "": ""
     },
     "abort": {
-      "": ""
+      "already_configured": "Sensor already exists!"
     },
     "create_entry": { "default": "" }
   }
