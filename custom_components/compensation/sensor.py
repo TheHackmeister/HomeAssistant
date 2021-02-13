@@ -16,7 +16,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 
-from .const import CONF_COMPENSATION, CONF_POLYNOMIAL, CONF_PRECISION, DATA_COMPENSATION
+from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
+from .const import CONF_COMPENSATION, CONF_POLYNOMIAL, CONF_PRECISION, DATA_COMPENSATION, CONF_TRACKED_ENTITY_ID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,14 +28,15 @@ ATTR_COEFFICIENTS = "coefficients"
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the Compensation sensor."""
     if discovery_info is not None:
-        compensation = discovery_info.get(CONF_COMPENSATION)
-        conf = hass.data[DATA_COMPENSATION][compensation]
+        entity_id = discovery_info.get(CONF_COMPENSATION)
+        conf = hass.data[DATA_COMPENSATION][entity_id]
 
         async_add_entities(
             [
                 CompensationSensor(
                     hass,
-                    conf[CONF_ENTITY_ID],
+                    f"{ DOMAIN_SENSOR }.{ entity_id }",
+                    conf[CONF_TRACKED_ENTITY_ID],
                     conf.get(CONF_NAME),
                     conf.get(CONF_ATTRIBUTE),
                     conf[CONF_PRECISION],
@@ -51,6 +53,7 @@ async def async_setup_entry(hass, entry, async_add_entries):
     entity = CompensationSensor(
         hass,
         conf[CONF_ENTITY_ID],
+        conf[CONF_TRACKED_ENTITY_ID],
         conf.get(CONF_NAME),
         conf.get(CONF_ATTRIBUTE),
         conf[CONF_PRECISION],
@@ -68,6 +71,7 @@ class CompensationSensor(Entity):
         self,
         hass,
         entity_id,
+        tracked_entity_id,
         name,
         attribute,
         precision,
@@ -76,18 +80,31 @@ class CompensationSensor(Entity):
     ):
         """Initialize the Compensation sensor."""
         self._entity_id = entity_id
+        self._tracked_entity_id = tracked_entity_id
         self._name = name
         self._precision = precision
         self._attribute = attribute
         self._unit_of_measurement = unit_of_measurement
         self._poly = polynomial
         self._coefficients = polynomial.coefficients.tolist()
+
+        if hass.states.get(self._tracked_entity_id):
+            self.calc_state(hass.states.get(self._tracked_entity_id))
+        else:
         self._state = STATE_UNKNOWN
 
         @callback
         def async_compensation_sensor_state_listener(event):
             """Handle sensor state changes."""
             new_state = event.data.get("new_state")
+            self.calc_state(new_state)
+            self.async_write_ha_state()
+
+        async_track_state_change_event(
+            hass, [tracked_entity_id], async_compensation_sensor_state_listener
+        )
+
+    def calc_state(self, new_state):
             if new_state is None:
                 return
 
@@ -119,11 +136,15 @@ class CompensationSensor(Entity):
                 else:
                     _LOGGER.warning("%s state is not numerical", self._entity_id)
 
-            self.async_write_ha_state()
+    @property
+    def entity_id(self):
+        """Return the entity_id of the sensor."""
+        return self._entity_id
 
-        async_track_state_change_event(
-            hass, [entity_id], async_compensation_sensor_state_listener
-        )
+    @property
+    def tracked_entity_id(self):
+        """Return the tracked entity_id of the sensor."""
+        return self._tracked_entity_id
 
     @property
     def name(self):

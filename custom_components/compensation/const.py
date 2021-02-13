@@ -3,12 +3,12 @@ DOMAIN = "compensation"
 
 SENSOR = "compensation"
 
-CONF_CALIBRATED_ENTITY_ID = "calibrated_entity_id"
 CONF_COMPENSATION = "compensation"
 CONF_DATAPOINTS = "data_points"
 CONF_DEGREE = "degree"
 CONF_PRECISION = "precision"
 CONF_POLYNOMIAL = "polynomial"
+CONF_TRACKED_ENTITY_ID = "tracked_entity_id"
 
 DATA_COMPENSATION = "compensation_data"
 

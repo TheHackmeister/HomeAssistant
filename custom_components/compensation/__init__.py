@@ -19,12 +19,12 @@ from homeassistant.helpers.discovery import async_load_platform
 from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
-    CONF_CALIBRATED_ENTITY_ID,
     CONF_COMPENSATION,
     CONF_DATAPOINTS,
     CONF_DEGREE,
     CONF_POLYNOMIAL,
     CONF_PRECISION,
+    CONF_TRACKED_ENTITY_ID,
     DATA_COMPENSATION,
     DEFAULT_CALIBRATED_POSTFIX,
     DEFAULT_DEGREE,
@@ -49,7 +49,7 @@ def datapoints_greater_than_degree(value: dict) -> dict:
 
 COMPENSATION_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_ENTITY_ID): cv.entity_id,
+        vol.Required(CONF_TRACKED_ENTITY_ID): cv.entity_id,
         vol.Optional(CONF_DATAPOINTS): vol.All(
             cv.ensure_list(cv.matches_regex(MATCH_DATAPOINT)),
         ),
@@ -75,13 +75,11 @@ CONFIG_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
     """Set up the esphome component."""
-    _LOGGER.warning(f"Made it to async_setup_entry. {dir(entry.data)}||{entry.data}")
     hass.data.setdefault(DATA_COMPENSATION, {})
 
     hass.data[DATA_COMPENSATION][CONF_ENTITY_ID] = entry.data
     datapoints = [(1,1),(2,2),(3,3)]
-    hass.data[DATA_COMPENSATION][ entry.data.get(CONF_CALIBRATED_ENTITY_ID, f"{ entry.data[CONF_ENTITY_ID] }{ DEFAULT_CALIBRATED_POSTFIX }") ] = calculate_poly(entry.data, datapoints)
-    _LOGGER.warning(f"Post assignment: {hass.data[DATA_COMPENSATION]}")
+    hass.data[DATA_COMPENSATION][ entry.data.get(CONF_ENTITY_ID, f"{ entry.data[CONF_TRACKED_ENTITY_ID] }{ DEFAULT_CALIBRATED_POSTFIX }") ] = calculate_poly(entry.data, datapoints)
 
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setup(entry, "sensor")
