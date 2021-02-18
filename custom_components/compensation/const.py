@@ -17,4 +17,6 @@ DEFAULT_DEGREE = 1
 DEFAULT_NAME = "Compensation"
 DEFAULT_PRECISION = 2
 
+FLOW_KEEP_DATA_POINTS = "keep_data_points"
+
 MATCH_DATAPOINT = r"([-+]?[0-9]+\.?[0-9]*){1} -> ([-+]?[0-9]+\.?[0-9]*){1}"

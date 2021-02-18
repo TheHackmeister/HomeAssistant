@@ -36,5 +36,24 @@
       "already_configured": "Sensor already exists!"
     },
     "create_entry": { "default": "" }
+  },
+  "options": {
+      "step": {
+          "select_sensors": {
+              "title": "Pick sensors to calibrate",
+              "description": "These are the sensors that will be updated when you add new data points. By default, existing data points will be removed before this calibration run. ",
+              "data": {
+                  "entity_id": "Sensors To Calibrate",
+                  "keep_data_points": "Preserve existing data points"
+              }
+          },
+          "add_calibration_datapoints": {
+              "title": "Add Data Points To Calibration",
+              "description": "This will pair whatever you enter here with the current state of the tracked sensors. Sensor data points are updated as they are entered, so when you're finished, all you have to do is close this dialog.",
+              "data": {
+                  "data_points": "Calibrated Value"
+              }
+          }
+      }
   }
 }

@@ -1,10 +1,11 @@
 """Config flow for the Compesation integration."""
 import logging
 
+from typing import Any, Dict
 import voluptuous as vol
 
-from homeassistant import config_entries
 
+from . import options_update_listener
 from .const import (
     CONF_TRACKED_ENTITY_ID,
     CONF_COMPENSATION,
@@ -18,17 +19,19 @@ from .const import (
     DEFAULT_NAME,
     DEFAULT_PRECISION,
     DOMAIN,
+    FLOW_KEEP_DATA_POINTS,
     MATCH_DATAPOINT,
 )
 
+from homeassistant import config_entries
 from homeassistant.const import (
     CONF_ATTRIBUTE,
     CONF_ENTITY_ID,
     CONF_NAME,
     CONF_UNIT_OF_MEASUREMENT,
 )
+from homeassistant.core import callback
 from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
-
 from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
@@ -106,3 +109,95 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Import a config entry.
         """
         return await self.async_step_user(user_input)
+
+    @callback
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
+        return OptionsFlowHandler(config_entry)
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Handles options flow for the component."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """Manage the options."""
+        # Will probably use the init flow to pick a subflow eventually. 
+        # But for now, we only have select_sensors, so that's what gets used.
+        return await self.async_step_select_sensors()
+
+    async def async_step_select_sensors(
+        self, user_input: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        self._errors = {}
+
+        self._config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in self.hass.config_entries.async_entries(DOMAIN) }
+        
+        if user_input and user_input.get(CONF_ENTITY_ID):
+            if not user_input.get(FLOW_KEEP_DATA_POINTS):
+                for entity in user_input[CONF_ENTITY_ID]:
+                    # Clears the data_points option.
+                    entry = self._config_entries.get(entity)
+                    self.hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: []})
+                    self.hass.async_create_task(
+                        options_update_listener(self.hass, entry)
+                    )
+
+            self._calibrating_entities = user_input[CONF_ENTITY_ID] 
+
+            return await self.async_step_add_calibration_datapoints(user_input)
+
+        return self.async_show_form(
+            step_id="select_sensors",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_ENTITY_ID): cv.multi_select( { entity_id: entry.data[CONF_NAME] for entity_id, entry in self._config_entries.items() } ),
+                    vol.Optional(FLOW_KEEP_DATA_POINTS): vol.Coerce(bool),
+                }
+            ),
+            errors=self._errors,
+        )
+
+    async def async_step_add_calibration_datapoints(
+        self, user_input: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """Manage the options for the custom component."""
+        """Step when user configures a calibrated sensor."""
+        self._errors = {}
+
+
+        config_entries = self.hass.config_entries.async_entries(DOMAIN)
+
+        if user_input and user_input.get(CONF_DATAPOINTS):
+            for entity_id in self._calibrating_entities:
+                existing_data = self._config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
+                datapoints = [ 
+                    ( user_input[CONF_DATAPOINTS], 
+                        float(self.hass.states.get(self._config_entries[entity_id].data.get(CONF_TRACKED_ENTITY_ID)).state)
+                    ) 
+                ]
+                datapoints.extend(existing_data)
+                entry = self._config_entries[entity_id]
+
+                self.hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: datapoints})
+                self.hass.async_create_task(
+                    options_update_listener(self.hass, entry)
+                )
+
+            # Unset the datapoint. 
+            user_input.pop(CONF_DATAPOINTS)
+
+        return self.async_show_form(
+            step_id="add_calibration_datapoints",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_DATAPOINTS): vol.Coerce(float),
+                }
+            ),
+            errors=self._errors,
+        )

@@ -17,6 +17,7 @@ from homeassistant.const import (
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import async_load_platform
 from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant import core, config_entries
 
 from .const import (
     CONF_COMPENSATION,
@@ -77,9 +78,15 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
     """Set up the esphome component."""
     hass.data.setdefault(DATA_COMPENSATION, {})
 
-    hass.data[DATA_COMPENSATION][CONF_ENTITY_ID] = entry.data
-    datapoints = [(1,1),(2,2),(3,3)]
-    hass.data[DATA_COMPENSATION][ entry.data.get(CONF_ENTITY_ID, f"{ entry.data[CONF_TRACKED_ENTITY_ID] }{ DEFAULT_CALIBRATED_POSTFIX }") ] = calculate_poly(entry.data, datapoints)
+    datapoints = entry.options.get(CONF_DATAPOINTS, [(1,1), (2,2)])
+
+    hass_data = calculate_poly(entry.data, datapoints)
+
+    ## Registers update listener to update config entry when options are updated.
+    unsub_options_update_listener = entry.add_update_listener(options_update_listener)
+    ## Store a reference to the unsubscribe function to cleanup if an entry is unloaded.
+    hass_data["unsub_options_update_listener"] = unsub_options_update_listener
+    hass.data[DATA_COMPENSATION][entry.unique_id] = hass_data
 
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setup(entry, "sensor")
@@ -149,3 +156,10 @@ def calculate_poly(conf, datapoints):
         data[CONF_POLYNOMIAL] = np.poly1d(coefficients)
 
     return data
+
+async def options_update_listener(
+    hass: HomeAssistantType, config_entry: ConfigEntry
+):
+    """Handle options update."""
+    #pass
+    await hass.config_entries.async_reload(config_entry.entry_id)
