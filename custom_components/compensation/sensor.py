@@ -140,10 +140,10 @@ class CompensationSensor(Entity):
     def entity_id(self):
         """Return the entity_id of the sensor."""
         return self._entity_id
-
     @entity_id.setter 
     def entity_id(self, ent_id): 
         self._entity_id = ent_id
+
     @property
     def tracked_entity_id(self):
         """Return the tracked entity_id of the sensor."""

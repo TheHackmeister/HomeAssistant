@@ -170,12 +170,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Step when user configures a calibrated sensor."""
         self._errors = {}
 
-
         config_entries = self.hass.config_entries.async_entries(DOMAIN)
+        sensor_issues = []
 
         if user_input and user_input.get(CONF_DATAPOINTS):
             for entity_id in self._calibrating_entities:
                 existing_data = self._config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
+                try: 
                 datapoints = [ 
                     ( user_input[CONF_DATAPOINTS], 
                         float(self.hass.states.get(self._config_entries[entity_id].data.get(CONF_TRACKED_ENTITY_ID)).state)
@@ -188,9 +189,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 self.hass.async_create_task(
                     options_update_listener(self.hass, entry)
                 )
+                except:
+                    sensor_issues.append(entity_id)
+                    self._errors = { "base": "state_not_a_float" }
+
 
             # Unset the datapoint. 
             user_input.pop(CONF_DATAPOINTS)
+            if sensor_issues:
+                sensor_issues = f"\nProblematic Sensors: { ', '.join(sensor_issues) }"
 
         return self.async_show_form(
             step_id="add_calibration_datapoints",
@@ -200,4 +207,5 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             errors=self._errors,
+            description_placeholders={CONF_TRACKED_ENTITY_ID: sensor_issues}
         )

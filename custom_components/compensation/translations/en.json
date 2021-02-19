@@ -49,11 +49,14 @@
           },
           "add_calibration_datapoints": {
               "title": "Add Data Points To Calibration",
-              "description": "This will pair whatever you enter here with the current state of the tracked sensors. Sensor data points are updated as they are entered, so when you're finished, all you have to do is close this dialog.",
+              "description": "This will pair the value you enter here with the current state of the tracked sensors. Sensor data points are updated as they are entered, so when you're finished, all you have to do is close this dialog.\n{ tracked_entity_id }",
               "data": {
                   "data_points": "Calibrated Value"
               }
           }
+      },
+      "error": {
+        "state_not_a_float": "The state(s) for the above tracked sensors were not floats. Skipping calibration of these sensors."
       }
   }
 }
