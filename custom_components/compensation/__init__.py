@@ -124,7 +124,7 @@ async def async_setup(hass, config):
 def calculate_poly(conf, datapoints):
     # get x values and y values from the x,y point pairs
     degree = conf[CONF_DEGREE]
-    x_values, y_values = zip(*datapoints)
+    y_values, x_values = zip(*datapoints)
 
     # try to get valid coefficients for a polynomial
     coefficients = None
