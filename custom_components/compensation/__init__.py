@@ -162,3 +162,21 @@ async def options_update_listener(
     """Handle options update."""
     #pass
     await hass.config_entries.async_reload(config_entry.entry_id)
+
+async def async_unload_entry(hass, entry):
+    """Unload a config entry."""
+    unload_ok = all(
+        await asyncio.gather(
+            *[
+                hass.config_entries.async_forward_entry_unload(entry, component)
+                for component in PLATFORMS
+            ]
+        )
+    )
+
+    hass.data[DOMAIN][entry.entry_id]["unsub_options_update_listener"]()
+
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
