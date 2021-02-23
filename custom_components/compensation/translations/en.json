@@ -14,6 +14,7 @@
         "description": "Enter the following information to configure a calibrated sensor.",
         "data": {
           "tracked_entity_id": "Tracked entity_id",
+          "accept_defaults": "Accept the generated defaults"
         }
       },
       "configure": {
@@ -30,7 +31,8 @@
       }
     },
     "error": {
-      "": ""
+      "state_not_a_float": "state_not_a_float",
+      "entity_id_not_valid": "The provided entity_id was not valid."
     },
     "abort": {
       "already_configured": "Sensor already exists!"
@@ -41,7 +43,7 @@
       "step": {
           "select_sensors": {
               "title": "Pick sensors to calibrate",
-              "description": "These are the sensors that will be updated when you add new data points. By default, existing data points will be removed before this calibration run. ",
+              "description": "These are the sensors that will be updated when you add new data points. By default, existing data points will be removed before this calibration run.",
               "data": {
                   "entity_id": "Sensors To Calibrate",
                   "keep_data_points": "Preserve existing data points"
@@ -49,7 +51,7 @@
           },
           "add_calibration_datapoints": {
               "title": "Add Data Points To Calibration",
-              "description": "This will pair the value you enter here with the current state of the tracked sensors. Sensor data points are updated as they are entered, so when you're finished, all you have to do is close this dialog.\n{ tracked_entity_id }",
+              "description": "This will pair the value you enter here with the current state of the tracked sensors. Sensor data points are updated as they are entered, so when you're finished, all you have to do is close this dialog.\n Currently Calibrating: \n{ entity_id }\n{ tracked_entity_id }",
               "data": {
                   "data_points": "Calibrated Value"
               }

@@ -96,7 +96,6 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
 async def async_setup(hass, config):
     """Set up the Compensation sensor."""
     hass.data[DATA_COMPENSATION] = {}
-    _LOGGER.warning(f"Config: {hass.data[DATA_COMPENSATION]}")
 
     for compensation, conf in config.get(DOMAIN).items():
         _LOGGER.debug("Setup %s.%s", DOMAIN, compensation)
