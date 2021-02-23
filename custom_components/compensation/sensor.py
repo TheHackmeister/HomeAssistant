@@ -84,6 +84,7 @@ class CompensationSensor(Entity):
         self._name = name
         self._precision = precision
         self._attribute = attribute
+        self._attributes = {}
         self._unit_of_measurement = unit_of_measurement
         self._poly = polynomial
         self._coefficients = polynomial.coefficients.tolist()
@@ -107,6 +108,8 @@ class CompensationSensor(Entity):
     def calc_state(self, new_state):
             if new_state is None:
                 return
+
+        self._attributes.update(new_state.attributes)
 
             if self._unit_of_measurement is None and self._attribute is None:
                 self._unit_of_measurement = new_state.attributes.get(
@@ -173,6 +176,8 @@ class CompensationSensor(Entity):
         }
         if self._attribute:
             ret[ATTR_ATTRIBUTE] = self._attribute
+        if self._attributes:
+            ret.update(self._attributes)
         return ret
 
     @property
