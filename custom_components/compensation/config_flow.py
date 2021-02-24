@@ -70,7 +70,7 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Step when user configures a calibrated sensor."""
         errors = {}
 
-        if user_input.get(CONF_ENTITY_ID):
+        if user_input and user_input.get(CONF_ENTITY_ID):
             await self.async_set_unique_id( user_input.get(CONF_ENTITY_ID) )
             self._abort_if_unique_id_configured()
 
@@ -92,13 +92,20 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except vol.Invalid as e:
                 errors[CONF_ENTITY_ID] = "entity_id_not_valid"
         
-        tracked_entity_id = user_input.get(CONF_TRACKED_ENTITY_ID, self.entity_id_from_user_step)
+        tracked_entity_id = self.entity_id_from_user_step
+        if tracked_entity_id.endswith("_raw"):
+            default_entity_id = tracked_entity_id.replace("_raw", "_calibrated")
+            default_name =  self.hass.states.get(tracked_entity_id).name.replace(" Raw", " Calibrated")
+        else:
+            default_entity_id = f"{ tracked_entity_id }_calibrated"
+            default_name = f"{ self.hass.states.get(tracked_entity_id).name } Calibrated"
+
         return self.async_show_form(
             step_id="configure",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_ENTITY_ID, default=f"{ tracked_entity_id }_calibrated"): cv.string,
-                    vol.Optional(CONF_NAME, default=f"{ self.hass.states.get(tracked_entity_id).name } Calibrated"): cv.string,
+                    vol.Required(CONF_ENTITY_ID, default=default_entity_id): cv.string,
+                    vol.Optional(CONF_NAME, default=default_name): cv.string,
                     vol.Optional(CONF_ATTRIBUTE): vol.In( list(self.hass.states.get(tracked_entity_id).attributes.keys()) ),
                     vol.Optional(CONF_PRECISION, default=DEFAULT_PRECISION): cv.positive_int,
                     vol.Optional(CONF_DEGREE, default=DEFAULT_DEGREE): vol.All(
@@ -111,8 +118,9 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+
     async def async_step_import(self, user_input=None):
-        """Import a config entry.
+        """ Used to import a discovered _raw sensor. 
         """
         return await self.async_step_user(user_input)
 

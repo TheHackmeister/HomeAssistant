@@ -1,5 +1,6 @@
 {
   "config": {
+    "flow_title": "Calibrate Sensor: {entity_id}",
     "title": "Calibrate Sensor: ",
     "step": {
       "init": {

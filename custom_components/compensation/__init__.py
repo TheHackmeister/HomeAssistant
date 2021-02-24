@@ -3,21 +3,26 @@ import logging
 import re
 import warnings
 
+from datetime import timedelta
 import numpy as np
 import voluptuous as vol
 
-from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+from homeassistant import core, config_entries
+from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_ATTRIBUTE,
     CONF_ENTITY_ID,
     CONF_NAME,
     CONF_UNIT_OF_MEASUREMENT,
+    EVENT_HOMEASSISTANT_STARTED,
 )
+from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import async_load_platform
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.typing import HomeAssistantType
-from homeassistant import core, config_entries
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_COMPENSATION,
@@ -37,6 +42,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+SCAN_INTERVAL = timedelta(seconds=300)
 
 def datapoints_greater_than_degree(value: dict) -> dict:
     """Validate data point list is greater than polynomial degrees."""
@@ -96,6 +102,7 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
 async def async_setup(hass, config):
     """Set up the Compensation sensor."""
     hass.data[DATA_COMPENSATION] = {}
+    already_discovered = set()
 
     for compensation, conf in config.get(DOMAIN).items():
         _LOGGER.debug("Setup %s.%s", DOMAIN, compensation)
@@ -113,13 +120,65 @@ async def async_setup(hass, config):
         hass.async_create_task(
             async_load_platform(
                 hass,
-                SENSOR_DOMAIN,
+                DOMAIN_SENSOR,
                 DOMAIN,
                 {CONF_COMPENSATION: compensation},
                 config,
             )
         )
+
+    async def new_service_found(entity_id):
+        """Handle a new service if one is found."""
+
+        already_discovered.update( set( entity[CONF_TRACKED_ENTITY_ID] for entity in hass.data[DATA_COMPENSATION].values() )) 
+        if entity_id in already_discovered:
+            _LOGGER.debug("Already discovered calibrated sensor: %s.", entity_id)
+            return
+
+        already_discovered.add(entity_id)
+        return await hass.config_entries.flow.async_init(
+            DOMAIN,
+            # "source" translates to the config_flow step called.
+            context={"source": "import", 'title_placeholders': { CONF_ENTITY_ID: entity_id} },
+            data={CONF_TRACKED_ENTITY_ID: entity_id},
+        )
+
+    async def scan_devices(now):
+        """Scan for devices."""
+        try:
+            results = await hass.async_add_executor_job(
+                _discover, hass, already_discovered
+            )
+
+            for result in results:
+                hass.async_create_task(new_service_found(result))
+
+        async_track_point_in_utc_time(
+            hass, scan_devices, dt_util.utcnow() + SCAN_INTERVAL
+        )
+
+    @callback
+    def schedule_first(event):
+        """Schedule the first discovery when Home Assistant starts up."""
+        async_track_point_in_utc_time(hass, scan_devices, dt_util.utcnow())
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, schedule_first)
     return True
+
+
+def _discover(hass, already_discovered):
+    """Discover devices."""
+    results = []
+
+    for state in sorted(
+            hass.states.async_all(DOMAIN_SENSOR),
+            key=lambda item: item.entity_id, 
+        ):
+        if state.entity_id in already_discovered:
+            continue
+        if "_raw" in state.entity_id:
+            results.append(state.entity_id)
+    return results
 
 def calculate_poly(conf, datapoints):
     # get x values and y values from the x,y point pairs
@@ -168,8 +227,7 @@ async def async_unload_entry(hass, entry):
     unload_ok = all(
         await asyncio.gather(
             *[
-                hass.config_entries.async_forward_entry_unload(entry, component)
-                for component in PLATFORMS
+                hass.config_entries.async_forward_entry_unload(entry, DOMAIN_SENSOR)
             ]
         )
     )
