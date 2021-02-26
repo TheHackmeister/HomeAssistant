@@ -173,7 +173,7 @@ def _discover(hass, already_discovered):
 
     for state in sorted(
             hass.states.async_all(DOMAIN_SENSOR),
-            key=lambda item: item.entity_id, 
+            key=lambda item: item.entity_id,
         ):
         if state.entity_id in already_discovered:
             continue
@@ -184,7 +184,14 @@ def _discover(hass, already_discovered):
 def calculate_poly(conf, datapoints):
     # get x values and y values from the x,y point pairs
     degree = conf[CONF_DEGREE]
-    y_values, x_values = zip(*datapoints)
+    try:
+        x_values, y_values = zip(*datapoints)
+    except ValueError:
+        _LOGGER.warning(
+            f"Warning: No calibration points set for { conf[CONF_ENTITY_ID] }. Will use trackted entity's state without modification."
+        )
+        x_values = [1,2]
+        y_values = [1,2]
 
     # try to get valid coefficients for a polynomial
     coefficients = None
@@ -197,14 +204,14 @@ def calculate_poly(conf, datapoints):
             except FloatingPointError as error:
                 _LOGGER.error(
                     "Setup of %s encountered an error, %s.",
-                    compensation,
+                    conf[CONF_ENTITY_ID],
                     error,
                 )
             # raise any warnings
             for warning in all_warnings:
                 _LOGGER.warning(
                     "Setup of %s encountered a warning, %s.",
-                    compensation,
+                    conf[CONF_ENTITY_ID],
                     str(warning.message).lower(),
                 )
 

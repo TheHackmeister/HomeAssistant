@@ -58,7 +58,7 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_TRACKED_ENTITY_ID): vol.In(
-                        # Note: I considered filtering this to only contain states that were floats, but realized that would exclude some valid attributes we could track on some states. 
+                        # Note: I considered filtering this to only contain states that were floats, but realized that would exclude some valid attributes we could track on some states.
                         { ent.entity_id: f"{ ent.name } ({ ent.entity_id }) - { ent.state }" for ent in self.hass.states.async_all(DOMAIN_SENSOR) }
                     ),
                 }
@@ -77,21 +77,21 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 # Validate the user provided entity_id.
                 cv.entity_id(user_input[CONF_ENTITY_ID])
-            return self.async_create_entry(
-                title=f"{ self.unique_id }",
-                data={
-                    CONF_ENTITY_ID: self.unique_id,
-                    CONF_TRACKED_ENTITY_ID: self.entity_id_from_user_step,
-                    CONF_NAME: user_input[CONF_NAME],
-                    CONF_ATTRIBUTE: user_input.get(CONF_ATTRIBUTE,None),
-                    CONF_PRECISION: user_input[CONF_PRECISION],
-                    CONF_DEGREE: user_input[CONF_DEGREE],
-                    CONF_UNIT_OF_MEASUREMENT: user_input[CONF_UNIT_OF_MEASUREMENT],
-                },
-            )
+                return self.async_create_entry(
+                    title=f"{ self.unique_id }",
+                    data={
+                        CONF_ENTITY_ID: self.unique_id,
+                        CONF_TRACKED_ENTITY_ID: self.entity_id_from_user_step,
+                        CONF_NAME: user_input[CONF_NAME],
+                        CONF_ATTRIBUTE: user_input.get(CONF_ATTRIBUTE,None),
+                        CONF_PRECISION: user_input[CONF_PRECISION],
+                        CONF_DEGREE: user_input[CONF_DEGREE],
+                        CONF_UNIT_OF_MEASUREMENT: user_input[CONF_UNIT_OF_MEASUREMENT],
+                    },
+                )
             except vol.Invalid as e:
                 errors[CONF_ENTITY_ID] = "entity_id_not_valid"
-        
+
         tracked_entity_id = self.entity_id_from_user_step
         if tracked_entity_id.endswith("_raw"):
             default_entity_id = tracked_entity_id.replace("_raw", "_calibrated")
@@ -120,7 +120,7 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
     async def async_step_import(self, user_input=None):
-        """ Used to import a discovered _raw sensor. 
+        """ Used to import a discovered _raw sensor.
         """
         return await self.async_step_user(user_input)
 
@@ -187,24 +187,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         if user_input and user_input.get(CONF_DATAPOINTS):
             for entity_id in self._calibrating_entities:
                 existing_data = self._config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
-                try: 
-                datapoints = [ 
-                    ( user_input[CONF_DATAPOINTS], 
-                        float(self.hass.states.get(self._config_entries[entity_id].data.get(CONF_TRACKED_ENTITY_ID)).state)
-                    ) 
-                ]
-                datapoints.extend(existing_data)
-                entry = self._config_entries[entity_id]
+                try:
+                    datapoints = [ (
+                        float(self.hass.states.get(self._config_entries[entity_id].data.get(CONF_TRACKED_ENTITY_ID)).state),
+                        user_input[CONF_DATAPOINTS]
+                    ) ]
+                    datapoints.extend(existing_data)
+                    entry = self._config_entries[entity_id]
 
                     self.hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: datapoints})
                 except (ValueError, TypeError, AttributeError) as e:
                     sensor_issues.append(entity_id)
                     self._errors = { "base": "state_not_a_float" }
 
-            # Unset the datapoint. 
+            # Unset the datapoint.
             user_input.pop(CONF_DATAPOINTS)
 
-            if sensor_issues:
+        if sensor_issues:
             sensor_issues = "\n- ".join(sensor_issues)
             sensor_issues = f"\nProblematic Sensors: \n- { sensor_issues }"
         else:
@@ -218,5 +217,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             errors=self._errors,
-            description_placeholders={CONF_ENTITY_ID: "\n- " + "\n- ".join([f"{ entity_id }:\n { self._config_entries[entity_id].options.get(CONF_DATAPOINTS) }\n" for entity_id in self._calibrating_entities]), CONF_TRACKED_ENTITY_ID: sensor_issues}
+            description_placeholders={
+                CONF_ENTITY_ID: "\n- " + "\n- "
+                    .join([f"{ entity_id }:\n { self._config_entries[entity_id].options.get(CONF_DATAPOINTS) }\n" for entity_id in sorted(self._calibrating_entities) ]),
+                CONF_TRACKED_ENTITY_ID: sensor_issues
+            }
         )
