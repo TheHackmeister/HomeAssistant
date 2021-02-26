@@ -1,4 +1,5 @@
 """The Compensation integration."""
+import asyncio
 import logging
 import re
 import warnings
@@ -89,10 +90,10 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
     hass_data = calculate_poly(entry.data, datapoints)
 
     ## Registers update listener to update config entry when options are updated.
-    unsub_options_update_listener = entry.add_update_listener(options_update_listener)
     ## Store a reference to the unsubscribe function to cleanup if an entry is unloaded.
-    hass_data["unsub_options_update_listener"] = unsub_options_update_listener
+    unsub_options_update_listener = entry.add_update_listener(options_update_listener)
     hass.data[DATA_COMPENSATION][entry.unique_id] = hass_data
+    hass.data[DATA_COMPENSATION][entry.unique_id]["unsub_options_update_listener"] = unsub_options_update_listener
 
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setup(entry, "sensor")
@@ -130,7 +131,7 @@ async def async_setup(hass, config):
     async def new_service_found(entity_id):
         """Handle a new service if one is found."""
 
-        already_discovered.update( set( entity[CONF_TRACKED_ENTITY_ID] for entity in hass.data[DATA_COMPENSATION].values() )) 
+        already_discovered.update( set( entity[CONF_TRACKED_ENTITY_ID] for entity in hass.data[DATA_COMPENSATION].values() ))
         if entity_id in already_discovered:
             _LOGGER.debug("Already discovered calibrated sensor: %s.", entity_id)
             return
@@ -152,10 +153,10 @@ async def async_setup(hass, config):
 
             for result in results:
                 hass.async_create_task(new_service_found(result))
-
-        async_track_point_in_utc_time(
-            hass, scan_devices, dt_util.utcnow() + SCAN_INTERVAL
-        )
+        finally:
+            async_track_point_in_utc_time(
+                hass, scan_devices, dt_util.utcnow() + SCAN_INTERVAL
+            )
 
     @callback
     def schedule_first(event):
@@ -219,7 +220,6 @@ async def options_update_listener(
     hass: HomeAssistantType, config_entry: ConfigEntry
 ):
     """Handle options update."""
-    #pass
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 async def async_unload_entry(hass, entry):
@@ -232,9 +232,9 @@ async def async_unload_entry(hass, entry):
         )
     )
 
-    hass.data[DOMAIN][entry.entry_id]["unsub_options_update_listener"]()
+    hass.data[DATA_COMPENSATION][ entry.unique_id ]["unsub_options_update_listener"]()
 
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        hass.data[DATA_COMPENSATION].pop(entry.unique_id)
 
     return unload_ok

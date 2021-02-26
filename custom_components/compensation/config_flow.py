@@ -141,7 +141,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Manage the options."""
-        # Will probably use the init flow to pick a subflow eventually. 
+        # Will probably use the init flow to pick a subflow eventually.
         # But for now, we only have select_sensors, so that's what gets used.
         return await self.async_step_select_sensors()
 
@@ -151,18 +151,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._errors = {}
 
         self._config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in self.hass.config_entries.async_entries(DOMAIN) }
-        
+
         if user_input and user_input.get(CONF_ENTITY_ID):
             if not user_input.get(FLOW_KEEP_DATA_POINTS):
                 for entity in user_input[CONF_ENTITY_ID]:
                     # Clears the data_points option.
                     entry = self._config_entries.get(entity)
                     self.hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: []})
-                    self.hass.async_create_task(
-                        options_update_listener(self.hass, entry)
-                    )
 
-            self._calibrating_entities = user_input[CONF_ENTITY_ID] 
+            self._calibrating_entities = user_input[CONF_ENTITY_ID]
 
             return await self.async_step_add_calibration_datapoints(user_input)
 
@@ -199,10 +196,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 datapoints.extend(existing_data)
                 entry = self._config_entries[entity_id]
 
-                self.hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: datapoints})
-                self.hass.async_create_task(
-                    options_update_listener(self.hass, entry)
-                )
+                    self.hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: datapoints})
                 except (ValueError, TypeError, AttributeError) as e:
                     sensor_issues.append(entity_id)
                     self._errors = { "base": "state_not_a_float" }
