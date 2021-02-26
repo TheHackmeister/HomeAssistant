@@ -92,7 +92,7 @@ class CompensationSensor(Entity):
         if hass.states.get(self._tracked_entity_id):
             self.calc_state(hass.states.get(self._tracked_entity_id))
         else:
-        self._state = STATE_UNKNOWN
+            self._state = STATE_UNKNOWN
 
         @callback
         def async_compensation_sensor_state_listener(event):
@@ -106,45 +106,45 @@ class CompensationSensor(Entity):
         )
 
     def calc_state(self, new_state):
-            if new_state is None:
-                return
+        if new_state is None:
+            return
 
         self._attributes.update(new_state.attributes)
 
-            if self._unit_of_measurement is None and self._attribute is None:
-                self._unit_of_measurement = new_state.attributes.get(
-                    ATTR_UNIT_OF_MEASUREMENT
+        if self._unit_of_measurement is None and self._attribute is None:
+            self._unit_of_measurement = new_state.attributes.get(
+                ATTR_UNIT_OF_MEASUREMENT
+            )
+
+        try:
+            if self._attribute:
+                value = float(new_state.attributes.get(self._attribute))
+            else:
+                value = (
+                    None
+                    if new_state.state == STATE_UNKNOWN
+                    else float(new_state.state)
                 )
+            # Calculate the result
+            self._state = round(self._poly(value), self._precision)
 
-            try:
-                if self._attribute:
-                    value = float(new_state.attributes.get(self._attribute))
-                else:
-                    value = (
-                        None
-                        if new_state.state == STATE_UNKNOWN
-                        else float(new_state.state)
-                    )
-                # Calculate the result
-                self._state = round(self._poly(value), self._precision)
-
-            except (ValueError, TypeError):
-                self._state = STATE_UNKNOWN
-                if self._attribute:
-                    _LOGGER.warning(
-                        "%s attribute %s is not numerical",
-                        self._entity_id,
-                        self._attribute,
-                    )
-                else:
-                    _LOGGER.warning("%s state is not numerical", self._entity_id)
+        except (ValueError, TypeError):
+            self._state = STATE_UNKNOWN
+            if self._attribute:
+                _LOGGER.warning(
+                    "%s attribute %s is not numerical",
+                    self._entity_id,
+                    self._attribute,
+                )
+            else:
+                _LOGGER.warning("%s state is not numerical", self._entity_id)
 
     @property
     def entity_id(self):
         """Return the entity_id of the sensor."""
         return self._entity_id
-    @entity_id.setter 
-    def entity_id(self, ent_id): 
+    @entity_id.setter
+    def entity_id(self, ent_id):
         self._entity_id = ent_id
 
     @property
