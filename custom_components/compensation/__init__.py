@@ -186,6 +186,9 @@ def calculate_poly(conf, datapoints):
     degree = conf[CONF_DEGREE]
     try:
         x_values, y_values = zip(*datapoints)
+        # If all values are 0, there ends up being a divide by 0 error.
+        if len(x_values) == 1 and x_values[0] == 0:
+            raise ValueError
     except ValueError:
         _LOGGER.warning(
             f"Warning: No calibration points set for { conf[CONF_ENTITY_ID] }. Will use trackted entity's state without modification."
