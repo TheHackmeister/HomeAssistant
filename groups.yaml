@@ -1,33 +1,49 @@
 #group:
-  nhl_lights:
-    name: NHL Lights
-    icon: mdi:hockey-sticks
-    entities:
-      #- light.laundry_light
-      - switch.tv_room_side_table_power_relay_4
-      - light.dresser_light
-      - switch.tv_room_light_01_relay
-      - switch.third_reality_inc_3rss007z_on_off
-      #- switch.eb9f3e9dade65a70a3e7vl
-      #- switch.ebf12734e103a03f57j9s0
-  
-  tv_room_single_click:
-    name: TV Room Single Click Lights
-    icon: mdi:lightbulb-group
-    entities:
-      - switch.tv_room_side_table_power_relay_4
-      - switch.tv_room_light_01_relay
+nhl_lights:
+  name: NHL Lights
+  icon: mdi:hockey-sticks
+  entities:
+    - switch.tv_room_side_table_power_relay_4
+    - light.dresser_light
+    - switch.tv_room_light_01_relay
+    - switch.third_reality_inc_3rss007z_on_off
+    - light.tv_room_color_light
+    #- light.laundry_light
+    #- light.tv
+    #- switch.eb9f3e9dade65a70a3e7vl
+    #- switch.ebf12734e103a03f57j9s0
 
-  tv_room_double_click:
-    name: TV Room Double Click Lights
-    icon: mdi:lightbulb-group
-    entities:
-      - switch.third_reality_inc_3rss007z_on_off
+tv_room_single_click:
+  name: TV Room Single Click Lights
+  icon: mdi:lightbulb-group
+  entities:
+    - switch.tv_room_side_table_power_relay_4
+    - switch.tv_room_light_01_relay
+    - light.tv_room_color_light
 
-  tv_room_long_click:
-    name: TV Room Long Click Lights
-    icon: mdi:lightbulb-group
-    #entities:
-    #  - switch.third_reality_inc_3rss007z_on_off
-    #  - switch.tv_room_side_table_power_relay_4
-    #  - switch.tv_room_light_01_relay
+tv_room_double_click:
+  name: TV Room Double Click Lights
+  icon: mdi:lightbulb-group
+  entities:
+    - switch.third_reality_inc_3rss007z_on_off
+
+
+tv_room_long_click:
+  name: TV Room Long Click Lights
+  icon: mdi:lightbulb-group
+  #entities:
+  #  - switch.third_reality_inc_3rss007z_on_off
+  #  - switch.tv_room_side_table_power_relay_4
+  #  - switch.tv_room_light_01_relay
+
+plant_lights:
+  name: Plant Lights
+  icon: mdi:lightbulb
+  entities:
+    - switch.plant_light_02_relay
+    - switch.plant_light_03_relay
+plant_nursery_lights:
+  name: Plant Nursery Lights
+  icon: mdi:lightbulb
+  entities:
+    - switch.plant_light_01_relay

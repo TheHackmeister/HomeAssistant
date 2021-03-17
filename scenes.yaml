@@ -10,3 +10,97 @@
     switch.eb9f3e9dade65a70a3e7vl:
       friendly_name: Smart Socket 3
       state: 'on'
+- id: master_bathroom_lights_off
+  name: Master Bathroom Lights Off
+  entities:
+    light.master_bath_color_light:
+      min_mireds: 142
+      max_mireds: 666
+      off_brightness:
+      friendly_name: Master Bath Color Light
+      supported_features: 59
+      state: 'off'
+    light.master_bathroom_white_light:
+      off_brightness:
+      friendly_name: Master Bathroom White Light
+      supported_features: 41
+      state: 'off'
+- id: '1612755694494'
+  name: Master Bathroom Ligths Day
+  entities:
+    light.master_bath_color_light:
+      min_mireds: 142
+      max_mireds: 666
+      brightness: 254
+      color_temp: 160
+      off_brightness:
+      friendly_name: Master Bath Color Light
+      supported_features: 59
+      state: 'on'
+    light.master_bathroom_white_light:
+      brightness: 254
+      off_brightness:
+      friendly_name: Master Bathroom White Light
+      supported_features: 41
+      state: 'on'
+- id: '1612755811173'
+  name: Master Bath Lights Night
+  entities:
+    light.master_bath_color_light:
+      min_mireds: 142
+      max_mireds: 666
+      brightness: 163
+      hs_color:
+      - 360
+      - 100
+      rgb_color:
+      - 255
+      - 0
+      - 0
+      xy_color:
+      - 0.701
+      - 0.299
+      off_brightness:
+      friendly_name: Master Bath Color Light
+      supported_features: 59
+      state: 'on'
+    light.master_bathroom_white_light:
+      off_brightness:
+      friendly_name: Master Bathroom White Light
+      supported_features: 41
+      state: 'off'
+- id: '1615685988075'
+  name: Front - Delivery
+  entities:
+    light.front_yard_lights:
+      min_mireds: 142
+      max_mireds: 666
+      brightness: 254
+      hs_color:
+      - 360
+      - 100
+      rgb_color:
+      - 255
+      - 0
+      - 0
+      xy_color:
+      - 0.701
+      - 0.299
+      entity_id:
+      - light.front_porch_light
+      friendly_name: Front Yard Lights
+      icon: mdi:lightbulb-group
+      supported_features: 59
+      state: 'on'
+- id: '1615692920881'
+  name: Front - White
+  entities:
+    light.front_porch_light:
+      min_mireds: 142
+      max_mireds: 666
+      brightness: 254
+      color_temp: 381
+      off_brightness:
+      friendly_name: Front Porch Light
+      supported_features: 59
+      state: 'on'

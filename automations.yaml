@@ -1,31 +1,14 @@
-- id: reset_score
-  alias: reset_score
-  initial_state: true
-  trigger:
-    platform: state
-    entity_id: sensor.nhl_hockey
-    from: Scheduled
-    to: Pre-Game
-  action:
-  - service: input_number.set_value
-    entity_id: input_number.home_score
-    data:
-      value: 0
-  - service: input_number.set_value
-    entity_id: input_number.away_score
-    data:
-      value: 0
 - id: avalanche_score
   alias: avalanche_score
   trigger:
   - platform: state
     entity_id: sensor.nhl_sensor
     attribute: away_score
-    for: 00:00:10
+    for: 00:00:15
   - platform: state
     entity_id: sensor.nhl_sensor
     attribute: home_score
-    for: 00:00:10
+    for: 00:00:15
   condition:
   - condition: or
     conditions:
@@ -93,7 +76,7 @@
           my_custom_data: foo_bar
   mode: single
 - id: set_theme
-  alias: Set Theme
+  alias: Set Home Assistant Theme on Start
   trigger:
   - platform: homeassistant
     event: start
@@ -101,6 +84,7 @@
   - service: frontend.set_theme
     data:
       name: ios-dark-mode
+  mode: single
 - alias: Perform Auto Backup
   trigger:
     platform: time_pattern
@@ -151,122 +135,6 @@
       name: 'WeeklyBackup: {{ now().strftime(''%A, %B %-d, %Y'') }}'
       keep_days: 28
   id: 3ec6cfbb570941639d833212ddbb903e
-- id: '1611516702755'
-  alias: A Test Scoring - template sensors, ***_state.state
-  description: ''
-  trigger:
-  - platform: state
-    entity_id: sensor.home_team
-  - platform: state
-    entity_id: sensor.away_team
-  condition: []
-  action:
-  - type: turn_on
-    device_id: 4f29bfe1a93405f65442a6252557247a
-    entity_id: switch.eb9f3e9dade65a70a3e7vl
-    domain: switch
-  - service: system_log.write
-    data:
-      message: 'The state changed (template sensors)({{ as_timestamp(now()) }}): from
-        state: {{ trigger.from_state.state }} to state: {{ trigger.to_state.state
-        }} nhl_sensor: {{ states("sensor.nhl_sensor") }} nhl_sensor attr: {{ state_attr("sensor.nhl_sensor",
-        "goal_event_id") }} nhl_sensor attr: {{ state_attr("sensor.nhl_sensor", "goal_tracked_team")
-        }}'
-      level: warning
-  mode: parallel
-  max: 100
-- id: template_sensors
-  alias: A Test Scoring - nhl_sensor attributes, ***_state
-  description: ''
-  trigger:
-  - platform: state
-    entity_id: sensor.nhl_sensor
-    attribute: away_score
-  - platform: state
-    entity_id: sensor.nhl_sensor
-    attribute: home_score
-  condition: []
-  action:
-  - type: turn_on
-    device_id: 4f29bfe1a93405f65442a6252557247a
-    entity_id: switch.eb9f3e9dade65a70a3e7vl
-    domain: switch
-  - service: system_log.write
-    data:
-      message: 'The state changed (nhl_sensor attributes)({{ as_timestamp(now()) }}):
-        from: {{ trigger.from_state }} to: {{ trigger.to_state }} goal_tracked: {{
-        trigger.to_state.attributes.goal_tracked_team }} goal_tracked state_attr:
-        {{ state_attr("trigger.to_state", "goal_tracked_team") }}'
-      level: warning
-  mode: parallel
-  max: 100
-- id: nhl_sensor
-  alias: A Test Scoring - nhl_sensor
-  description: ''
-  trigger:
-  - platform: state
-    entity_id: sensor.nhl_sensor
-  condition:
-  - condition: or
-    conditions:
-    - condition: template
-      value_template: '{{ trigger.from_state.attributes.away_score < trigger.to_state.attributes.away_score
-        }}'
-    - condition: template
-      value_template: '{{ trigger.from_state.attributes.home_score < trigger.to_state.attributes.home_score
-        }}'
-  action:
-  - type: turn_on
-    device_id: 4f29bfe1a93405f65442a6252557247a
-    entity_id: switch.eb9f3e9dade65a70a3e7vl
-    domain: switch
-  - service: system_log.write
-    data:
-      message: 'The nhl_sensor state changed ({{ as_timestamp(now()) }}): trigger:
-        {{ trigger }} goal_tracked: {{ trigger.to_state.attributes.goal_tracked_team
-        }}'
-      level: warning
-  mode: parallel
-  max: 100
-- id: nhl_goal
-  alias: A Test Scoring - nhl_goal
-  description: ''
-  trigger:
-  - platform: state
-    entity_id: sensor.nhl_sensor
-  condition:
-  - condition: or
-    conditions:
-    - condition: template
-      value_template: '{{ trigger.from_state.attributes.away_score < trigger.to_state.attributes.away_score
-        }}'
-    - condition: template
-      value_template: '{{ trigger.from_state.attributes.home_score < trigger.to_state.attributes.home_score
-        }}'
-  action:
-  - type: turn_on
-    device_id: 4f29bfe1a93405f65442a6252557247a
-    entity_id: switch.eb9f3e9dade65a70a3e7vl
-    domain: switch
-  - service: system_log.write
-    data:
-      message: 'The nhl_goal state changed({{ as_timestamp(now()) }}): trigger: {{
-        trigger }} goal_tracked: {{ trigger.to_state.attributes.goal_tracked_team
-        }}'
-      level: warning
-  mode: parallel
-  max: 100
-- id: '1612139237148'
-  alias: New Automation
-  description: ''
-  trigger: []
-  condition: []
-  action:
-  - service: system_log.write
-    data:
-      message: 'Entity ID: {{ trigger.event.data.entity_id }}'
-      level: warning
-  mode: single
 - id: '1612306599523'
   alias: 'TV Room Button: Single Click'
   description: ''
@@ -279,36 +147,282 @@
     event_type: esphome.button_click
     event_data:
       entity: tv_room_side_table
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_ieee: 5c:02:72:ff:fe:c3:cc:55
   condition: []
   action:
   - choose:
     - conditions:
-      - condition: template
-        value_template: '{{ trigger.event.data.command  == "toggle" }}'
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "toggle" }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 4 }}'
       sequence:
-      - service: system_log.write
-        data:
-          level: warning
-          message: MADE IT
       - service: homeassistant.toggle
         entity_id: group.tv_room_single_click
     - conditions:
-      - condition: template
-        value_template: '{{ trigger.event.data.command  == "on" }}'
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "on" }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 3 }}'
       sequence:
       - service: homeassistant.toggle
         data: {}
         entity_id: group.tv_room_double_click
     - conditions:
-      - condition: template
-        value_template: '{{ trigger.event.data.command  == "off" }}'
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "off" }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 1 }}'
       sequence:
       - service: homeassistant.turn_off
         data: {}
-        entity_id: group.tv_room_double_click,group.tv_room_single_click
+        target:
+          entity_id:
+          - group.tv_room_single_click
+          - group.tv_room_double_click
+          - light.pantry_light
+    default: []
+  mode: single
+- id: Master Bathroom Buttons
+  alias: Master Bathroom Button
+  description: ''
+  trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_ieee: 58:8e:81:ff:fe:1c:e8:55
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_ieee: 5c:02:72:ff:fe:a1:38:3e
+  condition: []
+  action:
+  - choose:
+    - conditions:
+      - condition: device
+        type: is_on
+        device_id: 50ebe23b85300387830b55cc3e744197
+        entity_id: light.master_bath_color_light
+        domain: light
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "off" }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 3 }}'
+      sequence:
+      - service: scene.turn_on
+        entity_id: scene.master_bathroom_lights_off
+    - conditions:
+      - condition: time
+        after: '23:30'
+        before: '7:00'
+      - condition: device
+        type: is_off
+        device_id: 50ebe23b85300387830b55cc3e744197
+        entity_id: light.master_bath_color_light
+        domain: light
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "off" }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 3 }}'
+      sequence:
+      - service: scene.turn_on
+        entity_id: scene.master_bath_lights_night
+    - conditions:
+      - condition: device
+        type: is_off
+        device_id: 50ebe23b85300387830b55cc3e744197
+        entity_id: light.master_bath_color_light
+        domain: light
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 3 }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "off" }}'
+      sequence:
+      - service: scene.turn_on
+        entity_id: scene.master_bathroom_ligths_day
+    - conditions:
+      - condition: device
+        type: is_off
+        device_id: 50ebe23b85300387830b55cc3e744197
+        entity_id: light.master_bath_color_light
+        domain: light
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "on" }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 2 }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 1 }}'
+      sequence:
+      - service: scene.turn_on
+        data: {}
+        entity_id: scene.master_bathroom_ligths_day
+    - conditions:
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ trigger.event.data.command  == "on" }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 2 }}'
+        - condition: template
+          value_template: '{{ trigger.event.data.endpoint_id  == 1 }}'
+      sequence:
+      - service: scene.turn_on
+        data: {}
+        entity_id: scene.master_bathroom_lights_off
     default: []
   - service: system_log.write
     data:
       level: warning
       message: Trigger:{{ trigger.event.data.command }}
   mode: single
+- id: '1612757569353'
+  alias: Master Bathroom Door Lights
+  description: ''
+  trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_ieee: 00:15:8d:00:03:ce:be:13
+  condition: []
+  action:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.event.data.args.value == false }}'
+      - condition: time
+        after: '23:30'
+        before: '7:00'
+      sequence:
+      - service: scene.turn_on
+        entity_id: scene.master_bath_lights_night
+        data: {}
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.event.data.args.value == false }}'
+      sequence:
+      - service: scene.turn_on
+        entity_id: scene.master_bathroom_ligths_day
+        data: {}
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.event.data.args.value == true}}'
+      sequence:
+      - service: scene.turn_on
+        entity_id: scene.master_bathroom_lights_off
+  mode: single
+- id: '1615524460190'
+  alias: Office 4-Button Switch
+  description: ''
+  use_blueprint:
+    path: homeassistant/tuya_4_switch.yaml
+    input:
+      tuya_4button_scene_switch: 39a9f4653dea97b165d696e02dec86e4
+      button_one_short_press:
+      - service: homeassistant.toggle
+        target:
+          entity_id:
+          - group.plant_lights
+          - group.plant_nursery_lights
+      button_one_double_press:
+      - service: homeassistant.turn_on
+        target:
+          entity_id:
+          - group.plant_lights
+          - group.plant_nursery_lights
+      button_three_short_press:
+      - service: light.toggle
+        data: {}
+        target:
+          entity_id: light.office_lights
+      button_four_short_press:
+      - service: light.toggle
+        data: {}
+        target:
+          entity_id: light.front_yard_lights
+      button_three_double_press:
+      - service: light.turn_on
+        data: {}
+        target:
+          entity_id: light.office_lights
+      button_three_long_press:
+      - service: light.turn_off
+        target:
+          entity_id: light.office_lights
+      button_four_double_press:
+      - service: light.turn_on
+        data: {}
+        target:
+          entity_id: light.front_yard_lights
+      button_four_long_press:
+      - service: light.turn_off
+        target:
+          entity_id: light.front_yard_lights
+      button_one_long_press:
+      - service: homeassistant.turn_off
+        target:
+          entity_id:
+          - group.plant_lights
+          - group.plant_nursery_lights
+- id: '1615525388857'
+  alias: Turn on office lights at dusk
+  description: ''
+  trigger:
+  - platform: sun
+    event: sunset
+  condition: []
+  action:
+  - service: light.turn_on
+    data: {}
+    target:
+      entity_id: light.office_lights
+  mode: single
+- id: '1615685946863'
+  alias: Delivery Complete - Turn Porch Light White
+  description: ''
+  trigger:
+  - platform: state
+    entity_id: sensor.noco_nosh
+    to: no_deliveries
+  condition: []
+  action:
+  - scene: scene.front_white
+  mode: single
+- id: '1615690939113'
+  alias: TV Room 4 Buttons
+  description: Only for bottom right button. Others are covered with TV Single Click
+    (or whatever)
+  use_blueprint:
+    path: homeassistant/tuya_4_switch.yaml
+    input:
+      tuya_4button_scene_switch: 57acf2649f5d0d55d239f33b8f5a4874
+      button_two_short_press:
+      - service: light.toggle
+        data: {}
+        target:
+          entity_id: light.pantry_light
+      button_two_double_press:
+      - service: light.turn_on
+        data: {}
+        target:
+          entity_id: light.pantry_light
+      button_two_long_press:
+      - service: light.turn_off
+        target:
+          entity_id: light.pantry_light

@@ -20,14 +20,6 @@ notify:
 
 light:
   - platform: switch
-    name: Laundry Light
-    entity_id: switch.ebf12734e103a03f57j9s0
-
-  - platform: switch
-    name: Dresser Light
-    entity_id: switch.eb9f3e9dade65a70a3e7vl
-
-  - platform: switch
     name: Cube Shelf Light
     entity_id: switch.plant_light_01_relay
 
@@ -54,6 +46,10 @@ frontend:
 #     title: "Audio"
 #     url: "https://audio.spencerslab.com/iris/"
 
+magic_areas:
+homeassistant:
+  packages: !include_dir_named packages
+
 logger:
   logs:
     homeassistant.components.http.ban: warning
@@ -76,6 +72,18 @@ sensor:
     jails:
       - ssh
       - hass-iptables
+  - platform: imap_email_content
+    server: mail.spencerslab.com
+    name: noco_nosh
+    port: 993
+    username: !secret imap_username
+    password: !secret imap_password
+    value_template: >-
+      {% if 'Driver at restaurant' in subject %}
+        delivery_coming
+      {% elif 'Order delivered' in subject %}
+        no_deliveries
+      {% endif %}
 
 media_player:
   - platform: snapcast
@@ -119,26 +127,33 @@ variable:
     #restore: true
   #current_power_usage:
   #  force_update: true
-var: 
+var:
   calibration_values:
     friendly_name: 'Calibration Values'
   calibration_entities:
     friendly_name: 'Calibration Entities'
-    initial_value: 
+    initial_value:
 zwave:
   usb_path: /dev/ttyUSB0
   #network_key: ""
 zha:
-  usb_path: /dev/ttyUSB1
   database_path: /config/zigbee.db
 
+compensation:
+
+binary_sensor:
+  - platform: ping
+    host: 1.1.1.1
+    name: "Internet Connection"
+    count: 2
+    scan_interval: 60
 
 input_number:
   calibration_input:
     min: 0
     max: 500
     mode: box
-  
+
   # Will set attribute to calibration readings.
   calibration_readings:
     min: 0
@@ -154,4 +169,13 @@ input_number:
 #   home_score:
 #     min: 0
 #     max: 100
+
+influxdb:
+  username: !secret influxdb_username
+  password: !secret influxdb_password
+  # How to use the friendly_name tag in Grafana
+  # https://community.home-assistant.io/t/grafana-influxdb-using-friendly-names/41145/5#post_5
+  tags_attributes:
+    - friendly_name
+    - hidden
 
