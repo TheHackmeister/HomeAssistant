@@ -1,5 +1,7 @@
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
+#debugpy:
+  #wait: true
 
 # Text to speech
 tts:
@@ -172,18 +174,16 @@ input_number:
     min: 0
     max: 500
 
-
-
-
   manual_raw:
     min: 0
     max: 500
-  
+
 #   home_score:
 #     min: 0
 #     max: 100
 
 influxdb:
+  default_measurement: state
   username: !secret influxdb_username
   password: !secret influxdb_password
   # How to use the friendly_name tag in Grafana
