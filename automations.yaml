@@ -385,7 +385,18 @@
     target:
       entity_id: light.office_lights
   mode: single
-- id: '1615685946863'
+- id: 'delivery_coming'
+  alias: Delivery Complete - Turn Porch Light Red
+  description: ''
+  trigger:
+  - platform: state
+    entity_id: sensor.noco_nosh
+    to: delivery_coming
+  condition: []
+  action:
+  - scene: scene.front_delivery
+  mode: single
+- id: 'delivery_complete'
   alias: Delivery Complete - Turn Porch Light White
   description: ''
   trigger:

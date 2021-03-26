@@ -78,10 +78,23 @@ sensor:
     port: 993
     username: !secret imap_username
     password: !secret imap_password
+    senders:
+      - noreply@www.noconosh.com
     value_template: >-
-      {% if 'Driver at restaurant' in subject %}
+      {% if (
+        'Driver at restaurant' in subject or
+        'Your Costco order is confirmed for' in subject or
+        'Your Sprouts Farmers Market order is confirmed for' in subject or
+        'Your King Soopers order is confirmed' in subject or
+        'is being prepared' in subject
+      ) %}
         delivery_coming
-      {% elif 'Order delivered' in subject %}
+      {% elif (
+        'Your Costco order receipt' in subject or
+        'Your Sprouts Farmers Market order receipt' in subject or
+        'Your Instacart order receipt' in subject or
+        'Order delivered' in subject
+      ) %}
         no_deliveries
       {% endif %}
 
