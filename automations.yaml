@@ -1,30 +1,22 @@
 - id: avalanche_score
   alias: avalanche_score
   trigger:
-  - platform: state
-    entity_id: sensor.nhl_sensor
-    attribute: away_score
-    for: 00:00:15
-  - platform: state
-    entity_id: sensor.nhl_sensor
-    attribute: home_score
-    for: 00:00:15
-  condition:
-  - condition: or
-    conditions:
-    - condition: template
-      value_template: '{{ trigger.from_state.attributes.away_score < trigger.to_state.attributes.away_score
-        }}'
-    - condition: template
-      value_template: '{{ trigger.from_state.attributes.home_score < trigger.to_state.attributes.home_score  }}'
+  - platform: event
+    event_type: nhl_goal
+    event_data:
+      goal_tracked_team: true
+  condition: []
   action:
   - service: system_log.write
     data_template:
       message: 'Aves Score Automation Trigger({{ as_timestamp(now()) }}): {{ trigger
         }} '
       level: warning
-  - condition: template
-    value_template: '{{ state_attr("sensor.nhl_sensor", "goal_tracked_team") }}'
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 10
+      milliseconds: 0
   - service: homeassistant.toggle
     data: {}
     entity_id: group.nhl_lights
