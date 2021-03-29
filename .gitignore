@@ -1,16 +1,39 @@
 # Example .gitignore file for your config dir.
 # An * ensures that everything will be ignored.
-*
 # You can whitelist files/folders with !, these will not be ignored.
 !*.yaml
 !.gitignore
 !*.md
 !custom_components/compensation/*
+!custom_components/magic_area/*
+!custom_components/nhl_api/*
+
+custom_components/*
+www/community/*
 
 # Ignore folders.
+# There are a couple of files in .storage that aren't ignored. Mainly stuff for Lovelace.
 .storage
 .cloud
 .google.token
+# We might want some images?
+image/
+
+#
+.HA_VERSION
+aircast.xml
+options.xml
+OZW_Log.txt
+pyozw.sqlite
+traccar.xml
+zwcfg_*.xml
+zwscene.xml
+
+# Don't need generated tts files.
+tts/*
+
+# Don't need ESPHame's compiled files.
+esphome/build/*
 
 # Ensure these YAML files are ignored, otherwise your secret data/credentials will leak.
 ip_bans.yaml
