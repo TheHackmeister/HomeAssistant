@@ -1,0 +1,44 @@
+{
+    "version": 1,
+    "key": "core.area_registry",
+    "data": {
+        "areas": [
+            {
+                "name": "Living Room",
+                "id": "living_room"
+            },
+            {
+                "name": "Kitchen",
+                "id": "kitchen"
+            },
+            {
+                "name": "Office",
+                "id": "office"
+            },
+            {
+                "name": "Garage",
+                "id": "garage"
+            },
+            {
+                "name": "Backyard",
+                "id": "backyard"
+            },
+            {
+                "name": "Front Yard",
+                "id": "front_yard"
+            },
+            {
+                "name": "Boy's Bathroom",
+                "id": "boy_s_bathroom"
+            },
+            {
+                "name": "Master Bathroom",
+                "id": "master_bathroom"
+            },
+            {
+                "name": "Master Bedroom",
+                "id": "master_bedroom"
+            }
+        ]
+    }
+}

@@ -1,0 +1,156 @@
+{
+    "version": 1,
+    "key": "scheduler.storage",
+    "data": {
+        "schedules": [
+            {
+                "schedule_id": "7074a2",
+                "timeslots": [
+                    {
+                        "start": "06:00:00",
+                        "stop": "13:00:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "switch.turn_on",
+                                "entity_id": "group.plant_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    },
+                    {
+                        "start": "13:00:00",
+                        "stop": "13:10:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "switch.turn_off",
+                                "entity_id": "group.plant_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    }
+                ],
+                "weekdays": [
+                    "daily"
+                ],
+                "repeat_type": "repeat",
+                "name": "",
+                "enabled": true
+            },
+            {
+                "schedule_id": "9b2546",
+                "timeslots": [
+                    {
+                        "start": "06:00:00",
+                        "stop": "11:00:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "switch.turn_on",
+                                "entity_id": "group.plant_nursery_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    },
+                    {
+                        "start": "11:00:00",
+                        "stop": "11:20:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "switch.turn_off",
+                                "entity_id": "group.plant_nursery_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    }
+                ],
+                "weekdays": [
+                    "daily"
+                ],
+                "repeat_type": "repeat",
+                "name": "",
+                "enabled": true
+            },
+            {
+                "schedule_id": "483634",
+                "timeslots": [
+                    {
+                        "start": "17:30:00",
+                        "stop": "22:00:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "light.turn_on",
+                                "entity_id": "light.front_yard_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    },
+                    {
+                        "start": "22:00:00",
+                        "stop": "00:00:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "light.turn_off",
+                                "entity_id": "light.front_yard_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    }
+                ],
+                "weekdays": [
+                    "daily"
+                ],
+                "repeat_type": "repeat",
+                "name": "",
+                "enabled": true
+            },
+            {
+                "schedule_id": "6ea34b",
+                "timeslots": [
+                    {
+                        "start": "17:00:00",
+                        "stop": "22:30:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "light.turn_on",
+                                "entity_id": "light.office_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    },
+                    {
+                        "start": "22:30:00",
+                        "stop": "00:00:00",
+                        "conditions": [],
+                        "condition_type": null,
+                        "actions": [
+                            {
+                                "service": "light.turn_off",
+                                "entity_id": "light.office_lights",
+                                "service_data": {}
+                            }
+                        ]
+                    }
+                ],
+                "weekdays": [
+                    "daily"
+                ],
+                "repeat_type": "repeat",
+                "name": null,
+                "enabled": true
+            }
+        ]
+    }
+}

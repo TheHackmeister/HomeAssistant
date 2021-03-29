@@ -1,0 +1,88 @@
+{
+    "version": 1,
+    "key": "lovelace_resources",
+    "data": {
+        "items": [
+            {
+                "url": "hacsfiles/lovelace-card-tools/card-tools.js",
+                "type": "module",
+                "id": "3dad27db8da94fb59f8313d28147cf48"
+            },
+            {
+                "url": "/hacsfiles/scheduler-card/scheduler-card.js",
+                "type": "module",
+                "id": "15836a4a20c74d5d95ecdfac45f62325"
+            },
+            {
+                "url": "hacsfiles/search-card/search-card.js",
+                "type": "module",
+                "id": "1c7730ef45a84fc3ade249d91b2563e3"
+            },
+            {
+                "url": "/hacsfiles/lovelace-animated-background/animated-background.js",
+                "type": "module",
+                "id": "1c65c268cf7b4de5a02df428fe5183c2"
+            },
+            {
+                "url": "/hacsfiles/lovelace-auto-entities/auto-entities.js",
+                "type": "module",
+                "id": "99b5ab29ce08479e8e6faa37293fa205"
+            },
+            {
+                "url": "/hacsfiles/mini-media-player/mini-media-player-bundle.js",
+                "type": "module",
+                "id": "c667e3b10d0b411c83756950becccde4"
+            },
+            {
+                "url": "/hacsfiles/button-card/button-card.js",
+                "type": "module",
+                "id": "ed9c47ae7a604170bc963d1c88a2ca11"
+            },
+            {
+                "url": "/hacsfiles/flex-table-card/flex-table-card.js",
+                "type": "module",
+                "id": "3a9ea86280844a688bea518f4d83cddd"
+            },
+            {
+                "url": "/hacsfiles/lovelace-card-templater/lovelace-card-templater.js",
+                "type": "module",
+                "id": "fd0c81dba07b4c749596628bf963b7c2"
+            },
+            {
+                "url": "/hacsfiles/lovelace-canary/canary.js",
+                "type": "module",
+                "id": "9051e40236544acd93f99de37bd0c168"
+            },
+            {
+                "url": "/hacsfiles/select-list-card/select-list-card.js",
+                "type": "module",
+                "id": "b9803d01fad44aa3a7c591dda30c29aa"
+            },
+            {
+                "url": "/hacsfiles/mini-graph-card/mini-graph-card-bundle.js",
+                "type": "module",
+                "id": "a5daad820efc473f861677026bcb5814"
+            },
+            {
+                "url": "/hacsfiles/battery-state-card/battery-state-card.js",
+                "type": "module",
+                "id": "5c9e633bb14b46a997e5898bf439b063"
+            },
+            {
+                "url": "/hacsfiles/garbage-collection-card/garbage-collection-card.js",
+                "type": "module",
+                "id": "2b58bc9ef24247c5a44c7c01de220b15"
+            },
+            {
+                "url": "/hacsfiles/lovelace-fold-entity-row/fold-entity-row.js",
+                "type": "module",
+                "id": "7004770722474dd5b2f1146b11c5ed71"
+            },
+            {
+                "url": "/hacsfiles/lovelace-hui-element/hui-element.js",
+                "type": "module",
+                "id": "be88d5e407d9464f848591ebb701c18e"
+            }
+        ]
+    }
+}

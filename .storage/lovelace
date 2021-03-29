@@ -1,0 +1,825 @@
+{
+    "version": 1,
+    "key": "lovelace",
+    "data": {
+        "config": {
+            "animated_background": {
+                "default_url": "https://cdn.flixel.com/flixel/ypy8bw9fgw1zv2b4htp2.hd.mp4",
+                "included_users": [
+                    "Villhellm",
+                    "spencer",
+                    "Spencer"
+                ],
+                "entity": "weather.kfnl_hourly",
+                "state_url": {
+                    "sunny": [
+                        "https://cdn.flixel.com/flixel/hlhff0h8md4ev0kju5be.hd.mp4",
+                        "https://cdn.flixel.com/flixel/zjqsoc6ecqhntpl5vacs.hd.mp4",
+                        "https://cdn.flixel.com/flixel/jvw1avupguhfbo11betq.hd.mp4",
+                        "https://cdn.flixel.com/flixel/8cmeusxf3pkanai43djs.hd.mp4",
+                        "https://cdn.flixel.com/flixel/guwb10mfddctfvwioaex.hd.mp4"
+                    ],
+                    "partlycloudy": [
+                        "https://cdn.flixel.com/flixel/13e0s6coh6ayapvdyqnv.hd.mp4",
+                        "https://cdn.flixel.com/flixel/aorl3skmssy7udwopk22.hd.mp4",
+                        "https://cdn.flixel.com/flixel/qed6wvf2igukiioykg3r.hd.mp4",
+                        "https://cdn.flixel.com/flixel/3rd72eezaj6d23ahlo7y.hd.mp4",
+                        "https://cdn.flixel.com/flixel/9m11gd43m6qn3y93ntzp.hd.mp4",
+                        "https://cdn.flixel.com/flixel/hrkw2m8eofib9sk7t1v2.hd.mp4"
+                    ],
+                    "cloudy": [
+                        "https://cdn.flixel.com/flixel/13e0s6coh6ayapvdyqnv.hd.mp4",
+                        "https://cdn.flixel.com/flixel/aorl3skmssy7udwopk22.hd.mp4",
+                        "https://cdn.flixel.com/flixel/qed6wvf2igukiioykg3r.hd.mp4",
+                        "https://cdn.flixel.com/flixel/3rd72eezaj6d23ahlo7y.hd.mp4",
+                        "https://cdn.flixel.com/flixel/9m11gd43m6qn3y93ntzp.hd.mp4",
+                        "https://cdn.flixel.com/flixel/hrkw2m8eofib9sk7t1v2.hd.mp4"
+                    ],
+                    "mostlycloudy": [
+                        "https://cdn.flixel.com/flixel/e95h5cqyvhnrk4ytqt4q.hd.mp4",
+                        "https://cdn.flixel.com/flixel/l2bjw34wnusyf5q2qq3p.hd.mp4",
+                        "https://cdn.flixel.com/flixel/rrgta099ulami3zb9fd2.hd.mp4"
+                    ],
+                    "clear-night": [
+                        "https://cdn.flixel.com/flixel/x9dr8caygivq5secll7i.hd.mp4",
+                        "https://cdn.flixel.com/flixel/v26zyfd6yf0r33s46vpe.hd.mp4",
+                        "https://cdn.flixel.com/flixel/ypy8bw9fgw1zv2b4htp2.hd.mp4",
+                        "https://cdn.flixel.com/flixel/rosz2gi676xhkiw1ut6i.hd.mp4"
+                    ],
+                    "fog": [
+                        "https://cdn.flixel.com/flixel/vwqzlk4turo2449be9uf.hd.mp4",
+                        "https://cdn.flixel.com/flixel/5363uhabodwwrzgnq6vx.hd.mp4"
+                    ],
+                    "rainy": "https://cdn.flixel.com/flixel/f0w23bd0enxur5ff0bxz.hd.mp4"
+                }
+            },
+            "views": [
+                {
+                    "title": "Overview",
+                    "icon": "mdi:home",
+                    "badges": [
+                        {
+                            "entity": "person.spencer"
+                        },
+                        {
+                            "type": "entity-filter",
+                            "entities": [
+                                "binary_sensor.updater",
+                                "binary_sensor.launch_within_24_hours"
+                            ],
+                            "state_filter": [
+                                "on"
+                            ]
+                        },
+                        {
+                            "type": "entity-filter",
+                            "entities": [
+                                "sensor.home_team",
+                                "sensor.away_team",
+                                "sensor.nhl_sensor"
+                            ],
+                            "state_filter": [
+                                {
+                                    "operator": "==",
+                                    "value": "Anaheim Ducks",
+                                    "attribute": "friendly_name"
+                                },
+                                {
+                                    "operator": "==",
+                                    "value": "January 18, 2021",
+                                    "attribute": "next_game_date"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "entity-filter",
+                            "entities": [
+                                "sensor.fail2ban_ssh",
+                                "sensor.fail2ban_hass_iptables"
+                            ],
+                            "state_filter": [
+                                {
+                                    "operator": "!=",
+                                    "value": "None"
+                                }
+                            ]
+                        }
+                    ],
+                    "cards": [
+                        {
+                            "type": "vertical-stack",
+                            "cards": [
+                                {
+                                    "type": "entities",
+                                    "show_header_toggle": false,
+                                    "entities": [
+                                        {
+                                            "entity": "sensor.nhl_sensor"
+                                        },
+                                        {
+                                            "entity": "sensor.home_team"
+                                        },
+                                        {
+                                            "entity": "sensor.away_team"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "custom:auto-entities",
+                                    "card": {
+                                        "type": "entities",
+                                        "title": "Lights"
+                                    },
+                                    "filter": {
+                                        "include": [
+                                            {
+                                                "name": "/[Ll]ight/",
+                                                "domain": "switch"
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "custom:mini-media-player",
+                                    "entity": "media_player.dining_room_audio",
+                                    "group": false,
+                                    "artwork": "cover"
+                                },
+                                {
+                                    "type": "custom:mini-media-player",
+                                    "entity": "media_player.whole_house_audio"
+                                },
+                                {
+                                    "type": "custom:mini-media-player",
+                                    "entity": "media_player.home_tts"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "vertical-stack",
+                            "cards": [
+                                {
+                                    "type": "weather-forecast",
+                                    "entity": "weather.kfnl_daynight"
+                                },
+                                {
+                                    "type": "weather-forecast",
+                                    "entity": "weather.kfnl_hourly",
+                                    "secondary_info_attribute": "humidity"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "vertical-stack",
+                            "cards": [
+                                {
+                                    "type": "entities",
+                                    "entities": [
+                                        {
+                                            "entity": "sensor.next_launch_mission"
+                                        },
+                                        {
+                                            "entity": "sensor.latest_launch_rocket"
+                                        },
+                                        {
+                                            "entity": "sensor.next_launch_countdown"
+                                        }
+                                    ],
+                                    "title": "Space X Launch"
+                                },
+                                {
+                                    "type": "glance",
+                                    "entities": [
+                                        {
+                                            "entity": "sensor.us_coronavirus_confirmed"
+                                        },
+                                        {
+                                            "entity": "sensor.us_coronavirus_deaths"
+                                        }
+                                    ],
+                                    "title": "COVID 19"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "TV Room Lights"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "TV Room*Light*",
+                                        "domain": "group"
+                                    },
+                                    {
+                                        "name": "TV Room*Light*",
+                                        "domain": "switch"
+                                    },
+                                    {
+                                        "groups": "*tv_room*click*"
+                                    },
+                                    {
+                                        "name": "Flipper*"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "entity",
+                            "entity": "sensor.compensation"
+                        },
+                        {
+                            "type": "entities",
+                            "entities": [
+                                {
+                                    "entity": "light.front_porch_light_level_light_color_on_off"
+                                },
+                                {
+                                    "entity": "light.boys_bathroom_light_level_light_color_on_off"
+                                }
+                            ],
+                            "title": "Colored Lights"
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Missing Entities"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "state": "= Unavailable"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "title": "Light Schedule",
+                    "path": "light-schedule",
+                    "badges": [],
+                    "icon": "mdi:floor-lamp-variant",
+                    "cards": [
+                        {
+                            "type": "custom:scheduler-card",
+                            "include": [
+                                "group",
+                                "light",
+                                "switch"
+                            ],
+                            "title": "Scheduler"
+                        }
+                    ]
+                },
+                {
+                    "title": "Network",
+                    "path": "network",
+                    "badges": [],
+                    "cards": []
+                },
+                {
+                    "title": "Calibration",
+                    "path": "calibration",
+                    "icon": "",
+                    "badges": [],
+                    "cards": [
+                        {
+                            "type": "entities",
+                            "entities": [
+                                {
+                                    "entity": "sensor.power_monitor_for_tea_kettle_wattage"
+                                },
+                                {
+                                    "entity": "sensor.power_monitor_for_tea_kettle_wattage_calibrated"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "custom:search-card",
+                            "max_results": 10
+                        },
+                        {
+                            "type": "vertical-stack",
+                            "cards": [
+                                {
+                                    "type": "custom:auto-entities",
+                                    "card": {
+                                        "type": "entities",
+                                        "title": "Raw Entities"
+                                    },
+                                    "filter": {
+                                        "include": [
+                                            {
+                                                "name": "/raw/"
+                                            },
+                                            {
+                                                "entity_id": "/raw/",
+                                                "options": {
+                                                    "tap_action": {
+                                                        "action": "call-service",
+                                                        "service": "pyscript.add_calibration_entity",
+                                                        "service_data": {
+                                                            "entity": "this.entity_id"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "horizontal-stack",
+                                    "cards": [
+                                        {
+                                            "type": "button",
+                                            "tap_action": {
+                                                "action": "call-service",
+                                                "service": "pyscript.add_calibration_reading"
+                                            },
+                                            "name": "Add Calibration Point",
+                                            "icon": "hass:lightbulb"
+                                        },
+                                        {
+                                            "type": "button",
+                                            "tap_action": {
+                                                "action": "call-service",
+                                                "service": "script.run_calibration"
+                                            },
+                                            "name": "Start Calibration",
+                                            "icon": "hass:lightbulb"
+                                        },
+                                        {
+                                            "type": "button",
+                                            "tap_action": {
+                                                "action": "call-service",
+                                                "service": "script.stop_calibration"
+                                            },
+                                            "name": "Stop Calibration",
+                                            "icon": "hass:lightbulb"
+                                        },
+                                        {
+                                            "type": "button",
+                                            "tap_action": {
+                                                "action": "call-service",
+                                                "service": "script.clear_calibration_list"
+                                            },
+                                            "name": "Clear Calibration Entities",
+                                            "icon": "hass:lightbulb"
+                                        },
+                                        {
+                                            "type": "button",
+                                            "tap_action": {
+                                                "action": "call-service",
+                                                "service": "pyscript.calibration_calc"
+                                            },
+                                            "name": "Calc Calibration",
+                                            "icon": "hass:lightbulb"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "entity",
+                                    "entity": "var.calibration_entities",
+                                    "name": "Calibration Entities"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "entity",
+                            "entity": "input_number.manual_raw"
+                        },
+                        {
+                            "type": "entities",
+                            "entities": [
+                                {
+                                    "entity": "input_number.manual_raw"
+                                },
+                                {
+                                    "entity": "input_number.calibration_input"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "custom:mini-graph-card",
+                            "entities": [
+                                {
+                                    "entity": "sensor.verandah",
+                                    "name": "Verandah"
+                                },
+                                {
+                                    "entity": "sensor.lounge",
+                                    "name": "Lounge"
+                                },
+                                {
+                                    "entity": "sensor.kitchen",
+                                    "name": "Kitchen"
+                                },
+                                {
+                                    "entity": "input_number.nighttime",
+                                    "name": "Night",
+                                    "y_axis": "secondary"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "custom:mini-graph-card",
+                            "entities": [
+                                {
+                                    "entity": "input_number.calibration_input_2"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "entity",
+                            "entity": "var.calibration_values"
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "TV Room Lights"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "TV Room*Lights"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "title": "Power Monitoring",
+                    "path": "power-monitoring",
+                    "badges": [],
+                    "cards": [
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Wattage Calibrated"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "/Wattage Calibrated/"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "state",
+                                "numeric": true
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Wattage Raw"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "/Wattage Raw/"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "state",
+                                "numeric": true
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Voltage - Calibrated"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "/Voltage Calibrated/"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "state"
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Voltage - Raw"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "/Voltage Raw/"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "state"
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Amperage Calibrated"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "/Amperage Calibrated/"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "state"
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Amperage Raw"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "name": "/Amperage Raw/"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "state"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "title": "Debugging",
+                    "path": "debugging",
+                    "badges": [],
+                    "cards": [
+                        {
+                            "type": "custom:auto-entities",
+                            "show_empty": true,
+                            "filter": {
+                                "include": [
+                                    {
+                                        "domain": "var"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "name",
+                                "ignore_case": true
+                            },
+                            "card": {
+                                "type": "entities",
+                                "title": "Variable Values",
+                                "show_header_toggle": false
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "show_empty": true,
+                            "filter": {
+                                "include": [
+                                    {
+                                        "domain": "automation"
+                                    }
+                                ],
+                                "exclude": [
+                                    {
+                                        "state": "on"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "name",
+                                "ignore_case": true
+                            },
+                            "card": {
+                                "type": "entities",
+                                "title": "Disabled Automations",
+                                "show_header_toggle": false
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "show_empty": true,
+                            "filter": {
+                                "include": [
+                                    {
+                                        "domain": "automation"
+                                    }
+                                ],
+                                "exclude": [
+                                    {
+                                        "attributes": {
+                                            "current": "= 0"
+                                        }
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "name",
+                                "ignore_case": true
+                            },
+                            "card": {
+                                "type": "entities",
+                                "title": "Running Automations",
+                                "show_header_toggle": false
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "show_empty": true,
+                            "filter": {
+                                "include": [
+                                    {
+                                        "domain": "script"
+                                    }
+                                ],
+                                "exclude": [
+                                    {
+                                        "state": "off"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "name",
+                                "ignore_case": true
+                            },
+                            "card": {
+                                "type": "entities",
+                                "title": "Running Scripts",
+                                "show_header_toggle": true
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "show_empty": true,
+                            "filter": {
+                                "include": [
+                                    {
+                                        "domain": "timer"
+                                    }
+                                ],
+                                "exclude": [
+                                    {
+                                        "state": "idle"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "name",
+                                "ignore_case": true
+                            },
+                            "card": {
+                                "type": "entities",
+                                "title": "Running Timers",
+                                "show_header_toggle": false
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "show_empty": true,
+                            "filter": {
+                                "include": [
+                                    {
+                                        "domain": "alert"
+                                    }
+                                ],
+                                "exclude": [
+                                    {
+                                        "state": "idle"
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "name",
+                                "ignore_case": true
+                            },
+                            "card": {
+                                "type": "entities",
+                                "title": "Active Alerts",
+                                "show_header_toggle": false
+                            }
+                        },
+                        {
+                            "type": "entities",
+                            "entities": [
+                                {
+                                    "entity": "binary_sensor.area_master_bathroom"
+                                },
+                                {
+                                    "entity": "switch.area_presence_hold_master_bathroom"
+                                },
+                                {
+                                    "entity": "sensor.area_battery_master_bathroom"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "show_empty": true,
+                            "filter": {
+                                "include": [
+                                    {
+                                        "domain": "group",
+                                        "options": {
+                                            "type": "custom:fold-entity-row"
+                                        }
+                                    }
+                                ]
+                            },
+                            "sort": {
+                                "method": "name",
+                                "ignore_case": true
+                            },
+                            "card": {
+                                "type": "entities",
+                                "show_header_toggle": false,
+                                "title": "Groups"
+                            }
+                        },
+                        {
+                            "type": "entities",
+                            "title": "System Monitor",
+                            "show_header_toggle": false,
+                            "entities": [
+                                {
+                                    "type": "custom:fold-entity-row",
+                                    "head": "sensor.unavailable_entities",
+                                    "padding": 5,
+                                    "entities": [
+                                        {
+                                            "type": "custom:hui-element",
+                                            "card_type": "markdown",
+                                            "content": "{%- if states.sensor.unavailable_entities.attributes.entities is defined -%}\n    {%- if states('sensor.unavailable_entities')|int == 0 -%}\n      No unavailable entities.\n    {%- else -%}\n      {%- for device in state_attr('sensor.unavailable_entities','entities') -%}\n      - {{ device ~ '\\n' }}\n      {%- endfor %}\n    {%- endif -%}\n  {%- endif -%}\n"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Master Bathroom"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "area": "Master Bathroom"
+                                    },
+                                    {
+                                        "entity_id": "master_bath*"
+                                    }
+                                ],
+                                "exclude": []
+                            },
+                            "sort": {
+                                "method": "last_changed",
+                                "reverse": true
+                            }
+                        },
+                        {
+                            "type": "custom:auto-entities",
+                            "card": {
+                                "type": "entities",
+                                "title": "Master Bathroom"
+                            },
+                            "filter": {
+                                "include": [
+                                    {
+                                        "area": "Living Room"
+                                    },
+                                    {
+                                        "entity_id": "master_bath*"
+                                    }
+                                ],
+                                "exclude": []
+                            },
+                            "sort": {
+                                "method": "domain",
+                                "reverse": true
+                            }
+                        }
+                    ]
+                }
+            ],
+            "title": "Home"
+        }
+    }
+}
