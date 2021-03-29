@@ -1,0 +1,30 @@
+esphome:
+  name: $system
+  platform: ESP8266
+  board: nodemcuv2
+  build_path: ./build/${system}
+
+i2c:
+  sda: D5
+  scl: D6
+
+sensor:
+  platform: dht
+  model: DHT22
+  pin:
+    number: D1
+  temperature:
+    name: ${system_friendly} Temperature
+    filters:
+        - or:
+                - delta: 1
+                - throttle: 30s
+        - throttle: 0.5s
+  humidity:
+    name: ${system_friendly} Humidity
+    filters:
+        - or:
+                - delta: 1
+                - throttle: 30s
+        - throttle: 0.5s
+  update_interval: 1s

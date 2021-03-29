@@ -1,0 +1,7 @@
+substitutions:
+  system: tv_room_side_table
+  system_friendly: TV Room Side Table Power
+
+packages:
+  package-core-device: !include package-core-device.yaml
+  package-sp10: !include package-ss30.yaml

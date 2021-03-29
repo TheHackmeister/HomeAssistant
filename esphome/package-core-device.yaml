@@ -1,0 +1,46 @@
+esphome:
+  name: ${system}
+  platform: ESP8266
+  board: esp01_1m
+  build_path: ./build/${system}
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Generic Fallback Hotspot"
+    password: "HZ2pfxrhwEmO"
+captive_portal:
+
+api:
+  password: !secret hass_api_key
+  reboot_timeout: 1h
+
+ota:
+  password: !secret ota_password
+
+#mqtt:
+#  #username: $mqtt_username
+#  #password: $mqtt_password 
+#  broker: home.spencerslab.com
+#  port: 1883
+
+sensor:
+  - platform: wifi_signal
+    name: "${system_friendly} WiFi Signal"
+    update_interval: 60s
+  - platform: uptime
+    name: "${system_friendly} Uptime"
+binary_sensor:
+  - platform: status
+    name: "${system_friendly} Status"
+text_sensor:
+  - platform: version
+    name: "${system_friendly} ESPHome Version"  
+
+# Enable logging
+logger:
+  #level: ${log_level}
+

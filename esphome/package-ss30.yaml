@@ -1,0 +1,79 @@
+
+switch:
+  - platform: gpio
+    name: "${system_friendly} Relay 1"
+    pin: GPIO15
+    id: relay1
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: gpio
+    name: "${system_friendly} Relay 2"
+    pin: GPIO5
+    id: relay2
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: gpio
+    name: "${system_friendly} Relay 3"
+    pin: GPIO14
+    id: relay3
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: gpio
+    name: "${system_friendly} Relay 4"
+    pin: GPIO12
+    id: relay4
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: gpio
+    name: "${system_friendly} USB Power"
+    pin: GPIO4
+    id: relay5
+    restore_mode: RESTORE_DEFAULT_ON
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO13
+      mode: INPUT_PULLUP
+      inverted: True
+    name: "${system_friendly} Button"
+    on_multi_click:
+      - timing: 
+          - ON for at least 3s
+        then:
+          - logger.log: "Long Clicked"
+          - homeassistant.event:
+              event: esphome.button_click
+              data:
+                title: Long Click
+                click_type: long
+                command: "off"
+                entity: "${system}"
+
+      - timing:
+          - ON for at most 1s
+          - OFF for at most 0.3s
+          - ON for at most 1s
+          - OFF for at least 0.2s
+        then:
+          - logger.log: "Double Clicked"
+          - homeassistant.event:
+              event: esphome.button_click
+              data:
+                title: Double Click
+                click_type: double
+                entity: "${system}"
+                command: "on"
+
+      - timing:
+          - ON for at most 1s
+          - OFF for at least 0.5s
+        then:
+          - logger.log: "Single-Clicked"
+          - homeassistant.event:
+              event: esphome.button_click
+              data:
+                title: Single Click
+                click_type: single
+                entity: "${system}"
+                command: "toggle"
+
+status_led:
+  pin:
+    number: GPIO2

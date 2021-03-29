@@ -1,0 +1,7 @@
+substitutions:
+  system: power_monitor_washer
+  system_friendly: Washer Power Monitor
+
+packages:
+  package-core-device: !include package-core-device.yaml
+  package-sp20: !include package-sp20.yaml

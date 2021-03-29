@@ -1,0 +1,6 @@
+substitutions:
+  system: generic
+  system_friendly: Generic
+
+packages:
+  package-core-device: !include package-core-device.yaml

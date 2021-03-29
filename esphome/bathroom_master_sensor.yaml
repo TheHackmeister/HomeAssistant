@@ -1,0 +1,7 @@
+substitutions:
+  system: bathroom_master_sensor
+  system_friendly: Bathroom Master
+
+packages:
+  package-dht: !include package-dht.yaml
+  package-core-device: !include package-core-device.yaml

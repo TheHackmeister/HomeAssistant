@@ -1,0 +1,91 @@
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO13
+      inverted: True
+    name: "${system_friendly} Button"
+    on_press:
+      then:
+        - switch.toggle: relay
+
+sensor:
+  - platform: hlw8012
+    sel_pin:
+      number: GPIO12
+      inverted: True
+    cf_pin: GPIO05
+    cf1_pin: GPIO14
+    id: hlw
+    current:
+      name: "${system_friendly} Amperage Raw"
+      unit_of_measurement: A
+      force_update: true
+      accuracy_decimals: 5
+      filters:
+        - sliding_window_moving_average:
+            window_size: 10
+            send_every: 10
+        - heartbeat: 1 min
+        - delta: 0.1
+    voltage:
+      name: "${system_friendly} Voltage Raw"
+      unit_of_measurement: V
+      force_update: true
+      accuracy_decimals: 5
+      filters:
+        - sliding_window_moving_average:
+            window_size: 10
+            send_every: 10
+        - or:
+          - heartbeat: 1 min
+          - delta: 5
+    power:
+      name: "${system_friendly} Wattage Raw"
+      unit_of_measurement: W
+      id: "wattage"
+      force_update: true
+      accuracy_decimals: 10
+      filters:
+        - sliding_window_moving_average:
+            window_size: 20
+            send_every: 10
+        - heartbeat: 1 min
+        - delta: 5
+    change_mode_every: 20
+    update_interval: 200ms
+
+
+# This makes the red LED turn on when the relay is on.
+switch:
+- platform: output
+  name: "${system_friendly} Relay"
+  id: relay
+  output: power_led_output
+power_supply:
+  - id: power_led
+    pin:
+      number: GPIO0
+      inverted: True
+    keep_on_time: 0.1s
+output:
+  - platform: gpio
+    pin:
+      number: GPIO4
+    id: power_led_output
+    power_supply: power_led
+esphome:
+  on_boot:
+    then:
+      - switch.turn_on: relay
+
+status_led:
+  pin:
+    # This is the blue light.
+    number: GPIO2
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: America/Denver
+

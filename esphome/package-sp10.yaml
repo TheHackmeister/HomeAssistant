@@ -1,0 +1,38 @@
+status_led:
+  pin:
+    number: GPIO2
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO13
+      inverted: True
+    name: "${system_friendly} Button"
+    on_press:
+      then:
+        - switch.toggle: relay
+
+power_supply: 
+  - id: power_led
+    pin: 
+      number: GPIO0
+      inverted: True
+    keep_on_time: 0.1s
+
+output:
+  - platform: gpio
+    pin:
+      number: GPIO15
+    id: power_led_output
+    power_supply: power_led
+    
+switch:
+  - platform: output
+    name: "${system_friendly} Relay"
+    id: relay
+    output: power_led_output
+  - platform: gpio
+    name: "${system_friendly} LED Blue"
+    pin: GPIO2
+    inverted: True
+    restore_mode: ALWAYS_OFF

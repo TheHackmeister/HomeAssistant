@@ -1,0 +1,7 @@
+substitutions:
+  system: power_monitor_06
+  system_friendly: Power Monitor 06
+
+packages:
+  package-core-device: !include package-core-device.yaml
+  package-sp20: !include package-sp20.yaml
