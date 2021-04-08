@@ -38,11 +38,14 @@ from .const import (
     CONF_FEATURE_HEALTH,
     CONF_FEATURE_LIGHT_CONTROL,
     CONF_FEATURE_MEDIA_CONTROL,
+    CONF_FEATURE_CLOSED_PRESENCE_HOLD,
     CONF_ICON,
     CONF_MAIN_LIGHTS,
     CONF_NIGHT_ENTITY,
     CONF_NIGHT_STATE,
     CONF_ON_STATES,
+    CONF_PRESENCE_HOLD_ENTITY,
+    CONF_PRESENCE_HOLD_STATE,
     CONF_PRESENCE_SENSOR_DEVICE_CLASS,
     CONF_SLEEP_ENTITY,
     CONF_SLEEP_LIGHTS,
@@ -297,6 +300,19 @@ class AreaPresenceBinarySensor(BinarySensorBase):
             )
             self.tracking_listeners.append(remove_sleep)
 
+        # Track presence hold sensors.
+        if self.area.has_feature(CONF_FEATURE_CLOSED_PRESENCE_HOLD):
+            if self.area.config.get(CONF_PRESENCE_HOLD_ENTITY):
+                presence_hold_entity = self.area.config.get(CONF_PRESENCE_HOLD_ENTITY)
+            else:
+                presence_hold_entity = f"{BINARY_SENSOR_DOMAIN}.area_opening_{self.area.slug}"
+            remove_presence_hold = async_track_state_change(
+                self.hass,
+                presence_hold_entity,
+                self.autolight_presence_hold_state_change,
+            )
+            self.tracking_listeners.append(remove_presence_hold)
+
         # Timed self update
         delta = timedelta(seconds=self.area.config.get(CONF_UPDATE_INTERVAL))
         remove_interval = async_track_time_interval(
@@ -304,6 +320,15 @@ class AreaPresenceBinarySensor(BinarySensorBase):
         )
 
         self.tracking_listeners.extend([remove_presence, remove_interval])
+
+    def autolight_presence_hold_state_change(self, entity_id, from_state, to_state):
+        service_data = {ATTR_ENTITY_ID: f"{SWITCH_DOMAIN}.area_presence_hold_{self.area.slug}"}
+        if to_state.state in [ "off"]:
+            # Turn presence hold switch on
+            self.hass.services.call(SWITCH_DOMAIN, SERVICE_TURN_ON, service_data)
+        else:
+            # Turn presence hold switch off
+            self.hass.services.call(SWITCH_DOMAIN, SERVICE_TURN_OFF, service_data)
 
     def autolight_sleep_state_change(self, entity_id, from_state, to_state):
 
