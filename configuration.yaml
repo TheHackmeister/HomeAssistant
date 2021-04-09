@@ -82,6 +82,11 @@ sensor:
     password: !secret imap_password
     senders:
       - noreply@www.noconosh.com
+      - orders+sprouts@instacart.com
+      - orders+costco@instacart.com
+      - "*@instacart.com"
+      - "*@grubhub.com"
+
     value_template: >-
       {% if (
         'Driver at restaurant' in subject or
