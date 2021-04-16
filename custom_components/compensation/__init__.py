@@ -105,7 +105,7 @@ async def async_setup(hass, config):
     hass.data[DATA_COMPENSATION] = {}
     already_discovered = set()
 
-    for compensation, conf in config.get(DOMAIN).items():
+    for compensation, conf in config.get(DOMAIN, {}).items():
         _LOGGER.debug("Setup %s.%s", DOMAIN, compensation)
 
 
