@@ -5,7 +5,7 @@ from typing import Any, Dict
 import voluptuous as vol
 
 
-from . import options_update_listener
+from . import options_update_listener, take_reading
 from .const import (
     CONF_TRACKED_ENTITY_ID,
     CONF_COMPENSATION,
@@ -185,20 +185,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         sensor_issues = []
 
         if user_input and user_input.get(CONF_DATAPOINTS):
-            for entity_id in self._calibrating_entities:
-                existing_data = self._config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
-                try:
-                    datapoints = [ (
-                        float(self.hass.states.get(self._config_entries[entity_id].data.get(CONF_TRACKED_ENTITY_ID)).state),
-                        user_input[CONF_DATAPOINTS]
-                    ) ]
-                    datapoints.extend(existing_data)
-                    entry = self._config_entries[entity_id]
-
-                    self.hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: datapoints})
-                except (ValueError, TypeError, AttributeError) as e:
-                    sensor_issues.append(entity_id)
-                    self._errors = { "base": "state_not_a_float" }
+            take_reading(self.hass, user_input[CONF_DATAPOINTS], self._calibrating_entities)
 
             # Unset the datapoint.
             user_input.pop(CONF_DATAPOINTS)

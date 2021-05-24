@@ -17,12 +17,13 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 
 from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
-from .const import CONF_COMPENSATION, CONF_POLYNOMIAL, CONF_PRECISION, DATA_COMPENSATION, CONF_TRACKED_ENTITY_ID
+from .const import CONF_COMPENSATION, CONF_POLYNOMIAL, CONF_PRECISION, DATA_COMPENSATION, CONF_TRACKED_ENTITY_ID, CONF_DATAPOINTS
 
 _LOGGER = logging.getLogger(__name__)
 
 ATTR_ATTRIBUTE = "attribute"
 ATTR_COEFFICIENTS = "coefficients"
+ATTR_BASE_SENSOR = "base_sensor"
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
@@ -58,6 +59,7 @@ async def async_setup_entry(hass, entry, async_add_entries):
         conf.get(CONF_ATTRIBUTE),
         conf[CONF_PRECISION],
         conf.get(CONF_POLYNOMIAL, np.poly1d(1)),
+        conf.get(CONF_DATAPOINTS),
         conf.get(CONF_UNIT_OF_MEASUREMENT),
     )
 
@@ -76,6 +78,7 @@ class CompensationSensor(Entity):
         attribute,
         precision,
         polynomial,
+        datapoints,
         unit_of_measurement,
     ):
         """Initialize the Compensation sensor."""
@@ -87,6 +90,7 @@ class CompensationSensor(Entity):
         self._attributes = {}
         self._unit_of_measurement = unit_of_measurement
         self._poly = polynomial
+        self._datapoints = datapoints
         self._coefficients = polynomial.coefficients.tolist()
 
         if hass.states.get(self._tracked_entity_id):
@@ -173,6 +177,9 @@ class CompensationSensor(Entity):
         ret = {
             ATTR_ENTITY_ID: self._entity_id,
             ATTR_COEFFICIENTS: self._coefficients,
+            CONF_TRACKED_ENTITY_ID: self._tracked_entity_id,
+            ATTR_BASE_SENSOR: self._entity_id.replace("_calibrated", ""),
+            CONF_DATAPOINTS: self._datapoints,
         }
         if self._attribute:
             ret[ATTR_ATTRIBUTE] = self._attribute

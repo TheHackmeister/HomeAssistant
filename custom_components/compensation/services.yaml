@@ -1,0 +1,52 @@
+take_reading:
+  name: Take Reading
+  description: Takes the reading of a known good source and configured sensors and add the reading to the list of data points.
+  fields:
+    known_good_entity:
+      name: Known good entitiy
+      description: Known good entity for calibration
+      required: true
+      example: "input_text.calibration_manual_input"
+      default: "[]"
+      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+      selector:
+        entity:
+          domain: sensor
+    entities_list:
+      name: Entities List
+      description: Entitiy with lists of entities
+      required: true
+      example: "var.lists_of_entities"
+      default: "[]"
+      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+      selector:
+        entity:
+          domain: var
+    entities_list_attribute:
+      name: Entities List Attribute
+      description: The attribute to access for the desired list of entities.
+      required: true
+      example: "calibration_entities"
+      default: "[]"
+      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+
+delete_datapoints:
+  name: Delete Datapoints
+  description: Deletes the list of data points for the given sensors.
+  fields:
+    entities_list:
+      name: Entities List
+      description: Entitiy with lists of entities
+      required: true
+      example: "var.lists_of_entities"
+      default: "[]"
+      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+      selector:
+        entity:
+          domain: var
+    entities_list_attribute:
+      name: Entities List Attribute
+      description: The attribute to access for the desired list of entities.
+      required: true
+      example: "calibration_entities"
+      default: "[]"

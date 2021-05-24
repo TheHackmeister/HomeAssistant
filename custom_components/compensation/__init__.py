@@ -128,6 +128,20 @@ async def async_setup(hass, config):
             )
         )
 
+    @callback
+    def async_take_reading(call):
+        _LOGGER.warning(f"call: { call }")
+        take_reading(hass, hass.states.get(hass.states.get(call.data["known_good_entity"]).state).state, json.loads(hass.states.get(call.data["entities_list"]).attributes[call.data["entities_list_attribute"]]))
+
+    hass.services.async_register(DOMAIN, "take_reading", async_take_reading) #, EXTENDED_ALARM_SERVICE_SCHEMA)
+
+    @callback
+    def async_delete_datapoints(call):
+        _LOGGER.warning(f"call: { call }")
+        delete_datapoints(hass, json.loads(hass.states.get(call.data["entities_list"]).attributes[call.data["entities_list_attribute"]]))
+
+    hass.services.async_register(DOMAIN, "delete_datapoints", async_delete_datapoints)
+
     async def new_service_found(entity_id):
         """Handle a new service if one is found."""
 
@@ -181,6 +195,36 @@ def _discover(hass, already_discovered):
             results.append(state.entity_id)
     return results
 
+def delete_datapoints(hass, entities):
+    _LOGGER.warning(f"delete_datpoints: {entities}")
+    config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in hass.config_entries.async_entries(DOMAIN) }
+    for entity_id in entities:
+        existing_data = config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
+        try:
+            datapoints = [ ]
+            entry = config_entries[entity_id]
+            hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: datapoints})
+        except (ValueError, TypeError, AttributeError) as e:
+            _LOGGER.warning(f"Issue with datapoints: {e}")
+
+def take_reading(hass, known_good_reading, entities_to_calibrate):
+    _LOGGER.warning(f"Take reading: {entities_to_calibrate}")
+    config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in hass.config_entries.async_entries(DOMAIN) }
+    for entity_id in entities_to_calibrate:
+        existing_data = config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
+        try:
+            datapoints = [ (
+                float(hass.states.get(config_entries[entity_id].data.get(CONF_TRACKED_ENTITY_ID)).state),
+                float(known_good_reading)
+            ) ]
+            datapoints.extend(existing_data)
+            entry = config_entries[entity_id]
+
+            _LOGGER.warning(f"Datapoints: {datapoints}")
+            hass.config_entries.async_update_entry(entry, options={CONF_DATAPOINTS: datapoints})
+        except (ValueError, TypeError, AttributeError) as e:
+            _LOGGER.warning(f"Issue with datapoints: {e}")
+
 def calculate_poly(conf, datapoints):
     # get x values and y values from the x,y point pairs
     degree = conf[CONF_DEGREE]
@@ -204,12 +248,14 @@ def calculate_poly(conf, datapoints):
             # try to catch 3 possible errors
             try:
                 coefficients = np.polyfit(x_values, y_values, degree)
-            except FloatingPointError as error:
+            except (FloatingPointError, np.core._exceptions.UFuncTypeError) as error:
                 _LOGGER.error(
                     "Setup of %s encountered an error, %s.",
                     conf[CONF_ENTITY_ID],
                     error,
                 )
+                coefficients = None
+
             # raise any warnings
             for warning in all_warnings:
                 _LOGGER.warning(

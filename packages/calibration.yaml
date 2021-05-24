@@ -1,0 +1,51 @@
+---
+input_select:
+  water_supply_mode:
+    name: Water Supply Mode
+    options:
+    - "MODE_RUNNING: 1"
+    - "MODE_MANUAL_OVERRIDE: 2"
+    - "MODE_CALIBRATION: 3"
+    - "MODE_WATER_SUPPLY_ERROR: 4"
+  water_supply_clean_water_dosage:
+    name: Water Supply Clean Water Dosage
+    options:
+    - "7.5 Minutes: 450000"
+    - "15 Minutes: 900000"
+    - "30 Minutes: 1800000"
+  calibration_unit_selector:
+    name: Calibration Unit Selector
+    options:
+    - "psi"
+    - "raw"
+  calibration_good_sensor_selector:
+    name: Calibration Good Sensor Selector
+    options:
+    - "raw"
+
+input_text:
+  calibration_manual_input:
+    name: Calibration Manual Input
+
+pyscript:
+
+
+var:
+  water_supply_mode_entities:
+    friendly_name: 'Water Supply Mode Entities'
+  seedship_drainage_entities:
+    friendly_name: 'SeedShip Drainage Entities'
+  seedship_water_nozzle_entities:
+    friendly_name: 'SeedShip Water Nozzle Entities'
+
+  lists_of_entities:
+    friendly_name: 'Lists of Entities'
+
+lovelace:
+  dashboards:
+    lovelace-seedship:
+      mode: yaml
+      title: SeedShips
+      icon: mdi:script
+      show_in_sidebar: true
+      filename: dashboards/seedships.yaml
