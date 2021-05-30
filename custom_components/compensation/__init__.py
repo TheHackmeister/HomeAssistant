@@ -11,6 +11,7 @@ import voluptuous as vol
 
 from homeassistant import core, config_entries
 from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
+from homeassistant.components.mqtt import publish
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_ATTRIBUTE,
@@ -30,6 +31,8 @@ from .const import (
     CONF_COMPENSATION,
     CONF_DATAPOINTS,
     CONF_DEGREE,
+    CONF_MQTT_PREFIX,
+    CONF_MQTT_TOPIC,
     CONF_POLYNOMIAL,
     CONF_PRECISION,
     CONF_TRACKED_ENTITY_ID,
@@ -85,6 +88,10 @@ CONFIG_SCHEMA = vol.Schema(
 async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
     """Set up the esphome component."""
     hass.data.setdefault(DATA_COMPENSATION, {})
+
+    if entry.unique_id == CONF_MQTT_PREFIX:
+        _LOGGER.warning("Skipping %s.", CONF_MQTT_PREFIX)
+        return False
 
     datapoints = entry.options.get(CONF_DATAPOINTS, [(1,1), (2,2)])
 
@@ -158,6 +165,21 @@ async def async_setup(hass, config):
             context={"source": "import", 'title_placeholders': { CONF_ENTITY_ID: entity_id} },
             data={CONF_TRACKED_ENTITY_ID: entity_id},
         )
+
+    @callback
+    def async_send_calibration_to_mqtt(call):
+        _LOGGER.warning(f"call: { call }")
+
+        for entity in json.loads(hass.states.get(call.data["entities_list"]).attributes[call.data["entities_list_attribute"]]):
+            thing = hass.states.get(entity).attributes
+            publish(hass,
+                hass.states.get(entity).attributes[CONF_MQTT_TOPIC],
+                json.dumps(hass.states.get(entity).attributes['coefficients']),
+                1,
+                True
+            )
+
+    hass.services.async_register(DOMAIN, "send_calibration_to_mqtt", async_send_calibration_to_mqtt) 
 
     async def scan_devices(now):
         """Scan for devices."""

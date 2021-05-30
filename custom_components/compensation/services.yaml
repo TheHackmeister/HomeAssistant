@@ -7,8 +7,7 @@ take_reading:
       description: Known good entity for calibration
       required: true
       example: "input_text.calibration_manual_input"
-      default: "[]"
-      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+      default: "input_text.calibration_manual_input"
       selector:
         entity:
           domain: sensor
@@ -17,8 +16,7 @@ take_reading:
       description: Entitiy with lists of entities
       required: true
       example: "var.lists_of_entities"
-      default: "[]"
-      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+      default: "var.lists_of_entities"
       selector:
         entity:
           domain: var
@@ -27,8 +25,9 @@ take_reading:
       description: The attribute to access for the desired list of entities.
       required: true
       example: "calibration_entities"
-      default: "[]"
-      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+      default: "calibration_entities"
+      selector:
+        text:
 
 delete_datapoints:
   name: Delete Datapoints
@@ -39,8 +38,7 @@ delete_datapoints:
       description: Entitiy with lists of entities
       required: true
       example: "var.lists_of_entities"
-      default: "[]"
-      # Selector (https://www.home-assistant.io/docs/blueprint/selectors/) to control the input UI for this field
+      default: "var.lists_of_entities"
       selector:
         entity:
           domain: var
@@ -49,4 +47,28 @@ delete_datapoints:
       description: The attribute to access for the desired list of entities.
       required: true
       example: "calibration_entities"
-      default: "[]"
+      default: "calibration_entities"
+      selector:
+        text:
+
+send_calibration_to_mqtt:
+  name: Send Calibration To MQTT
+  description: Sends the calibration data to an ESPHome device via MQTT.
+  fields:
+    entities_list:
+      name: Entities List
+      description: Entitiy with lists of entities
+      required: true
+      example: "var.lists_of_entities"
+      default: "var.lists_of_entities"
+      selector:
+        entity:
+          domain: var
+    entities_list_attribute:
+      name: Entities List Attribute
+      description: The attribute to access for the desired list of entities.
+      required: true
+      example: "calibration_entities"
+      default: "calibration_entities"
+      selector:
+        text:

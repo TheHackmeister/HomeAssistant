@@ -17,7 +17,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 
 from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
-from .const import CONF_COMPENSATION, CONF_POLYNOMIAL, CONF_PRECISION, DATA_COMPENSATION, CONF_TRACKED_ENTITY_ID, CONF_DATAPOINTS
+from .const import CONF_COMPENSATION, CONF_POLYNOMIAL, CONF_PRECISION, DATA_COMPENSATION, CONF_TRACKED_ENTITY_ID, CONF_DATAPOINTS, CONF_MQTT_TOPIC
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ async def async_setup_entry(hass, entry, async_add_entries):
         conf[CONF_ENTITY_ID],
         conf[CONF_TRACKED_ENTITY_ID],
         conf.get(CONF_NAME),
+        conf.get(CONF_MQTT_TOPIC),
         conf.get(CONF_ATTRIBUTE),
         conf[CONF_PRECISION],
         conf.get(CONF_POLYNOMIAL, np.poly1d(1)),
@@ -75,6 +76,7 @@ class CompensationSensor(Entity):
         entity_id,
         tracked_entity_id,
         name,
+        mqtt_topic,
         attribute,
         precision,
         polynomial,
@@ -85,6 +87,7 @@ class CompensationSensor(Entity):
         self._entity_id = entity_id
         self._tracked_entity_id = tracked_entity_id
         self._name = name
+        self._mqtt_topic = mqtt_topic
         self._precision = precision
         self._attribute = attribute
         self._attributes = {}
@@ -179,6 +182,7 @@ class CompensationSensor(Entity):
             ATTR_COEFFICIENTS: self._coefficients,
             CONF_TRACKED_ENTITY_ID: self._tracked_entity_id,
             ATTR_BASE_SENSOR: self._entity_id.replace("_calibrated", ""),
+            CONF_MQTT_TOPIC: self._mqtt_topic,
             CONF_DATAPOINTS: self._datapoints,
         }
         if self._attribute:

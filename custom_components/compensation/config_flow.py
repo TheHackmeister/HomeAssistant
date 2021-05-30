@@ -3,6 +3,8 @@ import logging
 
 from typing import Any, Dict
 import voluptuous as vol
+import re
+from homeassistant.components.mqtt import publish
 
 
 from . import options_update_listener, take_reading
@@ -11,6 +13,8 @@ from .const import (
     CONF_COMPENSATION,
     CONF_DATAPOINTS,
     CONF_DEGREE,
+    CONF_MQTT_TOPIC,
+    CONF_MQTT_PREFIX,
     CONF_POLYNOMIAL,
     CONF_PRECISION,
     DATA_COMPENSATION,
@@ -32,6 +36,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import callback
 from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
+from homeassistant.config_entries import ConfigEntry, CONN_CLASS_UNKNOWN
 from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,10 +51,37 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._errors = {}
 
+    def _get_prefix(self, user_set_prefix=""):
+        prefix_entry = self.hass.config_entries.async_get_entry(CONF_MQTT_PREFIX)
+        if prefix_entry is None:
+            prefix_entry = ConfigEntry(
+                version=1,
+                domain=DOMAIN,
+                entry_id=CONF_MQTT_PREFIX,
+                data={ CONF_MQTT_PREFIX: ""},
+                source="calibration",
+                title="~Calibration Prefix",
+                connection_class=CONN_CLASS_UNKNOWN,
+                options={},
+                system_options={},
+                unique_id=CONF_MQTT_PREFIX,
+            )
+
+            self.hass.async_create_task(
+                self.hass.config_entries.async_add(prefix_entry)
+            )
+
+        elif user_set_prefix is not None and prefix_entry.data[CONF_MQTT_PREFIX] != user_set_prefix:
+            self.hass.config_entries.async_update_entry(prefix_entry, data={CONF_MQTT_PREFIX: user_set_prefix})
+        return prefix_entry.data[CONF_MQTT_PREFIX]
+
     async def async_step_user(self, user_input=None):
         """Step when user initializes a integration."""
         self._errors = {}
         if user_input is not None:
+            # We need to call this so that if the prefix changes, the setting will be updated.
+            self._get_prefix(user_input.get(CONF_MQTT_PREFIX, ""))
+
             self.entity_id_from_user_step = user_input[CONF_TRACKED_ENTITY_ID]
             return await self.async_step_configure(user_input)
 
@@ -57,6 +89,7 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_MQTT_PREFIX, description={"suggested_value": self._get_prefix(None)}): cv.string,
                     vol.Required(CONF_TRACKED_ENTITY_ID): vol.In(
                         # Note: I considered filtering this to only contain states that were floats, but realized that would exclude some valid attributes we could track on some states.
                         { ent.entity_id: f"{ ent.name } ({ ent.entity_id }) - { ent.state }" for ent in self.hass.states.async_all(DOMAIN_SENSOR) }
@@ -85,6 +118,7 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_NAME: user_input[CONF_NAME],
                         CONF_ATTRIBUTE: user_input.get(CONF_ATTRIBUTE,None),
                         CONF_PRECISION: user_input[CONF_PRECISION],
+                        CONF_MQTT_TOPIC: user_input[CONF_MQTT_TOPIC],
                         CONF_DEGREE: user_input[CONF_DEGREE],
                         CONF_UNIT_OF_MEASUREMENT: user_input[CONF_UNIT_OF_MEASUREMENT],
                     },
@@ -100,6 +134,14 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default_entity_id = f"{ tracked_entity_id }_calibrated"
             default_name = f"{ self.hass.states.get(tracked_entity_id).name } Calibrated"
 
+        calibration_entity_id = default_entity_id.replace('_calibrated', '_calibration')
+
+        if self.hass.states.get(tracked_entity_id):
+            device_name = re.sub("(.*\d+).*","\\1", calibration_entity_id.replace("sensor.", "" ) )
+            default_topic = f"{ user_input.get(CONF_MQTT_PREFIX, '') if user_input else '' }{ device_name }/{ calibration_entity_id.replace(f'sensor.{ device_name }_', '') }"
+        else:
+            default_topic = ""
+
         return self.async_show_form(
             step_id="configure",
             data_schema=vol.Schema(
@@ -108,6 +150,7 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_NAME, default=default_name): cv.string,
                     vol.Optional(CONF_ATTRIBUTE): vol.In( list(self.hass.states.get(tracked_entity_id).attributes.keys()) ),
                     vol.Optional(CONF_PRECISION, default=DEFAULT_PRECISION): cv.positive_int,
+                    vol.Optional(CONF_MQTT_TOPIC, default=default_topic): cv.string,
                     vol.Optional(CONF_DEGREE, default=DEFAULT_DEGREE): vol.All(
                         vol.Coerce(int),
                         vol.Range(min=1, max=7),

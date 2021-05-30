@@ -25,6 +25,7 @@
           "entity_id": "Calibrated entity_id",
           "name": "Calibrated Sensor Name",
           "attribute": "Attribute",
+          "mqtt_topic": "MQTT Topic",
           "precision": "Precision",
           "degree": "Degree",
           "unit_of_measurement": "Unit Of Measurement"
