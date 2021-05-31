@@ -141,7 +141,7 @@ async def async_setup(hass, config):
         _LOGGER.warning(f"call: { call }")
         take_reading(hass, hass.states.get(hass.states.get(call.data["known_good_entity"]).state).state, json.loads(hass.states.get(call.data["entities_list"]).attributes[call.data["entities_list_attribute"]]))
 
-    hass.services.async_register(DOMAIN, "take_reading", async_take_reading) #, EXTENDED_ALARM_SERVICE_SCHEMA)
+    hass.services.async_register(DOMAIN, "take_reading", async_take_reading) 
 
     @callback
     def async_delete_datapoints(call):
@@ -171,15 +171,16 @@ async def async_setup(hass, config):
         _LOGGER.warning(f"call: { call }")
 
         for entity in json.loads(hass.states.get(call.data["entities_list"]).attributes[call.data["entities_list_attribute"]]):
-            thing = hass.states.get(entity).attributes
             publish(hass,
                 hass.states.get(entity).attributes[CONF_MQTT_TOPIC],
-                json.dumps(hass.states.get(entity).attributes['coefficients']),
+                json.dumps({
+                    key: value for key, value in enumerate(hass.states.get(entity).attributes['coefficients'])
+                }),
                 1,
                 True
             )
 
-    hass.services.async_register(DOMAIN, "send_calibration_to_mqtt", async_send_calibration_to_mqtt) 
+    hass.services.async_register(DOMAIN, "send_calibration_to_mqtt", async_send_calibration_to_mqtt)
 
     async def scan_devices(now):
         """Scan for devices."""
