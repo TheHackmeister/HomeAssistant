@@ -139,7 +139,13 @@ async def async_setup(hass, config):
     @callback
     def async_take_reading(call):
         _LOGGER.warning(f"call: { call }")
-        take_reading(hass, hass.states.get(hass.states.get(call.data["known_good_entity"]).state).state, json.loads(hass.states.get(call.data["entities_list"]).attributes[call.data["entities_list_attribute"]]))
+        if call.data['entities_list_attribute'] in hass.states.get(call.data["entities_list"]).attributes:
+            entities_array = json.loads(hass.states.get(call.data["entities_list"]).attributes[call.data["entities_list_attribute"]])
+        else:
+            _LOGGER.warning(f"No entities passed in via { call.data['entities_list'] }.{ call.data['entities_list_attribute'] }.")
+            return
+        if len(entities_array) > 0:
+            take_reading(hass, hass.states.get(hass.states.get(call.data["known_good_entity"]).state).state, entities_array)
 
     hass.services.async_register(DOMAIN, "take_reading", async_take_reading) 
 
@@ -221,7 +227,7 @@ def _discover(hass, already_discovered):
 
 def delete_datapoints(hass, entities):
     _LOGGER.warning(f"delete_datpoints: {entities}")
-    config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in hass.config_entries.async_entries(DOMAIN) }
+    config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in hass.config_entries.async_entries(DOMAIN) if CONF_ENTITY_ID in entry.data }
     for entity_id in entities:
         existing_data = config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
         try:
@@ -233,7 +239,7 @@ def delete_datapoints(hass, entities):
 
 def take_reading(hass, known_good_reading, entities_to_calibrate):
     _LOGGER.warning(f"Take reading: {entities_to_calibrate}")
-    config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in hass.config_entries.async_entries(DOMAIN) }
+    config_entries = { entry.data[CONF_ENTITY_ID]: entry for entry in hass.config_entries.async_entries(DOMAIN) if entry.data.get(CONF_ENTITY_ID, None)}
     for entity_id in entities_to_calibrate:
         existing_data = config_entries[entity_id].options.get(CONF_DATAPOINTS, [])
         try:
