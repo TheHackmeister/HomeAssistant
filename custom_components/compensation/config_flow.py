@@ -138,7 +138,7 @@ class CompensationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if self.hass.states.get(tracked_entity_id):
             device_name = re.sub("(.*\d+).*","\\1", calibration_entity_id.replace("sensor.", "" ) )
-            default_topic = f"{ user_input.get(CONF_MQTT_PREFIX, '') if user_input else '' }{ device_name }/{ calibration_entity_id.replace(f'sensor.{ device_name }_', '') }"
+            default_topic = f"{ user_input.get(CONF_MQTT_PREFIX, '') if user_input else self._get_prefix(None) }{ device_name }/{ calibration_entity_id.replace(f'sensor.{ device_name }_', '') }"
         else:
             default_topic = ""
 
