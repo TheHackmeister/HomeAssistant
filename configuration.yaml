@@ -1,13 +1,15 @@
 # Configure a default setup of Home Assistant (frontend, api, etc)
 default_config:
 #debugpy:
-  #wait: true
+#wait: true
+
+zha_toolkit:
 
 # Text to speech
 tts:
   - platform: picotts
     service_name: picotts_say
-    base_url: https://home.spencerslab.com
+    #base_url: https://home.spencerslab.com
     language: "en-US"
     cache: false
 notify:
@@ -19,11 +21,30 @@ notify:
     name: home_tts
     tts_service: tts.picotts_say
     media_player: media_player.home_tts
-
 light:
-  - platform: switch
-    name: Cube Shelf Light
-    entity_id: switch.plant_light_01_relay
+  - platform: template
+    lights:
+      scene_main_bathroom_night:
+        friendly_name: "Scene Main Bathroom Night"
+        unique_id: scene_main_bathroom_night
+        value_template: |-
+          {% for entity_ids in state_attr('scene.main_bathroom_night', 'entity_id') %}
+            {% if is_state(entity_ids, 'on') %}
+              {% if loop.index == 1 %}
+                true
+              {% endif %}
+            {% else %}
+              false
+            {% endif %}
+          {% endfor %}
+        turn_on:
+          service: scene.turn_on
+          target:
+            entity_id: scene.main_bathroom_night
+        turn_off:
+          service: homeassistant.turn_off
+          target:
+            entity_id: "{{ state_attr('scene.main_bathroom_night', 'entity_id') }}"
 
 http:
   ip_ban_enabled: true
@@ -32,7 +53,7 @@ http:
   trusted_proxies:
     - 172.30.33.0/24
 
-auto_backup:
+#auto_backup:
 group: !include groups.yaml
 automation: !include automations.yaml
 script: !include scripts.yaml
@@ -48,125 +69,66 @@ frontend:
 #     title: "Audio"
 #     url: "https://audio.spencerslab.com/iris/"
 
-magic_areas:
 homeassistant:
   packages: !include_dir_named packages
 
 logger:
   logs:
     homeassistant.components.http.ban: warning
-
 sensor:
   - platform: nhl_api
-    #team_id: 15 # Caps
-    team_id: 21
+    team_abbrev: col
+
   - platform: template
     sensors:
       away_team:
-        friendly_name_template: "{{ states.sensor.nhl_sensor.attributes.away_name }}"
-        value_template: "{{ states.sensor.nhl_sensor.attributes.away_score }}"
-        entity_picture_template: "{{ states.sensor.nhl_sensor.attributes.away_logo }}"
+        friendly_name_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_name is defined %}{{ states.sensor.nhl_sensor.attributes.away_name }}{%- endif %}"
+        value_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_score is defined %}{{ states.sensor.nhl_sensor.attributes.away_score }}{%- endif %}"
+        entity_picture_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_logo is defined %}{{ states.sensor.nhl_sensor.attributes.away_logo }}{%- endif %}"
       home_team:
-        friendly_name_template: "{{ states.sensor.nhl_sensor.attributes.home_name }}"
-        value_template: "{{ states.sensor.nhl_sensor.attributes.home_score }}"
-        entity_picture_template: "{{ states.sensor.nhl_sensor.attributes.home_logo }}"
-  - platform: fail2ban
-    jails:
-      - ssh
-      - hass-iptables
-  - platform: imap_email_content
-    server: mail.spencerslab.com
-    name: noco_nosh
-    port: 993
-    username: !secret imap_username
-    password: !secret imap_password
-    senders:
-      - noreply@www.noconosh.com
-      - orders+sprouts@instacart.com
-      - orders+costco@instacart.com
-      - "*@instacart.com"
-      - "*@grubhub.com"
+        friendly_name_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_name is defined %}{{ states.sensor.nhl_sensor.attributes.home_name }}{%- endif %}"
+        value_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_score is defined %}{{ states.sensor.nhl_sensor.attributes.home_score }}{%- endif %}"
+        entity_picture_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_logo is defined %}{{ states.sensor.nhl_sensor.attributes.home_logo }}{%- endif %}"
+      house_home_count:
+        friendly_name_template: "House: Home Count"
+        value_template: "{{ dict((states.person)|groupby('state'))['home']|count }}"
 
-    value_template: >-
-      {% if (
-        'Driver at restaurant' in subject or
-        'Your Costco order is confirmed for' in subject or
-        'Your Sprouts Farmers Market order is confirmed for' in subject or
-        'Your King Soopers order is confirmed' in subject or
-        'is being prepared' in subject
-      ) %}
-        delivery_coming
-      {% elif (
-        'Your Costco order receipt' in subject or
-        'Your Sprouts Farmers Market order receipt' in subject or
-        'Your Instacart order receipt' in subject or
-        'Order delivered' in subject
-      ) %}
-        no_deliveries
-      {% endif %}
+rest_command:
+  healthchecksio:
+    url: https://hc-ping.com/89ba143b-b5bc-4074-bf95-b0897ec23102
+    method: GET
 
-media_player:
-  - platform: snapcast
-    host: 127.0.0.1
+shell_command:
+  farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
+  farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
 
-  - platform: mpd
-    host: audio.spencerslab.com
-    port: 6601
-    name: Home TTS
+#compensation:
+#device_tracker:
+#  - platform: ping
+#    hosts:
+#      spencer_phone_ping: 10.0.88.6
+#    count: 90
+#    scan_interval: 5
+#  - platform: ping
+#    hosts:
+#      brianna_phone_ping: 10.0.88.50
+#    count: 90
+#    scan_interval: 5
 
-  - platform: mpd
-    host: audio.spencerslab.com
-    name: Whole House Audio
-
-  - platform: mpd
-    host: dining-room-audio.local
-    name: Dining Room Audio
-    #location: Multi-Room Controller
-#- platform: mpd
-#  server: localhost
-#  location: Room 1
-#weblink:
-#  entities:
-#  - name: Multi-Room Player
-#    url: http://home.spencerslab.com:1780/
-variable:
-  #countdown_timer:
-  #  value: 30
-  #  attributes:
-  #    friendly_name: 'Countdown'
-  #    icon: mdi:alarm
-  #countdown_trigger:
-  #  name: Countdown
-  #  value: False
-  calibration_values:
-    value: ['normal', "bad", cool]
-    attributes:
-      previous: ''
-  calibration_devices:
-    value: ["calibration": "devices"]
-    #restore: true
-  #current_power_usage:
-  #  force_update: true
-var:
-  calibration_values:
-    friendly_name: 'Calibration Values'
-  calibration_entities:
-    friendly_name: 'Calibration Entities'
-    initial_value:
-zwave:
-  usb_path: /dev/ttyUSB0
-  #network_key: ""
-zha:
-  database_path: /config/zigbee.db
-
-compensation:
-
-binary_sensor:
-  - platform: ping
-    host: 1.1.1.1
-    name: "Internet Connection"
-    count: 2
-    scan_interval: 60
+#binary_sensor:
+#  - platform: template
+#    sensors:
+#      # - spencer_home:
+#        # If ping = true
+#        # else if location = home
+#        # else na
+#        value_template: >-
+#          {% if states.binary_sensor.spencer_phone_ping == true or states.device_tracker.spencer_spencerphone == "Home" %}
+#            on
+#          {% else  %}
+#            off
+#          {% endif %}
+#        friendly_name: "Spencer Home"
 
 input_number:
   calibration_input:
@@ -196,4 +158,23 @@ influxdb:
   tags_attributes:
     - friendly_name
     - hidden
-
+# Info at: https://www.reddit.com/r/homeassistant/comments/10hc3vb/psa_adding_automations_to_the_left_panel/
+panel_custom:
+  - name: Automations
+    sidebar_title: Automations
+    sidebar_icon: mdi:cog-transfer
+    js_url: /api/hassio/app/entrypoint.js
+    url_path: config/automation/dashboard
+    embed_iframe: true
+    require_admin: true
+    config:
+      ingress: core_configurator
+  - name: Devices
+    sidebar_title: Devices
+    sidebar_icon: mdi:devices
+    js_url: /api/hassio/app/entrypoint.js
+    url_path: config/devices/dashboard
+    embed_iframe: true
+    require_admin: true
+    config:
+      ingress: core_configurator

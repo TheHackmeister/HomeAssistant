@@ -1,0 +1,134 @@
+substitutions:
+  name: "garage-light"
+  friendly_name: "Athom RGBWW Light"
+  project_name: "athom.rgbww-light"
+  project_version: "1.1"
+  light_restore_mode: RESTORE_DEFAULT_ON
+  color_interlock: 'true'
+
+globals:
+  - id: fast_boot
+    type: int
+    restore_value: yes
+    initial_value: '0'
+
+esphome:
+  name: "${name}"
+  name_add_mac_suffix: false
+  project:
+    name: "${project_name}"
+    version: "${project_version}"
+  on_boot:
+    then:
+      - script.execute: fast_boot_script
+
+esp8266:
+  board: esp8285
+  restore_from_flash: true
+
+preferences:
+  flash_write_interval: 1min
+  
+api:
+
+ota:
+
+logger:
+
+mdns:
+  disabled: false
+
+web_server:
+  port: 80
+  
+dashboard_import:
+  package_import_url: github://athom-tech/athom-configs/athom-rgbww-light.yaml
+
+binary_sensor:
+  - platform: status
+    name: "${friendly_name} Status"
+
+sensor:
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+
+button:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+    id: Reset
+
+output:
+  - platform: esp8266_pwm
+    id: red_output
+    pin: GPIO4
+  - platform: esp8266_pwm
+    id: green_output
+    pin: GPIO12
+  - platform: esp8266_pwm
+    id: blue_output
+    pin: GPIO14
+  - platform: esp8266_pwm
+    id: warm_white_output
+    pin: GPIO13
+  - platform: esp8266_pwm
+    id: white_output
+    pin: GPIO5
+
+
+light:
+  - platform: rgbww
+    id: rgbww_light
+    name: "${friendly_name}"
+    restore_mode: ${light_restore_mode}
+    red: red_output
+    green: green_output
+    blue: blue_output
+    warm_white: warm_white_output
+    cold_white: white_output
+    cold_white_color_temperature: 6000 K
+    warm_white_color_temperature: 3000 K
+    color_interlock: ${color_interlock}
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP Address"
+      disabled_by_default: true
+
+script:
+  - id: fast_boot_script
+    then:
+      - if:
+          condition:
+            lambda: return ( id(fast_boot) >= 3 );
+          then:
+            - lambda: |-
+                ESP_LOGD("athom-rgbww-light.yaml", "Now the counter is greater than or equal to 3, perform reset device and reboot");
+                id(fast_boot) = 0;
+                fast_boot->loop();
+                global_preferences->sync();
+                auto call = id(rgbww_light).turn_on();
+                call.set_transition_length(500);
+                call.set_brightness(1.0);
+                call.set_color_mode(ColorMode::RGB);
+                call.set_rgb(0.0, 0.0, 1.0);
+                call.perform();
+            - delay: 5s
+            - button.press: Reset
+      - lambda: |-
+          id(fast_boot) += 1;
+          fast_boot->loop();
+          global_preferences->sync();
+          ESP_LOGD("athom-rgbww-light.yaml", "Now the counter is %d.  Reset the device when the counter is greater than or equal to 3", id(fast_boot));
+      - delay: 10s
+      - lambda: |-
+          ESP_LOGD("athom-rgbww-light.yaml", "Reset counter");
+          id(fast_boot) = 0;
+          fast_boot->loop();
+          global_preferences->sync();
+
+wifi:
+  #ssid: !secret wifi_ssid
+  #password: !secret wifi_password
+  ap: 
+    password: bolin123

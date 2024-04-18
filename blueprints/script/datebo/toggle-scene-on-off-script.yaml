@@ -1,0 +1,37 @@
+blueprint:
+  name: Toggle scene
+  description: Toggle a scene on and off. If any of the entities is on, switch everything
+    off. Else, activate scene.
+  domain: script
+  input:
+    the_scene:
+      name: Scene to toggle
+      description: The scene you want to toggle
+      selector:
+        entity:
+          domain:
+          - scene
+          multiple: false
+  source_url: https://community.home-assistant.io/t/toggle-scene-on-off-script/473718
+mode: queued
+sequence:
+- alias: Set up variables
+  variables:
+    the_scene: !input the_scene
+    scene_entities: '{{ state_attr(the_scene, ''entity_id'') }}'
+- alias: Toggle the scene
+  if:
+  - condition: template
+    value_template: "{% for entity_ids in scene_entities if is_state(entity_ids, 'on')%}\n
+      \ {% if loop.index == 1 %}\n    true\n  {% endif %}\n{% else %}\n  false\n{%
+      endfor %}"
+  then:
+  - service: homeassistant.turn_off
+    data: {}
+    target:
+      entity_id: '{{ scene_entities }}'
+  else:
+  - service: scene.turn_on
+    target:
+      entity_id: !input the_scene
+    metadata: {}

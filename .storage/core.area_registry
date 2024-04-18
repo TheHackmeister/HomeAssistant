@@ -1,44 +1,117 @@
 {
-    "version": 1,
-    "key": "core.area_registry",
-    "data": {
-        "areas": [
-            {
-                "name": "Living Room",
-                "id": "living_room"
-            },
-            {
-                "name": "Kitchen",
-                "id": "kitchen"
-            },
-            {
-                "name": "Office",
-                "id": "office"
-            },
-            {
-                "name": "Garage",
-                "id": "garage"
-            },
-            {
-                "name": "Backyard",
-                "id": "backyard"
-            },
-            {
-                "name": "Front Yard",
-                "id": "front_yard"
-            },
-            {
-                "name": "Boy's Bathroom",
-                "id": "boy_s_bathroom"
-            },
-            {
-                "name": "Master Bathroom",
-                "id": "master_bathroom"
-            },
-            {
-                "name": "Master Bedroom",
-                "id": "master_bedroom"
-            }
-        ]
-    }
+  "version": 1,
+  "minor_version": 6,
+  "key": "core.area_registry",
+  "data": {
+    "areas": [
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "living_room",
+        "labels": [],
+        "name": "Living Room",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "kitchen",
+        "labels": [],
+        "name": "Kitchen",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "office",
+        "labels": [],
+        "name": "Office",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "master_bathroom",
+        "labels": [],
+        "name": "Main Bathroom",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "master_bedroom",
+        "labels": [],
+        "name": "Main Bedroom",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "dining_room",
+        "labels": [],
+        "name": "Dining Room",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "hall",
+        "labels": [],
+        "name": "Main Bedroom Hall",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "guest_bathroom",
+        "labels": [],
+        "name": "Guest Bathroom",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "master_closet",
+        "labels": [],
+        "name": "Main Bedroom Closet",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "porch",
+        "labels": [],
+        "name": "Porch",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "master_hall",
+        "labels": [],
+        "name": "Main Hall",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": null,
+        "id": "grow_room",
+        "labels": [],
+        "name": "Grow Room",
+        "picture": null
+      }
+    ]
+  }
 }

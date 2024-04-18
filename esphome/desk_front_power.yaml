@@ -1,0 +1,7 @@
+substitutions:
+  system: desk_front_power
+  system_friendly: Desk Front Power
+
+packages:
+  package-core-device: !include package-core-device.yaml
+  package-sp10: !include package-ss30.yaml

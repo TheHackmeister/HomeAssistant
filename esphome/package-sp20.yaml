@@ -17,6 +17,8 @@ sensor:
     cf_pin: GPIO05
     cf1_pin: GPIO14
     id: hlw
+    #current_resistor: ${current_res}
+    #voltage_divider: ${voltage_div}
     current:
       name: "${system_friendly} Amperage Raw"
       unit_of_measurement: A
@@ -54,6 +56,14 @@ sensor:
         - delta: 5
     change_mode_every: 20
     update_interval: 200ms
+
+  #- platform: total_daily_energy
+  #  name: "${system_friendly} Total Daily Energy"
+  #  power_id: "wattage"
+  #  filters:
+  #      # Multiplication factor from W to kW is 0.001
+  #      - multiply: 0.001
+  #  unit_of_measurement: kWh
 
 
 # This makes the red LED turn on when the relay is on.

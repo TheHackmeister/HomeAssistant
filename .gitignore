@@ -20,6 +20,7 @@ www/community/*
 image/
 
 #
+core
 .HA_VERSION
 aircast.xml
 options.xml
@@ -40,6 +41,8 @@ ip_bans.yaml
 secrets.yaml
 known_devices.yaml
 
-home-assistant.log
+home-assistant.log*
 home-assistant_v2.db
+home-assistant_v2.db-shm
+home-assistant_v2.db-wal
 zigbee.db

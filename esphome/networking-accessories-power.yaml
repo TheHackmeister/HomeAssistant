@@ -1,0 +1,7 @@
+substitutions:
+  system: networking-accessories-power
+  system_friendly: Networking Accessories Power
+
+packages:
+  package-core-device: !include package-core-device.yaml
+  package-sp10: !include package-ss30.yaml

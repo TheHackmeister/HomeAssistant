@@ -1,0 +1,71 @@
+esphome:
+  name: "garage-sensor"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+  #build_path: ./build/${system}
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  #encryption:
+  #  key: "CYLBQLA/mYvjoxIxu9K4BkAaBlkBTTcTA3uVs6bhKe0="
+#api:
+#  password: !secret hass_api_key
+#  reboot_timeout: 1h
+
+ota:
+  #password: "07427cbe0d70b02286649e045df36c7b"
+
+wifi:
+  #ssid: !secret wifi_ssid
+  #password: !secret wifi_password
+  #domain: .spencerslab.com
+  ssid: garage-light
+  password: bolin123
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Garage-Sensor Fallback Hotspot"
+    #password: "0vBdV4yidYq2"
+
+mdns:
+  disabled: false
+http_request:
+  useragent: esphome/device
+  timeout: 3s
+captive_portal:
+    
+sensor:
+  - platform: wifi_signal
+    name: "${system_friendly} WiFi Signal"
+    update_interval: 60s
+  - platform: uptime
+    name: "${system_friendly} Uptime"
+  - platform: esp32_hall
+    name: "ESP32 Hall Sensor"
+    update_interval: 5s
+    id: hall
+    on_value: 
+      then:
+        - if:
+            condition:
+              sensor.in_range:
+                id: hall
+                below: 200.0
+                above: -200.0
+            then:
+              - http_request.post: 
+                  url: http://garage-light.local/light/athom_rgbww_light/turn_on
+            else:
+              - http_request.post: 
+                  url: http://garage-light.local/light/athom_rgbww_light/turn_off
+binary_sensor:
+  - platform: status
+    name: "${system_friendly} Status"
+text_sensor:
+  - platform: version
+    name: "${system_friendly} ESPHome Version"
+

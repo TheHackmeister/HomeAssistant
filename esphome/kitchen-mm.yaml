@@ -1,0 +1,28 @@
+substitutions:
+  name: "kitchen-mm"
+  room: "kitchen"
+packages:
+  athom.smart-plug-v2: github://EverythingSmartHome/everything-presence-one/everything-presence-one-st.yaml
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "N/aGc8Z1UBUzoZWYIMggM+w18SzTLcnSO5uFfj6GjMM="
+
+ota:
+  password: "bbcfa510de596e53f0c371ec994f58d9"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Kitchen-Mm Fallback Hotspot"
+    password: "G7m2rksthdsf"
+
+captive_portal:
+    

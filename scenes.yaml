@@ -44,31 +44,39 @@
       supported_features: 41
       state: 'on'
 - id: '1612755811173'
-  name: Master Bath Lights Night
+  name: Main Bath Lights Night
   entities:
-    light.master_bath_color_light:
-      min_mireds: 142
-      max_mireds: 666
-      brightness: 163
+    light.half_bathroom_light:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - okay
+      - channel_change
+      - finish_effect
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - xy
+      friendly_name: Half-Bathroom Light
+      supported_features: 44
+      color_mode: xy
       hs_color:
-      - 360
-      - 100
+      - 9.231
+      - 66.275
       rgb_color:
       - 255
-      - 0
-      - 0
+      - 112
+      - 86
       xy_color:
-      - 0.701
-      - 0.299
-      off_brightness:
-      friendly_name: Master Bath Color Light
-      supported_features: 59
+      - 0.589
+      - 0.329
+      brightness: 56
       state: 'on'
-    light.master_bathroom_white_light:
-      off_brightness:
-      friendly_name: Master Bathroom White Light
-      supported_features: 41
-      state: 'off'
+  metadata: {}
 - id: '1615685988075'
   name: Front - Delivery
   entities:
@@ -104,3 +112,655 @@
       friendly_name: Front Porch Light
       supported_features: 59
       state: 'on'
+- id: '1660792576262'
+  name: Cooking
+  entities:
+    light.kitchen_lights:
+      min_mireds: 142
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      supported_color_modes:
+      - color_temp
+      - xy
+      entity_id:
+      - light.kitchen_light_door
+      - light.kitchen_light_sink
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      color_mode: color_temp
+      brightness: 254
+      hs_color:
+      - 27.423
+      - 49.825
+      rgb_color:
+      - 255
+      - 186
+      - 127
+      xy_color:
+      - 0.472
+      - 0.379
+      color_temp: 305
+      state: 'on'
+    switch.tv_room_side_table_power_relay_4:
+      icon: hass:lightbulb
+      friendly_name: TV Room Side Table Light
+      state: 'on'
+  metadata:
+    light.kitchen_lights:
+      entity_only: true
+    switch.tv_room_side_table_power_relay_4:
+      entity_only: true
+- id: '1660792938367'
+  name: 'House Mode: TV'
+  entities:
+    switch.tv_room_side_table_power_relay_4:
+      icon: hass:lightbulb
+      friendly_name: TV Room Side Table Light
+      state: 'off'
+    light.kitchen_lights:
+      min_mireds: 142
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      supported_color_modes:
+      - color_temp
+      - xy
+      entity_id:
+      - light.kitchen_light_door
+      - light.kitchen_light_sink
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      color_mode: color_temp
+      brightness: 3
+      hs_color:
+      - 25.487
+      - 100
+      rgb_color:
+      - 255
+      - 108
+      - 0
+      xy_color:
+      - 0.635
+      - 0.355
+      color_temp: 666
+      state: 'on'
+  metadata:
+    switch.tv_room_side_table_power_relay_4:
+      entity_only: true
+    light.kitchen_lights:
+      entity_only: true
+- id: '1660793166100'
+  name: 'House Mode: Bright'
+  entities:
+    light.kitchen_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - xy
+      effect:
+      color_mode: color_temp
+      brightness: 255
+      color_temp_kelvin: 3558
+      color_temp: 281
+      hs_color:
+      - 27.117
+      - 43.528
+      rgb_color:
+      - 255
+      - 194
+      - 144
+      xy_color:
+      - 0.449
+      - 0.373
+      lights:
+      - light.kitchen_light_door
+      - light.esp32_status_led_2
+      - light.kitchen_light_sink
+      controlling: true
+      child_ids:
+      - light.overhead_lights_kitchen
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      state: 'on'
+    light.grow_room_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6493
+      min_mireds: 154
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      color_mode: color_temp
+      brightness: 254
+      color_temp_kelvin: 3508
+      color_temp: 285
+      hs_color:
+      - 27.165
+      - 44.6
+      rgb_color:
+      - 255
+      - 192
+      - 141
+      xy_color:
+      - 0.454
+      - 0.373
+      lights:
+      - light.grow_room_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_grow_room
+      icon: mdi:lightbulb-group
+      friendly_name: Grow Room Lights
+      supported_features: 40
+      state: 'on'
+    light.dining_room_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6493
+      min_mireds: 154
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      color_mode: color_temp
+      brightness: 255
+      color_temp_kelvin: 3558
+      color_temp: 281
+      hs_color:
+      - 27.117
+      - 43.528
+      rgb_color:
+      - 255
+      - 194
+      - 144
+      xy_color:
+      - 0.449
+      - 0.373
+      lights:
+      - light.dining_room_light
+      - light.dining_room_game_corner_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_dining_room
+      - light.sleep_lights_dining_room
+      icon: mdi:lightbulb-group
+      friendly_name: Dining Room Lights
+      supported_features: 40
+      state: 'on'
+    light.living_room_lights:
+      supported_color_modes:
+      - brightness
+      color_mode: brightness
+      brightness: 255
+      lights:
+      - light.tv_room_side_table_light
+      - light.living_room_light
+      - light.esp32_status_led_3
+      controlling: true
+      child_ids:
+      - light.overhead_lights_living_room
+      - light.sleep_lights_living_room
+      icon: mdi:lightbulb-group
+      friendly_name: Living Room Lights
+      supported_features: 40
+      state: 'on'
+    light.main_bedroom_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - xy
+      effect:
+      color_mode: color_temp
+      brightness: 252
+      color_temp_kelvin: 2000
+      color_temp: 500
+      hs_color:
+      - 30.601
+      - 94.547
+      rgb_color:
+      - 255
+      - 136
+      - 13
+      xy_color:
+      - 0.599
+      - 0.382
+      lights:
+      - light.main_bedroom_dresser_light
+      - light.main_bedroom_right_light
+      - light.main_bedroom_left_light
+      - light.esp32_status_led_5
+      controlling: false
+      child_ids:
+      - light.overhead_lights_main_bedroom
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bedroom Lights
+      supported_features: 44
+      state: 'on'
+    light.main_bedroom_closet_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6493
+      min_mireds: 154
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      color_mode: color_temp
+      brightness: 255
+      color_temp_kelvin: 3508
+      color_temp: 285
+      hs_color:
+      - 27.165
+      - 44.6
+      rgb_color:
+      - 255
+      - 192
+      - 141
+      xy_color:
+      - 0.454
+      - 0.373
+      lights:
+      - light.main_bedroom_closet_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_main_bedroom_closet
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bedroom Closet Lights
+      supported_features: 40
+      state: 'on'
+    light.main_bedroom_hall_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - xy
+      effect:
+      color_mode: color_temp
+      brightness: 255
+      color_temp_kelvin: 3558
+      color_temp: 281
+      hs_color:
+      - 27.117
+      - 43.528
+      rgb_color:
+      - 255
+      - 194
+      - 144
+      xy_color:
+      - 0.449
+      - 0.373
+      lights:
+      - light.main_bathroom_sink_left_light
+      - light.main_bathroom_right_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_main_bedroom_hall
+      - light.sleep_lights_main_bedroom_hall
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bedroom Hall Lights
+      supported_features: 44
+      state: 'on'
+    light.main_bathroom_lights:
+      supported_color_modes:
+      - onoff
+      color_mode: onoff
+      lights:
+      - light.main_bathroom_light_flipper
+      - light.scene_main_bathroom_night
+      controlling: true
+      child_ids:
+      - light.overhead_lights_main_bathroom
+      - light.sleep_lights_main_bathroom
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bathroom Lights
+      supported_features: 0
+      state: 'on'
+  metadata:
+    light.kitchen_lights:
+      entity_only: true
+    light.grow_room_lights:
+      entity_only: true
+    light.dining_room_lights:
+      entity_only: true
+    light.living_room_lights:
+      entity_only: true
+    light.main_bedroom_lights:
+      entity_only: true
+    light.main_bedroom_closet_lights:
+      entity_only: true
+    light.main_bedroom_hall_lights:
+      entity_only: true
+    light.main_bathroom_lights:
+      entity_only: true
+- id: '1660793768339'
+  name: 'House Mode: Mood'
+  entities:
+    light.kitchen_lights:
+      supported_color_modes:
+      - color_temp
+      - xy
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      min_mireds: 142
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      entity_id:
+      - light.kitchen_light_door
+      - light.kitchen_light_sink
+      color_mode: xy
+      brightness: 109
+      hs_color:
+      - 30.252
+      - 93.333
+      rgb_color:
+      - 255
+      - 137
+      - 17
+      xy_color:
+      - 0.599
+      - 0.382
+      state: 'on'
+    switch.tv_room_side_table_power_relay_4:
+      icon: hass:lightbulb
+      friendly_name: TV Room Side Table Light
+      state: 'off'
+    light.dining_room_light:
+      supported_color_modes:
+      - brightness
+      friendly_name: Dining Room Light
+      supported_features: 32
+      state: 'off'
+  metadata:
+    light.kitchen_lights:
+      entity_only: true
+    switch.tv_room_side_table_power_relay_4:
+      entity_only: true
+    light.dining_room_light:
+      entity_only: true
+- id: '1660794155666'
+  name: 'House Mode: Party!'
+  entities:
+    light.kitchen_lights:
+      min_mireds: 142
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      supported_color_modes:
+      - color_temp
+      - xy
+      entity_id:
+      - light.kitchen_light_door
+      - light.kitchen_light_sink
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      color_mode: xy
+      brightness: 123
+      hs_color:
+      - 314.824
+      - 100
+      rgb_color:
+      - 255
+      - 0
+      - 192
+      xy_color:
+      - 0.477
+      - 0.196
+      state: 'on'
+  metadata:
+    light.kitchen_lights:
+      entity_only: true
+- id: '1661005080855'
+  name: 'Default Light Colors: On'
+  entities:
+    light.hall_light_status:
+      min_mireds: 153
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      supported_color_modes:
+      - color_temp
+      - xy
+      off_with_transition: false
+      off_brightness:
+      friendly_name: Hall Light - Status
+      supported_features: 44
+      color_mode: xy
+      brightness: 254
+      hs_color:
+      - 30.119
+      - 99.216
+      rgb_color:
+      - 255
+      - 129
+      - 2
+      xy_color:
+      - 0.611994
+      - 0.373999
+      state: 'on'
+    light.master_bathroom_night_light:
+      min_mireds: 153
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      - xy
+      off_with_transition: false
+      off_brightness:
+      friendly_name: Master Bathroom Night Light
+      supported_features: 40
+      color_mode: xy
+      brightness: 28
+      hs_color:
+      - 0
+      - 100
+      rgb_color:
+      - 255
+      - 0
+      - 0
+      xy_color:
+      - 0.701
+      - 0.299
+      state: 'on'
+  metadata:
+    light.hall_light_status:
+      entity_only: true
+    light.master_bathroom_night_light:
+      entity_only: true
+- id: '1661005863952'
+  name: 'Default Color Lights: Off'
+  entities:
+    light.hall_light_status:
+      min_mireds: 153
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      supported_color_modes:
+      - color_temp
+      - xy
+      off_with_transition: false
+      off_brightness: 254
+      friendly_name: Hall Light - Status
+      supported_features: 44
+      state: 'off'
+    light.master_bathroom_night_light:
+      min_mireds: 153
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      - xy
+      off_with_transition: false
+      off_brightness: 28
+      friendly_name: Master Bathroom Night Light
+      supported_features: 40
+      state: 'off'
+    light.master_closet_lights:
+      supported_color_modes:
+      - brightness
+      entity_id:
+      - light.master_closet_light_level_on_off
+      icon: mdi:lightbulb-group
+      friendly_name: Master Closet Lights
+      supported_features: 40
+      state: 'off'
+  metadata:
+    light.hall_light_status:
+      entity_only: true
+    light.master_bathroom_night_light:
+      entity_only: true
+    light.master_closet_lights:
+      entity_only: true
+- id: '1680049531928'
+  name: Game Time
+  entities:
+    light.kitchen_lights:
+      supported_color_modes:
+      - color_temp
+      - xy
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      min_color_temp_kelvin: 1501
+      max_color_temp_kelvin: 7042
+      min_mireds: 142
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      color_mode: xy
+      brightness: 130
+      hs_color:
+      - 205.938
+      - 75.294
+      rgb_color:
+      - 63
+      - 172
+      - 255
+      xy_color:
+      - 0.159
+      - 0.208
+      entity_id:
+      - light.kitchen_light_sink
+      - light.kitchen_light_door
+      state: 'on'
+    light.hall_lights:
+      supported_color_modes:
+      - color_temp
+      - xy
+      icon: mdi:lightbulb-group
+      friendly_name: Hall Lights
+      supported_features: 44
+      min_color_temp_kelvin: 1501
+      max_color_temp_kelvin: 6535
+      min_mireds: 153
+      max_mireds: 666
+      effect_list:
+      - colorloop
+      entity_id:
+      - light.hall_light_status
+      color_mode: xy
+      brightness: 254
+      hs_color:
+      - 341.486
+      - 68.627
+      rgb_color:
+      - 255
+      - 80
+      - 134
+      xy_color:
+      - 0.553
+      - 0.267
+      state: 'on'
+    light.dining_room_game_corner_light_light:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6493
+      min_mireds: 154
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      - xy
+      off_with_transition: false
+      off_brightness:
+      friendly_name: Dining Room Game Corner Light Light
+      supported_features: 40
+      color_mode: xy
+      brightness: 199
+      hs_color:
+      - 341.486
+      - 68.627
+      rgb_color:
+      - 255
+      - 80
+      - 134
+      xy_color:
+      - 0.553
+      - 0.267
+      state: 'on'
+  icon: mdi:hockey-sticks
+  metadata:
+    light.kitchen_lights:
+      entity_only: true
+    light.hall_lights:
+      entity_only: true
+    light.dining_room_game_corner_light_light:
+      entity_only: true
+- id: '1707574943464'
+  name: Guest Bathroom Night
+  entities:
+    light.master_bathroom_night_light:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6535
+      min_mireds: 153
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      - xy
+      color_mode: xy
+      brightness: 51
+      color_temp_kelvin:
+      color_temp:
+      hs_color:
+      - 0.992
+      - 94.902
+      rgb_color:
+      - 255
+      - 17
+      - 13
+      xy_color:
+      - 0.697
+      - 0.3
+      off_with_transition: false
+      off_brightness:
+      friendly_name: Master Bathroom Night Light
+      supported_features: 40
+      state: 'on'
+  icon: mdi:lightbulb-night-outline
+  metadata: {}

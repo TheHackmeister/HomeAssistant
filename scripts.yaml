@@ -17,10 +17,10 @@ add_to_calibration_list:
   sequence:
   - service: var.set
     data:
-      value_template: "{% if added_entity in states('var.calibration_entities') %}\n\
-        \  {{ states('var.calibration_values') }}\n{% else %}\n  {%- if not states('var.calibration_entities')|length\
-        \ == 0 %}{{ states('var.calibration_entities') }},{%- endif %}{{ added_entity\
-        \ }}\n{% endif %}\n"
+      value_template: "{% if added_entity in states('var.calibration_entities') %}\n
+        \ {{ states('var.calibration_values') }}\n{% else %}\n  {%- if not states('var.calibration_entities')|length
+        == 0 %}{{ states('var.calibration_entities') }},{%- endif %}{{ added_entity
+        }}\n{% endif %}\n"
       entity_id: var.calibration_entities
     entity_id: var.calibration_entities
   mode: parallel
@@ -53,3 +53,38 @@ stop_calibration:
       level: warning
   mode: single
   icon: mdi:home
+turn_off_all_lights:
+  alias: Turn Off All Lights
+  sequence:
+  - service: light.turn_off
+    target:
+      area_id:
+      - master_bathroom
+      - dining_room
+      - living_room
+  mode: single
+vacuum_single_section:
+  alias: 'Vacuum: Single Section'
+  sequence:
+  - service: mqtt.publish
+    data:
+      topic: valetudo/dog/MapSegmentationCapability/clean/set
+      payload_template: "{\"segment_ids\": {% set segments = states.sensor.valetudo_dog_map_segments.attributes
+        -%}  {% set search = state_attr(room,\"friendly_name\") | replace('Vacuum
+        ', '', 1) -%} [{%- for segmentId in segments -%} {%- if segments[segmentId]
+        == search -%}\n  \"{{ segmentId }}\"\n{%- endif -%} {% endfor %}]}"
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 2
+      milliseconds: 0
+  - wait_template: '{{ is_state("vacuum.valetudo_dog", "returning") }}'
+    continue_on_timeout: true
+    enabled: true
+  - service: input_boolean.turn_off
+    data: {}
+    target:
+      entity_id: '{{ room }}'
+  mode: queued
+  icon: mdi:robot-vacuum
+  max: 20

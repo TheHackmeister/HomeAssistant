@@ -1,4 +1,3 @@
-#group:
 nhl_lights:
   name: NHL Lights
   icon: mdi:hockey-sticks
@@ -26,35 +25,9 @@ tv_room_double_click:
 
 ignored_entities:
   entities:
-    # TODO: Fix this remote.
-    - sensor.rgbgenie_rgbgenie_zb_5028_a09e6816_power
-
     - device_tracker.one_a2005 # Spencer's phone
+    - device_tracker.pixel_6
+    - device_tracker.pixel_6_work
+    - device_tracker.note5
     - person.spencer
-    - sensor.oneplus_a5010_bluetooth_connection # Liz's phone
-    - sensor.oneplus_a5010_internal_storage # Liz's phone
-    - sensor.oneplus_a5010_next_alarm # Liz's phone
-    - sensor.oneplus_a5010_detected_activity # Liz's phone
-    # These aren't working currently.
-    - media_player.dining_room_audio
-    - media_player.snapcast_group_c0da183b_4684_748f_7da6_83ecbcbaed0a
 
-#tv_room_long_click:
-#  name: TV Room Long Click Lights
-#  icon: mdi:lightbulb-group
-  #entities:
-  #  - switch.third_reality_inc_3rss007z_on_off
-  #  - switch.tv_room_side_table_power_relay_4
-  #  - switch.tv_room_light_01_relay
-
-plant_lights:
-  name: Plant Lights
-  icon: mdi:lightbulb
-  entities:
-    - switch.plant_light_02_relay
-    - switch.plant_light_03_relay
-plant_nursery_lights:
-  name: Plant Nursery Lights
-  icon: mdi:lightbulb
-  entities:
-    - switch.plant_light_01_relay

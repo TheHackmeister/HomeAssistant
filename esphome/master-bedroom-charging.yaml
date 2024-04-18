@@ -1,0 +1,14 @@
+substitutions:
+  system: master_bedroom_charging
+  system_friendly: Master Bedroom Charging
+
+packages:
+  package-core-device: !include package-core-device.yaml
+  package-sp10: !include package-ss30.yaml
+
+wifi:
+  manual_ip:
+    static_ip: 192.168.4.250
+    gateway: 192.168.4.1
+    subnet: 255.255.255.0
+    

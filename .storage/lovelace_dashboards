@@ -1,16 +1,43 @@
 {
-    "version": 1,
-    "key": "lovelace_dashboards",
-    "data": {
-        "items": [
-            {
-                "require_admin": false,
-                "show_in_sidebar": true,
-                "title": "All Entities",
-                "url_path": "all-entities",
-                "mode": "storage",
-                "id": "all_entities"
-            }
-        ]
-    }
+  "version": 1,
+  "minor_version": 1,
+  "key": "lovelace_dashboards",
+  "data": {
+    "items": [
+      {
+        "require_admin": false,
+        "show_in_sidebar": true,
+        "title": "All Entities",
+        "url_path": "all-entities",
+        "mode": "storage",
+        "id": "all_entities"
+      },
+      {
+        "require_admin": false,
+        "show_in_sidebar": false,
+        "title": "Calibration",
+        "url_path": "lovelace-calibration",
+        "mode": "storage",
+        "id": "lovelace_calibration"
+      },
+      {
+        "show_in_sidebar": true,
+        "icon": "mdi:home-lightning-bolt-outline",
+        "title": "Home",
+        "require_admin": false,
+        "mode": "storage",
+        "url_path": "lovelace-home",
+        "id": "lovelace_home"
+      },
+      {
+        "id": "map",
+        "icon": "mdi:map",
+        "title": "Map",
+        "url_path": "map",
+        "show_in_sidebar": true,
+        "require_admin": false,
+        "mode": "storage"
+      }
+    ]
+  }
 }

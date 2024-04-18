@@ -1,0 +1,29 @@
+substitutions:
+  name: "dinning-room-mm"
+  room: "dinning-room"
+packages:
+  athom.smart-plug-v2: github://EverythingSmartHome/everything-presence-one/everything-presence-one-st.yaml
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "pJbzQdrbLIBRFsX5eEMsztQ8qpey1t07KJPW3SMvxZo="
+
+ota:
+  password: "1adb8f36fef29384856eb44124ce1cef"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Dinning-Room-Mm Fallback Hotspot"
+    password: "SFkdvkMQoI73"
+
+captive_portal:
+  
