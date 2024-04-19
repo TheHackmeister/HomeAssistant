@@ -1,0 +1,121 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - alias: Perform Auto Backup
+    trigger:
+      platform: time_pattern
+      hours: /3
+    action:
+      service: auto_backup.snapshot_partial
+      data_template:
+        name: 'AutoBackup: {{ now().strftime(''%a, %-I:%M %p (%d/%m/%Y)'') }}'
+        addons:
+        - core_mariadb
+        - core_mosquitto
+        folders:
+        - homeassistant
+        - share
+        - ssl
+        keep_days: 2
+    id: 5b59be520ac340168ae5457813cec372
+  - alias: Perform Daily Backup
+    trigger:
+      platform: time
+      at: 02:30:00
+    condition:
+      condition: time
+      weekday:
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+      - sun
+    action:
+      service: auto_backup.snapshot_full
+      data_template:
+        name: 'DailyBackup: {{ now().strftime(''%A, %B %-d, %Y'') }}'
+        keep_days: 7
+    id: 0488c83c127a4845994736f9fa9eb4a8
+  - alias: Perform Weekly Backup
+    trigger:
+      platform: time
+      at: 02:30:00
+    condition:
+      condition: time
+      weekday:
+      - mon
+    action:
+      service: auto_backup.snapshot_full
+      data_template:
+        name: 'WeeklyBackup: {{ now().strftime(''%A, %B %-d, %Y'') }}'
+        keep_days: 28
+    id: 3ec6cfbb570941639d833212ddbb903e
+  - id: '1668386418720'
+    alias: 'Low Battery: Alert'
+    description: ''
+    use_blueprint:
+      path: sbyx/low-battery-level-detection-notification-for-all-battery-sensors.yaml
+      input:
+        actions:
+        - service: notify.persistent_notification
+          data:
+            message: Low Battery! {{sensors}}
+  - id: healthchecksio_ping
+    alias: 'Infra: Healthcheckio ping'
+    description: ''
+    trigger:
+    - platform: time_pattern
+      minutes: /5
+    condition: []
+    action:
+    - service: rest_command.healthchecksio
+      data: {}
+    mode: single
+  - id: '1619370413023'
+    alias: 'Infra: Reserve Signal Number'
+    description: ''
+    trigger:
+    - platform: time
+      at: '12:00:00'
+    condition: []
+    action:
+    - service: notify.persistent_notification
+      data:
+        message: Reserve this number please.
+    mode: single
+  - id: '1650416586411'
+    alias: 'Infra: Phone IP Whitelisting'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id: sensor.pixel_6_public_ip_address
+      variables:
+        public_ip: '{{ states.sensor.pixel_6_public_ip_address.state }}'
+        wifi_connection: '{{ states.sensor.pixel_6_wifi_connection.state }}'
+    condition: []
+    action:
+    - service: mikrotik_api.remove
+      data:
+        command: /ip firewall address-list
+        find: /ip firewall address-list
+        find_params: list="http_whitelist" address="{{ public_ip }}"
+    - service: mikrotik_api.add
+      data:
+        command: /ip firewall address-list
+        params: list="http_whitelist" address="{{ public_ip }}" {% if (wifi_connection
+          == '<not connected>') %}timeout="24:00:00"{% endif %}" comment="{{ wifi_connection
+          }}"
+    mode: single

@@ -1,0 +1,60 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - id: '1660610808504'
+    alias: 'Button: Office'
+    description: ''
+    use_blueprint:
+      path: gtkow/ZHA - Sonoff SNZB-01.yaml
+      input:
+        remote: daba698afb5e06a48c96b3e041a342b8
+        single_press:
+        - service: light.toggle
+          data:
+            brightness_pct: 90
+          target:
+            area_id: office
+  - id: '1661009594593'
+    alias: 'Office: Control Hall Light'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - binary_sensor.contact_office_door
+    condition:
+    - condition: state
+      entity_id: input_select.house_mode
+      state: Night
+    action:
+    - if:
+      - condition: state
+        entity_id: binary_sensor.contact_office_door
+        state: 'on'
+      then:
+      - service: light.turn_on
+        data:
+          brightness_pct: 35
+          rgb_color:
+          - 198
+          - 70
+          - 0
+        target:
+          entity_id: light.hall_light_status
+      else:
+      - service: light.turn_off
+        data: {}
+        target:
+          entity_id: light.hall_light_status
+    mode: single

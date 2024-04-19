@@ -1,0 +1,105 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - id: '1667141355944'
+    alias: 'House Lock: When unlocked for 10 minutes'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - lock.touchscreen_deadbolt_z_wave_plus
+      to: unlocked
+      for:
+        hours: 0
+        minutes: 10
+        seconds: 0
+      id: Unlocked for 10 minutes
+    - platform: state
+      entity_id:
+      - binary_sensor.contact_front_door
+      to: 'off'
+      from: 'on'
+      id: Door Closed
+    condition:
+    - condition: or
+      conditions:
+      - condition: trigger
+        id: Unlocked for 10 minutes
+      - condition: and
+        conditions:
+        - condition: trigger
+          id: Door Closed
+        - condition: template
+          value_template: '{{ as_timestamp(now()) - as_timestamp(states.sensor.house_home_count.last_changed)
+            <  timedelta(minutes=10).total_seconds() }}'
+    action:
+    - service: automation.trigger
+      data: {}
+      target:
+        entity_id: automation.house_lock_lock_validation
+    mode: single
+  - id: '1667150342921'
+    alias: 'House Lock: When someone leaves'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - sensor.house_home_count
+    condition:
+    - condition: template
+      value_template: '{{ trigger.from_state.state|int(0) > trigger.to_state.state|int(0)
+        }}'
+    action:
+    - service: automation.trigger
+      data: {}
+      target:
+        entity_id: automation.house_lock_lock_validation
+    mode: single
+  - id: '1667150380222'
+    alias: 'House Lock: Unlock when someone arrives'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - sensor.house_home_count
+    condition:
+    - condition: template
+      value_template: '{{ trigger.from_state.state|int(0) < trigger.to_state.state|int(0)
+        }}'
+    - condition: state
+      entity_id: input_select.house_lock_mode
+      state: auto
+    action:
+    - service: lock.unlock
+      data: {}
+      target:
+        area_id: kitchen
+    mode: single
+  - id: '1667151041444'
+    alias: 'House Lock: Validate Conditions & Lock'
+    description: ''
+    trigger: []
+    condition:
+    - condition: template
+      value_template: '{# All the doors in the Kitchen are closed  #}'
+    - condition: state
+      entity_id: input_select.house_lock_mode
+      state: auto
+    action:
+    - service: lock.lock
+      data: {}
+      target:
+        area_id: kitchen
+    mode: single

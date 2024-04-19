@@ -1,0 +1,174 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - id: '1652670207101'
+    alias: 'House Mode: Night Trigger (Door)'
+    description: ''
+    trigger:
+    - type: not_opened
+      platform: device
+      device_id: e2d17c9f732bd7369ae1a5eb6fb7684f
+      entity_id: 6bb6182e6aa7d691040f8f162a2d93cc
+      domain: binary_sensor
+    condition:
+    - condition: time
+      before: 03:00:00
+      after: '19:00:00'
+      weekday:
+      - sun
+      - sat
+      - fri
+      - thu
+      - wed
+      - tue
+      - mon
+    action:
+    - service: input_select.select_option
+      data:
+        option: Night
+      target:
+        entity_id: input_select.house_mode
+    mode: single
+  - id: '1652670327204'
+    alias: 'House Mode: Day Trigger (Door)'
+    description: ''
+    trigger:
+    - type: opened
+      platform: device
+      device_id: e2d17c9f732bd7369ae1a5eb6fb7684f
+      entity_id: 6bb6182e6aa7d691040f8f162a2d93cc
+      domain: binary_sensor
+    condition:
+    - condition: time
+      before: '16:00:00'
+      after: 04:00:00
+      weekday:
+      - mon
+      - tue
+      - thu
+      - wed
+      - fri
+      - sat
+      - sun
+    action:
+    - service: input_select.select_option
+      data:
+        option: Day
+      target:
+        entity_id:
+        - input_select.house_mode
+    mode: single
+  - id: '1667095565781'
+    alias: 'House Mode: Day/Away'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - sensor.house_home_count
+      from: '0'
+      to: '1'
+      id: First Arrival
+    - platform: state
+      entity_id:
+      - sensor.house_home_count
+      from: '1'
+      to: '0'
+      id: Last Departure
+    condition: []
+    action:
+    - if:
+      - condition: trigger
+        id: Last Departure
+      then:
+      - service: input_select.select_option
+        data:
+          option: Away
+        target:
+          entity_id: input_select.house_mode
+      else:
+      - service: input_select.select_option
+        data:
+          option: Day
+        target:
+          entity_id: input_select.house_mode
+    mode: single
+  - id: '1668482874051'
+    alias: 'House Mode: Day'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.house_mode
+      from: Night
+      to: Day
+    condition: []
+    action:
+    - service: input_boolean.turn_off
+      data: {}
+      target:
+        entity_id: input_boolean.night_mode
+    - service: switch.turn_off
+      data: {}
+      target:
+        entity_id: switch.adaptive_lighting_sleep_mode_master_sink_lights
+    - service: switch.turn_on
+      data: {}
+      target:
+        entity_id: switch.adaptive_lighting_master_bedroom_lights
+    mode: single
+  - id: '1668482944676'
+    alias: 'House Mode: Night'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.house_mode
+      from: Day
+      to: Night
+    condition: []
+    action:
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.night_mode
+    - service: switch.turn_on
+      data: {}
+      target:
+        entity_id: switch.adaptive_lighting_sleep_mode_master_sink_lights
+    - service: switch.turn_off
+      data: {}
+      target:
+        entity_id: switch.adaptive_lighting_master_bedroom_lights
+    - service: light.turn_on
+      data:
+        brightness_pct: 8
+        kelvin: 2000
+      target:
+        entity_id: light.master_bedroom_lights
+    - service: media_player.turn_off
+      data: {}
+      target:
+        area_id: living_room
+    - service: light.turn_off
+      data: {}
+      target:
+        entity_id:
+        - light.tv_room_side_table_light
+        - light.dining_room_game_corner_light_light
+        - light.hall_light_status
+        area_id:
+        - dining_room
+        - living_room
+    mode: single

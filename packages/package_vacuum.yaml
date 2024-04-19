@@ -1,0 +1,99 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - id: '1668997929693'
+    alias: 'Vacuum: Run Selected Segments (When Away)'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.house_mode
+      to: Away
+    condition: []
+    action:
+    - repeat:
+        count: '{{ rooms | count }}'
+        sequence:
+        - service: script.turn_on
+          data:
+            variables:
+              segments: '["18"]'
+              room: '{{ rooms[repeat.index - 1] }}'
+          target:
+            entity_id: script.vacuum_single_section
+      enabled: true
+    variables:
+      rooms: '{{ states.input_boolean | selectattr("entity_id", "match", "input_boolean.vacuum.*")
+        | selectattr("state", "eq", "on") | sort(attribute="last_changed", reverse=true)
+        | map(attribute="entity_id") | list }}'
+    mode: single
+  - id: '1669085529205'
+    alias: 'Vacuum: Cancel Run (On Arrival)'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.house_mode
+      to: Day
+    condition: []
+    action:
+    - service: script.turn_off
+      data: {}
+      target:
+        entity_id: script.vacuum_single_section
+    - service: vacuum.return_to_base
+      data: {}
+      target:
+        area_id: living_room
+    mode: single
+  - id: '1669088385167'
+    alias: 'Vacuum: Schedule (Nightly)'
+    description: ''
+    trigger:
+    - platform: time
+      at: '23:59:50'
+    condition: []
+    action:
+    - repeat:
+        count: '{{ rooms | count }}'
+        sequence:
+        - service: input_boolean.turn_on
+          data_template:
+            entity_id: '{{ rooms[repeat.index - 1] }}'
+      enabled: true
+    - service: input_boolean.turn_off
+      data: {}
+      target:
+        entity_id:
+        - input_boolean.vacuum_kitchen
+        - input_boolean.vacuum_office
+        - input_boolean.vacuum_living_room
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.vacuum_living_room
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.vacuum_office
+    - service: input_boolean.turn_on
+      data: {}
+      target:
+        entity_id: input_boolean.vacuum_kitchen
+    mode: single
+    variables:
+      rooms: '{{ states.input_boolean | selectattr("entity_id", "match", "input_boolean.vacuum.*")
+        | sort(attribute="last_changed", reverse=true) | map(attribute="entity_id")
+        | list }}'

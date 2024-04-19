@@ -1,0 +1,144 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - id: '1660532203759'
+    alias: 'Buttons: Master Bedroom'
+    description: ''
+    use_blueprint:
+      path: niro1987/zha_ikea_tradfri_5button_remote_custom.yaml
+      input:
+        remote: dda5a35ca58ab1b57a0a2b727d121b0f
+        power_short:
+        - service: light.toggle
+          data: {}
+          target:
+            area_id:
+            - master_bedroom
+        dimdown_short:
+        - service: light.turn_off
+          data: {}
+          target:
+            area_id:
+            - master_closet
+            - master_bathroom
+            - master_bedroom
+            - master_hall
+        dimup_short:
+        - service: light.turn_on
+          data: {}
+          target:
+            area_id: master_bedroom
+        dimup_long:
+        - service: input_select.select_option
+          data:
+            option: Day
+          target:
+            entity_id: input_select.house_mode
+        dimdown_long:
+        - service: input_select.select_option
+          data:
+            option: Night
+          target:
+            entity_id: input_select.house_mode
+  - id: '1660610189672'
+    alias: 'Button: Master Bedroom'
+    description: ''
+    use_blueprint:
+      path: gtkow/ZHA - Sonoff SNZB-01.yaml
+      input:
+        remote: 194ed4f97e6562c7bcf8767b19d83413
+        single_press:
+        - service: light.toggle
+          data: {}
+          target:
+            area_id: master_bedroom
+        double_press:
+        - service: switch.toggle
+          data: {}
+          target:
+            entity_id: switch.area_presence_hold_master_bedroom
+  - id: '1712981375914'
+    alias: Bedroom Lights On
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 80658f61524311c7df4dae373f78b535
+      type: action
+      subtype: brightness_up_click
+    condition: []
+    action:
+    - service: light.turn_on
+      target:
+        area_id: master_bedroom
+      data: {}
+    mode: single
+  - id: '1712981431951'
+    alias: Turn Off Bedroom Lights
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 80658f61524311c7df4dae373f78b535
+      type: action
+      subtype: brightness_down_click
+    condition: []
+    action:
+    - service: light.turn_off
+      metadata: {}
+      data: {}
+      target:
+        area_id:
+        - master_bathroom
+        - master_closet
+        - master_bedroom
+        - hall
+    mode: single
+  - id: '1712982464266'
+    alias: Day Mode
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 80658f61524311c7df4dae373f78b535
+      type: action
+      subtype: brightness_up_hold
+    condition: []
+    action:
+    - service: input_select.select_option
+      metadata: {}
+      data:
+        option: Day
+      target:
+        entity_id: input_select.house_mode
+    mode: single
+  - id: '1712982502193'
+    alias: Night Mode
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 80658f61524311c7df4dae373f78b535
+      type: action
+      subtype: brightness_down_hold
+    condition: []
+    action:
+    - service: input_select.select_option
+      metadata: {}
+      data:
+        option: Night
+      target:
+        entity_id: input_select.house_mode
+    mode: single

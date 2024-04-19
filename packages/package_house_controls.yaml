@@ -1,0 +1,155 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - id: delivery_coming
+    alias: Delivery Complete - Turn Porch Light Red
+    description: ''
+    trigger:
+    - platform: state
+      entity_id: sensor.noco_nosh
+      to: delivery_coming
+    condition: []
+    action:
+    - scene: scene.front_delivery
+    mode: single
+  - id: delivery_complete
+    alias: Delivery Complete - Turn Porch Light White
+    description: ''
+    trigger:
+    - platform: state
+      entity_id: sensor.noco_nosh
+      to: no_deliveries
+    condition: []
+    action:
+    - scene: scene.front_white
+    mode: single
+  - id: '1615690939113'
+    alias: 'Buttons: House Main 4 Buttons'
+    description: ''
+    use_blueprint:
+      path: homeassistant/tuya_4_switch.yaml
+      input:
+        tuya_4button_scene_switch: 57acf2649f5d0d55d239f33b8f5a4874
+        button_two_long_press: []
+        button_four_long_press: []
+        button_four_short_press:
+        - service: scene.turn_on
+          target:
+            entity_id: scene.cooking
+          metadata: {}
+        button_three_long_press: []
+        button_one_short_press:
+        - service: scene.turn_on
+          target:
+            entity_id: scene.house_mode_bright
+          metadata: {}
+        button_two_short_press:
+        - service: scene.turn_on
+          target:
+            entity_id: scene.house_mode_party
+          metadata: {}
+        button_four_double_press:
+        - service: scene.turn_on
+          target:
+            entity_id: scene.house_mode_mood
+          metadata: {}
+        button_three_short_press:
+        - service: scene.turn_on
+          target:
+            entity_id: scene.house_mode_tv
+          metadata: {}
+        button_three_double_press:
+        - service: switch.toggle
+          data: {}
+          target:
+            entity_id: switch.tv_room_side_table_power_relay_4
+        button_two_double_press:
+        - service: automation.trigger
+          data: {}
+          target:
+            entity_id: automation.lights_restore_default_colors
+        button_one_double_press:
+        - service: light.toggle
+          data:
+            brightness_pct: 89
+          target:
+            area_id: office
+  - id: '1661005890182'
+    alias: 'Lights: Restore Default Colors'
+    description: ''
+    trigger: []
+    condition: []
+    action:
+    - service: light.turn_off
+      data: {}
+      target:
+        entity_id:
+        - light.office_flipper_switch
+        - light.hall_lights
+        - light.master_bathroom_lights
+        - light.tv_room_side_table_light
+        - light.master_hall_lights
+        - light.grow_room_lights
+        - light.porch_lights
+        - light.dining_room_game_corner_light_light
+        area_id:
+        - dining_room
+        - living_room
+        - office
+    - service: light.toggle
+      data: {}
+      target:
+        entity_id:
+        - light.kitchen_lights
+        - light.master_bedroom_lights
+    - service: light.toggle
+      data: {}
+      target:
+        entity_id:
+        - light.kitchen_lights
+        - light.master_bedroom_lights
+    - service: scene.turn_on
+      target:
+        entity_id: scene.default_light_colors
+      metadata: {}
+    - service: scene.turn_on
+      target:
+        entity_id: scene.default_color_lights_off
+      metadata: {}
+    mode: single
+  - id: '1661008795175'
+    alias: Hall Status
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - binary_sensor.contact_front_lock
+    condition: []
+    action:
+    - if:
+      - condition: state
+        entity_id: binary_sensor.contact_front_lock
+        state: 'on'
+      then:
+      - service: light.turn_on
+        data: {}
+        target:
+          entity_id: light.hall_lights
+      else:
+      - service: light.turn_off
+        data: {}
+        target:
+          entity_id: light.hall_lights
+    mode: single

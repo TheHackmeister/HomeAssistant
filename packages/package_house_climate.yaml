@@ -1,0 +1,330 @@
+#######################################################################################################################
+## Package - Unavailable Entities Sensor - GROUP VERSION
+## Count and list of entities with state of unavailable, unknown, or none (null)
+##
+## state: number of unavailable entities
+## attributes:
+##   entities: list of unavailable entity ids
+##
+## NOTES:
+##  - Home Assistant v0.117+ is required
+##  - This sensor updates once per minute.  State changes may take up to one minute to register.
+##  - Home Assistant does not have to restarted to use this sensor.  Just reload Localizations & Customizations and Group Entities.
+#######################################################################################################################
+
+automation:
+  - id: '1666063358700'
+    alias: 'Climate Mode: Away'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.climate_mode
+      to: Away
+    condition:
+    - condition: state
+      entity_id: input_select.climate_mode
+      state: Away
+    action:
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Heat
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_heating_away.state }}'
+        target:
+          area_id: living_room
+      - service: climate.set_hvac_mode
+        data:
+          hvac_mode: heat
+        target:
+          area_id: living_room
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Cool
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_cooling_away.state }}'
+        target:
+          area_id: living_room
+      - service: climate.set_hvac_mode
+        data:
+          hvac_mode: cool
+        target:
+          area_id: living_room
+    mode: single
+  - id: '1666410090998'
+    alias: 'Climate Mode: Day'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.climate_mode
+      to: Day
+    condition:
+    - condition: state
+      entity_id: input_select.climate_mode
+      state: Day
+    action:
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Heat
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_heating_day.state }}'
+        target:
+          area_id: living_room
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Cool
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_cooling_day.state }}'
+        target:
+          area_id: living_room
+    mode: single
+  - id: '1666410124566'
+    alias: 'Climate Mode: Peak Hours'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.climate_mode
+      to: Peak Hours
+    condition:
+    - condition: state
+      entity_id: input_select.climate_mode
+      state: Peak Hours
+    action:
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Heat
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_heating_peak_hours.state
+            }}'
+        target:
+          area_id: living_room
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Cool
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_cooling_peak_hours.state
+            }}'
+        target:
+          area_id: living_room
+    mode: single
+  - id: '1666410212073'
+    alias: 'Climate Mode: Super'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.climate_mode
+      to: Super Cool
+    - platform: state
+      entity_id:
+      - input_select.climate_mode
+      to: Super Heat
+    condition:
+    - condition: or
+      conditions:
+      - condition: state
+        entity_id: input_select.climate_mode
+        state: Super Heat
+      - condition: state
+        entity_id: input_select.climate_mode
+        state: Super Cool
+    action:
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Heat
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_heating_super.state }}'
+        target:
+          area_id: living_room
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Cool
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_cooling_super.state }}'
+        target:
+          area_id: living_room
+    mode: single
+  - id: '1666410455018'
+    alias: 'Climate Mode: Night'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.climate_mode
+      to: Night
+    condition:
+    - condition: state
+      entity_id: input_select.climate_mode
+      state: Night
+    action:
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Heat
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_heating_night.state }}'
+        target:
+          area_id: living_room
+    - if:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Cool
+        - condition: state
+          entity_id: input_select.climate_mode_providing
+          state: Both
+      then:
+      - service: climate.set_temperature
+        data_template:
+          temperature: '{{ states.input_number.climate_mode_cooling_night.state }}'
+        target:
+          area_id: living_room
+    mode: single
+  - id: '1666411618886'
+    alias: 'Climate Mode: Providing'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.climate_mode_providing
+    condition: []
+    action:
+    - if:
+      - condition: state
+        entity_id: input_select.climate_mode_providing
+        state: Cool
+      then:
+      - service: climate.set_hvac_mode
+        data:
+          hvac_mode: cool
+        target:
+          area_id: living_room
+    - if:
+      - condition: state
+        entity_id: input_select.climate_mode_providing
+        state: Heat
+      then:
+      - service: climate.set_hvac_mode
+        data:
+          hvac_mode: heat
+        target:
+          area_id: living_room
+    - if:
+      - condition: state
+        entity_id: input_select.climate_mode_providing
+        state: Both
+      then:
+      - service: climate.set_hvac_mode
+        data:
+          hvac_mode: Heat/Cool
+        target:
+          area_id: living_room
+    - service: automation.trigger
+      data:
+        skip_condition: false
+      target:
+        entity_id:
+        - automation.climate_mode_night
+        - automation.climate_mode_day
+        - automation.climate_mode_away
+        - automation.climate_mode_peak_hours
+        - automation.climate_mode_super
+    mode: single
+  - id: '1666414298157'
+    alias: 'Climate Mode: House Mode Sync'
+    description: ''
+    trigger:
+    - platform: state
+      entity_id:
+      - input_select.house_mode
+      to: Night
+    - platform: state
+      entity_id:
+      - input_select.house_mode
+      to: Away
+    - platform: state
+      entity_id:
+      - input_select.house_mode
+      to: Day
+    condition: []
+    action:
+    - service: input_select.select_option
+      data:
+        option: '{{ states.input_select.house_mode.state }}'
+      target:
+        entity_id: input_select.climate_mode
+    mode: single
