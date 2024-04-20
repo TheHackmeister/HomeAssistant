@@ -35,57 +35,127 @@ automation:
     action:
     - scene: scene.front_white
     mode: single
-  - id: '1615690939113'
-    alias: 'Buttons: House Main 4 Buttons'
+  - alias: 'House Lights: Cooking'
     description: ''
-    use_blueprint:
-      path: homeassistant/tuya_4_switch.yaml
-      input:
-        tuya_4button_scene_switch: 57acf2649f5d0d55d239f33b8f5a4874
-        button_two_long_press: []
-        button_four_long_press: []
-        button_four_short_press:
-        - service: scene.turn_on
-          target:
-            entity_id: scene.cooking
-          metadata: {}
-        button_three_long_press: []
-        button_one_short_press:
-        - service: scene.turn_on
-          target:
-            entity_id: scene.house_mode_bright
-          metadata: {}
-        button_two_short_press:
-        - service: scene.turn_on
-          target:
-            entity_id: scene.house_mode_party
-          metadata: {}
-        button_four_double_press:
-        - service: scene.turn_on
-          target:
-            entity_id: scene.house_mode_mood
-          metadata: {}
-        button_three_short_press:
-        - service: scene.turn_on
-          target:
-            entity_id: scene.house_mode_tv
-          metadata: {}
-        button_three_double_press:
-        - service: switch.toggle
-          data: {}
-          target:
-            entity_id: switch.tv_room_side_table_power_relay_4
-        button_two_double_press:
-        - service: automation.trigger
-          data: {}
-          target:
-            entity_id: automation.lights_restore_default_colors
-        button_one_double_press:
-        - service: light.toggle
-          data:
-            brightness_pct: 89
-          target:
-            area_id: office
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 4_single
+    mode: single
+    condition: []
+    action:
+      - service: scene.turn_on
+        target:
+          entity_id: scene.cooking
+        metadata: {}
+  - alias: 'House Lights: Bright'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 1_single
+    mode: single
+    condition: []
+    action:
+      - service: scene.turn_on
+        target:
+          entity_id: scene.house_mode_bright
+        metadata: {}
+  - alias: 'House Lights: Party'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 2_single
+    mode: single
+    condition: []
+    action:
+      - service: scene.turn_on
+        target:
+          entity_id: scene.house_mode_party
+        metadata: {}
+  - alias: 'House Lights: Mood'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 4_single
+    mode: single
+    condition: []
+    action:
+      - service: scene.turn_on
+        target:
+          entity_id: scene.house_mode_mood
+        metadata: {}
+  - alias: 'House Lights: TV'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 3_single
+    mode: single
+    condition: []
+    action:
+      - service: scene.turn_on
+        target:
+          entity_id: scene.house_mode_tv
+        metadata: {}
+  - alias: 'House Lights: Couch'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 3_double
+    mode: single
+    condition: []
+    action:
+      - service: switch.toggle
+        data: {}
+        target:
+          entity_id: switch.tv_room_side_table_power_relay_4
+  - alias: 'House Lights: Reset'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 2_double
+    mode: single
+    condition: []
+    action:
+      - service: automation.trigger
+        data: {}
+        target:
+          entity_id: automation.lights_restore_default_colors
+  - alias: 'House Lights: Office Lights'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: afde4e1e4b5130d838bd342d10f3c923
+      type: action
+      subtype: 1_double
+    mode: single
+    condition: []
+    action:
+      - service: light.toggle
+        data:
+          brightness_pct: 89
+        target:
+          area_id: office
   - id: '1661005890182'
     alias: 'Lights: Restore Default Colors'
     description: ''

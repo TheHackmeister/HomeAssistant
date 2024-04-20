@@ -210,11 +210,18 @@
       supported_color_modes:
       - color_temp
       - xy
-      effect:
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      lights:
+      - light.kitchen_light_sink
+      - light.kitchen_light_door
+      - light.esp32_status_led_2
+      controlling: true
+      child_ids:
+      - light.overhead_lights_kitchen
       color_mode: color_temp
       brightness: 255
-      color_temp_kelvin: 3558
-      color_temp: 281
       hs_color:
       - 27.117
       - 43.528
@@ -225,16 +232,8 @@
       xy_color:
       - 0.449
       - 0.373
-      lights:
-      - light.kitchen_light_door
-      - light.esp32_status_led_2
-      - light.kitchen_light_sink
-      controlling: true
-      child_ids:
-      - light.overhead_lights_kitchen
-      icon: mdi:lightbulb-group
-      friendly_name: Kitchen Lights
-      supported_features: 44
+      color_temp_kelvin: 3558
+      color_temp: 281
       state: 'on'
     light.grow_room_lights:
       min_color_temp_kelvin: 2000
@@ -243,6 +242,14 @@
       max_mireds: 500
       supported_color_modes:
       - color_temp
+      icon: mdi:lightbulb-group
+      friendly_name: Grow Room Lights
+      supported_features: 40
+      lights:
+      - light.grow_room_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_grow_room
       color_mode: color_temp
       brightness: 254
       color_temp_kelvin: 3508
@@ -257,14 +264,6 @@
       xy_color:
       - 0.454
       - 0.373
-      lights:
-      - light.grow_room_light
-      controlling: true
-      child_ids:
-      - light.overhead_lights_grow_room
-      icon: mdi:lightbulb-group
-      friendly_name: Grow Room Lights
-      supported_features: 40
       state: 'on'
     light.dining_room_lights:
       min_color_temp_kelvin: 2000
@@ -273,6 +272,16 @@
       max_mireds: 500
       supported_color_modes:
       - color_temp
+      icon: mdi:lightbulb-group
+      friendly_name: Dining Room Lights
+      supported_features: 40
+      lights:
+      - light.dining_room_light
+      - light.dining_room_game_corner_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_dining_room
+      - light.sleep_lights_dining_room
       color_mode: color_temp
       brightness: 255
       color_temp_kelvin: 3558
@@ -287,33 +296,23 @@
       xy_color:
       - 0.449
       - 0.373
-      lights:
-      - light.dining_room_light
-      - light.dining_room_game_corner_light
-      controlling: true
-      child_ids:
-      - light.overhead_lights_dining_room
-      - light.sleep_lights_dining_room
-      icon: mdi:lightbulb-group
-      friendly_name: Dining Room Lights
-      supported_features: 40
       state: 'on'
     light.living_room_lights:
       supported_color_modes:
       - brightness
-      color_mode: brightness
-      brightness: 255
+      icon: mdi:lightbulb-group
+      friendly_name: Living Room Lights
+      supported_features: 40
       lights:
       - light.tv_room_side_table_light
-      - light.living_room_light
       - light.esp32_status_led_3
+      - light.living_room_light
       controlling: true
       child_ids:
       - light.overhead_lights_living_room
       - light.sleep_lights_living_room
-      icon: mdi:lightbulb-group
-      friendly_name: Living Room Lights
-      supported_features: 40
+      color_mode: brightness
+      brightness: 255
       state: 'on'
     light.main_bedroom_lights:
       min_color_temp_kelvin: 2000
@@ -330,9 +329,19 @@
       supported_color_modes:
       - color_temp
       - xy
-      effect:
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bedroom Lights
+      supported_features: 44
+      lights:
+      - light.main_bedroom_right_light
+      - light.esp32_status_led_5
+      - light.main_bedroom_dresser_light
+      - light.main_bedroom_left_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_main_bedroom
       color_mode: color_temp
-      brightness: 252
+      brightness: 245
       color_temp_kelvin: 2000
       color_temp: 500
       hs_color:
@@ -345,17 +354,6 @@
       xy_color:
       - 0.599
       - 0.382
-      lights:
-      - light.main_bedroom_dresser_light
-      - light.main_bedroom_right_light
-      - light.main_bedroom_left_light
-      - light.esp32_status_led_5
-      controlling: false
-      child_ids:
-      - light.overhead_lights_main_bedroom
-      icon: mdi:lightbulb-group
-      friendly_name: Main Bedroom Lights
-      supported_features: 44
       state: 'on'
     light.main_bedroom_closet_lights:
       min_color_temp_kelvin: 2000
@@ -364,6 +362,14 @@
       max_mireds: 500
       supported_color_modes:
       - color_temp
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bedroom Closet Lights
+      supported_features: 40
+      lights:
+      - light.main_bedroom_closet_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_main_bedroom_closet
       color_mode: color_temp
       brightness: 255
       color_temp_kelvin: 3508
@@ -378,14 +384,6 @@
       xy_color:
       - 0.454
       - 0.373
-      lights:
-      - light.main_bedroom_closet_light
-      controlling: true
-      child_ids:
-      - light.overhead_lights_main_bedroom_closet
-      icon: mdi:lightbulb-group
-      friendly_name: Main Bedroom Closet Lights
-      supported_features: 40
       state: 'on'
     light.main_bedroom_hall_lights:
       min_color_temp_kelvin: 2000
@@ -402,11 +400,17 @@
       supported_color_modes:
       - color_temp
       - xy
-      effect:
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bedroom Hall Lights
+      supported_features: 44
+      lights:
+      - light.main_bathroom_right_light
+      - light.main_bathroom_sink_left_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_main_bedroom_hall
       color_mode: color_temp
       brightness: 255
-      color_temp_kelvin: 3558
-      color_temp: 281
       hs_color:
       - 27.117
       - 43.528
@@ -417,21 +421,15 @@
       xy_color:
       - 0.449
       - 0.373
-      lights:
-      - light.main_bathroom_sink_left_light
-      - light.main_bathroom_right_light
-      controlling: true
-      child_ids:
-      - light.overhead_lights_main_bedroom_hall
-      - light.sleep_lights_main_bedroom_hall
-      icon: mdi:lightbulb-group
-      friendly_name: Main Bedroom Hall Lights
-      supported_features: 44
+      color_temp_kelvin: 3558
+      color_temp: 281
       state: 'on'
     light.main_bathroom_lights:
       supported_color_modes:
       - onoff
-      color_mode: onoff
+      icon: mdi:lightbulb-group
+      friendly_name: Main Bathroom Lights
+      supported_features: 0
       lights:
       - light.main_bathroom_light_flipper
       - light.scene_main_bathroom_night
@@ -439,9 +437,37 @@
       child_ids:
       - light.overhead_lights_main_bathroom
       - light.sleep_lights_main_bathroom
+      color_mode: onoff
+      state: 'on'
+    light.office_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6493
+      min_mireds: 154
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
       icon: mdi:lightbulb-group
-      friendly_name: Main Bathroom Lights
-      supported_features: 0
+      friendly_name: Office Lights
+      supported_features: 40
+      color_mode: color_temp
+      brightness: 255
+      lights:
+      - light.office_color_light
+      - light.office_dimmer
+      controlling: true
+      child_ids: []
+      color_temp_kelvin: 3875
+      color_temp: 258
+      hs_color:
+      - 26.877
+      - 37.182
+      rgb_color:
+      - 255
+      - 202
+      - 160
+      xy_color:
+      - 0.428
+      - 0.367
       state: 'on'
   metadata:
     light.kitchen_lights:
@@ -459,6 +485,8 @@
     light.main_bedroom_hall_lights:
       entity_only: true
     light.main_bathroom_lights:
+      entity_only: true
+    light.office_lights:
       entity_only: true
 - id: '1660793768339'
   name: 'House Mode: Mood'

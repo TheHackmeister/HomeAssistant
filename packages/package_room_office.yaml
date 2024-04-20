@@ -13,19 +13,54 @@
 #######################################################################################################################
 
 automation:
-  - id: '1660610808504'
-    alias: 'Button: Office'
+  - alias: 'Office Lights: Toggle'
     description: ''
-    use_blueprint:
-      path: gtkow/ZHA - Sonoff SNZB-01.yaml
-      input:
-        remote: daba698afb5e06a48c96b3e041a342b8
-        single_press:
-        - service: light.toggle
-          data:
-            brightness_pct: 90
-          target:
-            area_id: office
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 4acb507d01850040bd5e0fa66c8a9ecc
+      type: action
+      subtype: single
+    mode: single
+    condition: []
+    action:
+      - service: light.toggle
+        data:
+          brightness_pct: 89
+        target:
+          area_id: office
+  - alias: 'Office Lights: Off'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 4acb507d01850040bd5e0fa66c8a9ecc
+      type: action
+      subtype: double
+    mode: single
+    condition: []
+    action:
+      - service: light.toggle
+        data:
+          brightness_pct: 89
+        target:
+          area_id: office
+  - alias: 'Office Lights: On'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 4acb507d01850040bd5e0fa66c8a9ecc
+      type: action
+      subtype: long
+    mode: single
+    condition: []
+    action:
+      - service: light.toggle
+        data:
+          brightness_pct: 89
+        target:
+          area_id: office
   - id: '1661009594593'
     alias: 'Office: Control Hall Light'
     description: ''

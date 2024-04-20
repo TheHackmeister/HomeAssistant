@@ -13,64 +13,45 @@
 #######################################################################################################################
 
 automation:
-  - id: '1660532203759'
-    alias: 'Buttons: Master Bedroom'
+  - alias: 'Main Bedroom: Toggle Lights'
     description: ''
-    use_blueprint:
-      path: niro1987/zha_ikea_tradfri_5button_remote_custom.yaml
-      input:
-        remote: dda5a35ca58ab1b57a0a2b727d121b0f
-        power_short:
-        - service: light.toggle
-          data: {}
-          target:
-            area_id:
-            - master_bedroom
-        dimdown_short:
-        - service: light.turn_off
-          data: {}
-          target:
-            area_id:
-            - master_closet
-            - master_bathroom
-            - master_bedroom
-            - master_hall
-        dimup_short:
-        - service: light.turn_on
-          data: {}
-          target:
-            area_id: master_bedroom
-        dimup_long:
-        - service: input_select.select_option
-          data:
-            option: Day
-          target:
-            entity_id: input_select.house_mode
-        dimdown_long:
-        - service: input_select.select_option
-          data:
-            option: Night
-          target:
-            entity_id: input_select.house_mode
-  - id: '1660610189672'
-    alias: 'Button: Master Bedroom'
+    trigger:
+    # Button
+    - platform: device
+      domain: mqtt
+      device_id: 327a85af123e9a975cfb3ef53814160f
+      type: action
+      subtype: single
+    # Disk 
+    - platform: device
+      domain: mqtt
+      device_id: 80658f61524311c7df4dae373f78b535
+      type: action
+      subtype: toggle
+    condition: []
+    action:
+      - service: light.toggle
+        data: {}
+        target:
+          area_id: master_bedroom
+    mode: single
+  - alias: 'Main Bedroom: Presense Hold'
     description: ''
-    use_blueprint:
-      path: gtkow/ZHA - Sonoff SNZB-01.yaml
-      input:
-        remote: 194ed4f97e6562c7bcf8767b19d83413
-        single_press:
-        - service: light.toggle
-          data: {}
-          target:
-            area_id: master_bedroom
-        double_press:
-        - service: switch.toggle
-          data: {}
-          target:
-            entity_id: switch.area_presence_hold_master_bedroom
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 327a85af123e9a975cfb3ef53814160f
+      type: action
+      subtype: double
+    condition: []
+    action:
+      - service: switch.toggle
+        data: {}
+        target:
+          entity_id: switch.area_presence_hold_main_bedroom
+    mode: single
   - id: '1712981375914'
-    alias: Bedroom Lights On
+    alias: 'Main Bedroom: Turn On Lights'
     description: ''
     trigger:
     - platform: device
@@ -86,7 +67,7 @@ automation:
       data: {}
     mode: single
   - id: '1712981431951'
-    alias: Turn Off Bedroom Lights
+    alias: 'Main Bedroom: Turn Off Lights'
     description: ''
     trigger:
     - platform: device
@@ -107,7 +88,7 @@ automation:
         - hall
     mode: single
   - id: '1712982464266'
-    alias: Day Mode
+    alias: 'Main Bedroom: Set Day Mode'
     description: ''
     trigger:
     - platform: device
@@ -125,7 +106,7 @@ automation:
         entity_id: input_select.house_mode
     mode: single
   - id: '1712982502193'
-    alias: Night Mode
+    alias: 'Main Bedroom: Set Night Mode'
     description: ''
     trigger:
     - platform: device

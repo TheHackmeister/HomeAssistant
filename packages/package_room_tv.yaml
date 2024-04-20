@@ -13,115 +13,141 @@
 #######################################################################################################################
 
 automation:
-  - id: '1630348249804'
-    alias: 'Buttons: TV Buttons'
-    description: Buttons to control the TV
-    use_blueprint:
-      path: homeassistant/tuya_4_switch.yaml
-      input:
-        button_two_short_press:
-        - service: automation.trigger
-          data: {}
-          target:
-            entity_id: automation.tv_automation_mute
-        button_two_long_press: []
-        tuya_4button_scene_switch: 07b2cfa4cde6e837172d2a76444e1882
-        button_four_short_press:
-        - service: media_player.turn_on
-          data: {}
-          target:
-            area_id: living_room
-        - service: media_player.select_source
-          target:
-            area_id: living_room
-          data:
-            source: HDMI-1
-        button_three_short_press:
-        - service: media_player.turn_on
-          data: {}
-          target:
-            area_id: living_room
-        - service: media_player.select_source
-          data:
-            source: HDMI-2
-          target:
-            area_id: living_room
-        button_one_short_press:
-        - service: media_player.turn_on
-          data: {}
-          target:
-            area_id: living_room
-        - service: media_player.select_source
-          target:
-            area_id: living_room
-          data:
-            source: HDMI-3
-        button_four_double_press:
-        - service: media_player.turn_off
-          data: {}
-          target:
-            area_id: living_room
-        button_four_long_press: []
-        button_three_double_press:
-        - service: media_player.turn_off
-          data: {}
-          target:
-            area_id: living_room
-        button_three_long_press: []
-        button_one_double_press:
-        - service: media_player.turn_on
-          data: {}
-          target:
-            area_id: living_room
-        - service: media_player.select_source
-          data:
-            source: HDMI-4
-          target:
-            area_id: living_room
-        button_one_long_press: []
-        button_two_double_press:
-        - service: automation.trigger
-          data: {}
-          target:
-            entity_id: automation.tv_automation_unmute 
-  - id: '1676519473445'
-    alias: 'TV Automation: Mute'
-    description: ''
-    trigger: []
-    condition: []
-    action:
-    - service: media_player.volume_mute
-      data:
-        is_volume_muted: true
-      target:
-        area_id: living_room
-    mode: single
-  - id: '1676519514455'
-    alias: 'TV Automation: Unmute'
-    description: ''
-    trigger: []
-    condition: []
-    action:
-    - service: media_player.volume_mute
-      data:
-        is_volume_muted: false
-      target:
-        area_id: living_room
-    mode: single
-  - id: '1712981150233'
-    alias: TV Buttons (New)
+  - alias: 'TV Room: DirecTV (Source)'
     description: ''
     trigger:
     - platform: device
       domain: mqtt
       device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
       type: action
-      subtype: 1_single
+      # 4 = Top Left
+      subtype: 4_single
+    mode: single
     condition: []
     action:
-    - service: light.toggle
-      metadata: {}
-      data: {}
-      target:
-        area_id: office
+      - service: media_player.turn_on
+        data: {}
+        target:
+          area_id: living_room
+      - service: media_player.select_source
+        target:
+          area_id: living_room
+        data:
+          source: HDMI-1
+  - alias: 'TV Room: Media Player (Source)'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+      type: action
+      # 3 = Top Right 
+      subtype: 3_single
     mode: single
+    condition: []
+    action:
+      - service: media_player.turn_on
+        data: {}
+        target:
+          area_id: living_room
+      - service: media_player.select_source
+        data:
+          source: HDMI-2
+        target:
+          area_id: living_room
+  - alias: 'TV Room: Switch (Source)'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+      type: action
+      # 1 = Bottom left
+      subtype: 1_single
+    mode: single
+    condition: []
+    action:
+      - service: media_player.turn_on
+        data: {}
+        target:
+          area_id: living_room
+      - service: media_player.select_source
+        target:
+          area_id: living_room
+        data:
+          source: HDMI-3
+  - alias: 'TV Room: Couch (Source)'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+      type: action
+      # 1 = Bottom left
+      subtype: 1_double
+    mode: single
+    condition: []
+    action:
+      - service: media_player.turn_on
+        data: {}
+        target:
+          area_id: living_room
+      - service: media_player.select_source
+        data:
+          source: HDMI-4
+        target:
+          area_id: living_room
+  - alias: 'TV Room: Turn Off'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+      type: action
+      # 4 = Top Left
+      subtype: 4_double
+    - platform: device
+      domain: mqtt
+      device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+      type: action
+      # 3 = Top Right 
+      subtype: 3_double
+    mode: single
+    condition: []
+    action:
+      - service: media_player.turn_off
+        data: {}
+        target:
+          area_id: living_room
+  - alias: 'TV Room: Mute'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+      type: action
+      # 1 = Bottom left
+      subtype: 2_single
+    mode: single
+    condition: []
+    action:
+      - service: automation.trigger
+        data: {}
+        target:
+          entity_id: automation.tv_automation_mute
+  - alias: 'TV Room: Unmute'
+    description: ''
+    trigger:
+    - platform: device
+      domain: mqtt
+      device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+      type: action
+      # 2 = Bottom Right
+      subtype: 2_double
+    mode: single
+    condition: []
+    action:
+      - service: automation.trigger
+        data: {}
+        target:
+          entity_id: automation.tv_automation_unmute 
