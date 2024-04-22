@@ -168,9 +168,9 @@ automation:
         entity_id:
         - light.office_flipper_switch
         - light.hall_lights
-        - light.master_bathroom_lights
+        - light.bathroom_main_lights
         - light.tv_room_side_table_light
-        - light.master_hall_lights
+        - light.hall_main_lights
         - light.grow_room_lights
         - light.porch_lights
         - light.dining_room_game_corner_light_light
@@ -183,13 +183,13 @@ automation:
       target:
         entity_id:
         - light.kitchen_lights
-        - light.master_bedroom_lights
+        - light.bedroom_main_lights
     - service: light.toggle
       data: {}
       target:
         entity_id:
         - light.kitchen_lights
-        - light.master_bedroom_lights
+        - light.bedroom_main_lights
     - service: scene.turn_on
       target:
         entity_id: scene.default_light_colors

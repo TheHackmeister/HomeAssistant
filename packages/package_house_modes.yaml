@@ -122,11 +122,11 @@ automation:
     - service: switch.turn_off
       data: {}
       target:
-        entity_id: switch.adaptive_lighting_sleep_mode_master_sink_lights
+        entity_id: switch.adaptive_lighting_sleep_mode_hall_bedroom_main_lights
     - service: switch.turn_on
       data: {}
       target:
-        entity_id: switch.adaptive_lighting_master_bedroom_lights
+        entity_id: switch.adaptive_lighting_bedroom_main_lights
     mode: single
   - id: '1668482944676'
     alias: 'House Mode: Night'
@@ -146,17 +146,17 @@ automation:
     - service: switch.turn_on
       data: {}
       target:
-        entity_id: switch.adaptive_lighting_sleep_mode_master_sink_lights
+        entity_id: switch.adaptive_lighting_sleep_mode_hall_bedroom_main_lights
     - service: switch.turn_off
       data: {}
       target:
-        entity_id: switch.adaptive_lighting_master_bedroom_lights
+        entity_id: switch.adaptive_lighting_bedroom_main_lights
     - service: light.turn_on
       data:
         brightness_pct: 8
         kelvin: 2000
       target:
-        entity_id: light.master_bedroom_lights
+        entity_id: light.bedroom_main_lights
     - service: media_player.turn_off
       data: {}
       target:

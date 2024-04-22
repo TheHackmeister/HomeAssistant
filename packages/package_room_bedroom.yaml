@@ -13,7 +13,8 @@
 #######################################################################################################################
 
 automation:
-  - alias: 'Main Bedroom: Toggle Lights'
+  - id: '1712981375915'
+    alias: 'Bedroom Main: Toggle Lights'
     description: ''
     trigger:
     # Button
@@ -33,9 +34,9 @@ automation:
       - service: light.toggle
         data: {}
         target:
-          area_id: master_bedroom
+          area_id: bedroom_main
     mode: single
-  - alias: 'Main Bedroom: Presense Hold'
+  - alias: 'Bedroom Main: Presense Hold'
     description: ''
     trigger:
     - platform: device
@@ -51,7 +52,7 @@ automation:
           entity_id: switch.area_presence_hold_main_bedroom
     mode: single
   - id: '1712981375914'
-    alias: 'Main Bedroom: Turn On Lights'
+    alias: 'Bedroom Main: Turn On Lights'
     description: ''
     trigger:
     - platform: device
@@ -63,11 +64,11 @@ automation:
     action:
     - service: light.turn_on
       target:
-        area_id: master_bedroom
+        area_id: bedroom_main
       data: {}
     mode: single
   - id: '1712981431951'
-    alias: 'Main Bedroom: Turn Off Lights'
+    alias: 'Bedroom Main: Turn Off Lights'
     description: ''
     trigger:
     - platform: device
@@ -82,13 +83,13 @@ automation:
       data: {}
       target:
         area_id:
-        - master_bathroom
-        - master_closet
-        - master_bedroom
+        - bathroom_main
+        - closet_bedroom_main
+        - bedroom_main
         - hall
     mode: single
   - id: '1712982464266'
-    alias: 'Main Bedroom: Set Day Mode'
+    alias: 'Bedroom Main: Set Day Mode'
     description: ''
     trigger:
     - platform: device
@@ -106,7 +107,7 @@ automation:
         entity_id: input_select.house_mode
     mode: single
   - id: '1712982502193'
-    alias: 'Main Bedroom: Set Night Mode'
+    alias: 'Bedroom Main: Set Night Mode'
     description: ''
     trigger:
     - platform: device

@@ -7,16 +7,16 @@
       {
         "aliases": [],
         "floor_id": null,
-        "icon": null,
+        "icon": "mdi:home-thermometer-outline",
         "id": "living_room",
         "labels": [],
-        "name": "TV Room",
+        "name": "Living Room",
         "picture": null
       },
       {
         "aliases": [],
         "floor_id": null,
-        "icon": null,
+        "icon": "mdi:chef-hat",
         "id": "kitchen",
         "labels": [],
         "name": "Kitchen",
@@ -25,7 +25,7 @@
       {
         "aliases": [],
         "floor_id": null,
-        "icon": null,
+        "icon": "mdi:laptop",
         "id": "office",
         "labels": [],
         "name": "Office",
@@ -34,25 +34,7 @@
       {
         "aliases": [],
         "floor_id": null,
-        "icon": null,
-        "id": "master_bathroom",
-        "labels": [],
-        "name": "Main Bathroom",
-        "picture": null
-      },
-      {
-        "aliases": [],
-        "floor_id": null,
-        "icon": null,
-        "id": "master_bedroom",
-        "labels": [],
-        "name": "Main Bedroom",
-        "picture": null
-      },
-      {
-        "aliases": [],
-        "floor_id": null,
-        "icon": null,
+        "icon": "mdi:table-chair",
         "id": "dining_room",
         "labels": [],
         "name": "Dining Room",
@@ -61,34 +43,7 @@
       {
         "aliases": [],
         "floor_id": null,
-        "icon": null,
-        "id": "hall",
-        "labels": [],
-        "name": "Main Bedroom Hall",
-        "picture": null
-      },
-      {
-        "aliases": [],
-        "floor_id": null,
-        "icon": null,
-        "id": "guest_bathroom",
-        "labels": [],
-        "name": "Guest Bathroom",
-        "picture": null
-      },
-      {
-        "aliases": [],
-        "floor_id": null,
-        "icon": null,
-        "id": "master_closet",
-        "labels": [],
-        "name": "Main Bedroom Closet",
-        "picture": null
-      },
-      {
-        "aliases": [],
-        "floor_id": null,
-        "icon": null,
+        "icon": "mdi:weather-sunset-down",
         "id": "porch",
         "labels": [],
         "name": "Porch",
@@ -97,19 +52,73 @@
       {
         "aliases": [],
         "floor_id": null,
-        "icon": null,
-        "id": "master_hall",
+        "icon": "mdi:sprout-outline",
+        "id": "grow_room",
         "labels": [],
-        "name": "Main Hall",
+        "name": "Grow Room",
         "picture": null
       },
       {
         "aliases": [],
         "floor_id": null,
-        "icon": null,
-        "id": "grow_room",
+        "icon": "mdi:bed-outline",
+        "id": "bedroom_main",
         "labels": [],
-        "name": "Grow Room",
+        "name": "Bedroom (Main)",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": "mdi:bathtub-outline",
+        "id": "bathroom_main",
+        "labels": [],
+        "name": "Bathroom (Main)",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": "mdi:faucet",
+        "id": "bathroom_guest",
+        "labels": [],
+        "name": "Bathroom (Guest)",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": "mdi:hanger",
+        "id": "closet_main_bedroom",
+        "labels": [],
+        "name": "Closet (Bedroom Main)",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": "mdi:television",
+        "id": "tv_room",
+        "labels": [],
+        "name": "TV Room",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": "mdi:faucet",
+        "id": "hall_bedroom_main",
+        "labels": [],
+        "name": "Hall (Bedroom Main)",
+        "picture": null
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "icon": "mdi:information-box-outline",
+        "id": "hall_main",
+        "labels": [],
+        "name": "Hall (Main)",
         "picture": null
       }
     ]

@@ -59,7 +59,7 @@ turn_off_all_lights:
   - service: light.turn_off
     target:
       area_id:
-      - master_bathroom
+      - bathroom_main
       - dining_room
       - living_room
   mode: single
