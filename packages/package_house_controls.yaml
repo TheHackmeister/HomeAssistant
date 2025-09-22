@@ -87,7 +87,7 @@ automation:
       domain: mqtt
       device_id: afde4e1e4b5130d838bd342d10f3c923
       type: action
-      subtype: 4_single
+      subtype: 4_double
     mode: single
     condition: []
     action:
@@ -176,7 +176,7 @@ automation:
         - light.dining_room_game_corner_light_light
         area_id:
         - dining_room
-        - living_room
+        - tv_room
         - office
     - service: light.toggle
       data: {}

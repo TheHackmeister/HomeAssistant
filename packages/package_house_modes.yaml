@@ -160,7 +160,7 @@ automation:
     - service: media_player.turn_off
       data: {}
       target:
-        area_id: living_room
+        area_id: tv_room
     - service: light.turn_off
       data: {}
       target:
@@ -170,5 +170,5 @@ automation:
         - light.hall_light_status
         area_id:
         - dining_room
-        - living_room
+        - tv_room
     mode: single
