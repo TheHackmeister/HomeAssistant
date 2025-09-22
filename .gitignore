@@ -5,8 +5,6 @@
 !.gitignore
 !*.md
 !custom_components/compensation/*
-!custom_components/magic_area/*
-!custom_components/nhl_api/*
 
 custom_components/*
 www/community/*
