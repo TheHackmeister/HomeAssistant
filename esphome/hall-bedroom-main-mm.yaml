@@ -1,0 +1,43 @@
+substitutions:
+  name: "hall-bedroom-main-mm"
+  #room: "master-bathroom"
+  friendly_name: Hall (Bedroom Main) mmWave
+packages:
+  athom.epo-ble: github://everythingsmarthome/presence-one/everything-presence-one-ble.yaml@v1.2.3
+#packages:
+#  athom.smart-plug-v2: github://EverythingSmartHome/everything-presence-one/everything-presence-one-st.yaml
+#  ble-tracking: github://EverythingSmartHome/everything-presence-one/common/bluetooth-base.yaml
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret hall-bedroom-main-mm-encryption
+
+ota:
+  - platform: esphome
+    password: !secret hall-bedroom-main-mm-ota
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+captive_portal:
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1000ms # default 320ms. Time spent per adv channel
+    window: 900ms # default 30ms. Time spent listening during interval.
+
+logger:
+
+binary_sensor:
+  - id: !extend occupancy
+    lambda: |-
+      if ( id(mmwave).state and id(pir_motion_sensor).state) {
+        return true;
+      } 
+      else {
+        return false;
+      }

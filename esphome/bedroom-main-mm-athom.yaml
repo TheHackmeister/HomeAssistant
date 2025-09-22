@@ -1,0 +1,24 @@
+substitutions:
+  name: bedroom-main-mm-athom
+  friendly_name: Bedroom (Main) mm Athom
+packages:
+  Athom_Technology.Presence_Sensor: github://athom-tech/athom-configs/athom-presence-sensor.yaml
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+api:
+  encryption:
+    key: !secret bedroom-main-mm-athom-encryption
+
+#esp8266:
+#  board: esp8285
+#  restore_from_flash: true
+
+#ota:
+#  - platform: esphome
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password

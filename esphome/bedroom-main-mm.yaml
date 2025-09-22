@@ -1,0 +1,17 @@
+substitutions:
+  name: bedroom-main-mm
+  friendly_name: Bedroom (Main) mm
+packages:
+  Everything_Smart_Technology.Everything_Presence_One: github://everythingsmarthome/everything-presence-one/everything-presence-one-ble.yaml@main
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+api:
+  encryption:
+    key: !secret bedroom-main-mm-encryption:
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password

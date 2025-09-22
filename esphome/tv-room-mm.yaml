@@ -1,0 +1,27 @@
+substitutions:
+  name: "tv-room-mm"
+  room: "tv-room"
+  friendly_name: "TV Room mmWave"
+packages:
+  athom.epo-ble: github://everythingsmarthome/presence-one/everything-presence-one-ble.yaml@v1.2.3
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret tv-room-mm-encryption
+
+ota:
+  - platform: esphome
+    password: !secret tv-room-mm-ota
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+#esp32_ble_tracker:
+#  scan_parameters:
+#    interval: 1000ms # default 320ms. Time spent per adv channel
+#    window: 900ms # default 30ms. Time spent listening during interval.

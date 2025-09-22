@@ -1,8 +1,11 @@
 substitutions:
   name: "dinning-room-mm"
   room: "dinning-room"
+  friendly_name: "Dinning Room mmWave"
 packages:
-  athom.smart-plug-v2: github://EverythingSmartHome/everything-presence-one/everything-presence-one-st.yaml
+  #athom.smart-plug-v2: github://EverythingSmartHome/everything-presence-one/everything-presence-one-st.yaml@1.1.8
+  athom.smart-plug-v2: github://everythingsmarthome/presence-one/everything-presence-one-ble.yaml@v1.2.3
+  #ble-tracking: github://EverythingSmartHome/everything-presence-one/common/bluetooth-base.yaml
 esphome:
   name: ${name}
   name_add_mac_suffix: false
@@ -11,19 +14,17 @@ esphome:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "pJbzQdrbLIBRFsX5eEMsztQ8qpey1t07KJPW3SMvxZo="
+    key: !secret dining-room-mm-encryption
 
 ota:
-  password: "1adb8f36fef29384856eb44124ce1cef"
+  - platform: esphome
+    password: !secret dining-room-mm-ota
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "Dinning-Room-Mm Fallback Hotspot"
-    password: "SFkdvkMQoI73"
-
-captive_portal:
-  
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1000ms # default 320ms. Time spent per adv channel
+    window: 900ms # default 30ms. Time spent listening during interval.

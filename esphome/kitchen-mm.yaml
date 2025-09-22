@@ -1,8 +1,9 @@
 substitutions:
   name: "kitchen-mm"
   room: "kitchen"
+  friendly_name: "Kitchen mmWave"
 packages:
-  athom.smart-plug-v2: github://EverythingSmartHome/everything-presence-one/everything-presence-one-st.yaml
+  athom.epo-ble: github://everythingsmarthome/presence-one/everything-presence-one-ble.yaml@v1.2.3
 esphome:
   name: ${name}
   name_add_mac_suffix: false
@@ -10,10 +11,11 @@ esphome:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "N/aGc8Z1UBUzoZWYIMggM+w18SzTLcnSO5uFfj6GjMM="
+    key: !secret kitchen-mm-encryption
 
 ota:
-  password: "bbcfa510de596e53f0c371ec994f58d9"
+  - platform: esphome
+    password: !secret kitchen-mm-ota
 
 wifi:
   ssid: !secret wifi_ssid
@@ -25,4 +27,7 @@ wifi:
     password: "G7m2rksthdsf"
 
 captive_portal:
-    
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1000ms # default 320ms. Time spent per adv channel
+    window: 900ms # default 30ms. Time spent listening during interval.
