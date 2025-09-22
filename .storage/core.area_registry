@@ -1,125 +1,343 @@
 {
   "version": 1,
-  "minor_version": 6,
+  "minor_version": 8,
   "key": "core.area_registry",
   "data": {
     "areas": [
       {
         "aliases": [],
         "floor_id": null,
+        "humidity_entity_id": null,
         "icon": "mdi:home-thermometer-outline",
         "id": "living_room",
         "labels": [],
         "name": "Living Room",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
-        "floor_id": null,
+        "floor_id": "living_area",
+        "humidity_entity_id": null,
         "icon": "mdi:chef-hat",
         "id": "kitchen",
         "labels": [],
         "name": "Kitchen",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
         "floor_id": null,
+        "humidity_entity_id": null,
         "icon": "mdi:laptop",
         "id": "office",
         "labels": [],
         "name": "Office",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
-        "floor_id": null,
+        "floor_id": "living_area",
+        "humidity_entity_id": null,
         "icon": "mdi:table-chair",
         "id": "dining_room",
         "labels": [],
         "name": "Dining Room",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
         "floor_id": null,
+        "humidity_entity_id": null,
         "icon": "mdi:weather-sunset-down",
         "id": "porch",
         "labels": [],
         "name": "Porch",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
         "floor_id": null,
+        "humidity_entity_id": null,
         "icon": "mdi:sprout-outline",
         "id": "grow_room",
         "labels": [],
         "name": "Grow Room",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
-        "floor_id": null,
+        "floor_id": "bedroom_area",
+        "humidity_entity_id": null,
         "icon": "mdi:bed-outline",
         "id": "bedroom_main",
         "labels": [],
         "name": "Bedroom (Main)",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
-        "floor_id": null,
+        "floor_id": "bedroom_area",
+        "humidity_entity_id": null,
         "icon": "mdi:bathtub-outline",
         "id": "bathroom_main",
         "labels": [],
         "name": "Bathroom (Main)",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
-        "floor_id": null,
+        "floor_id": "bedroom_area",
+        "humidity_entity_id": null,
         "icon": "mdi:faucet",
         "id": "bathroom_guest",
         "labels": [],
         "name": "Bathroom (Guest)",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
-        "floor_id": null,
-        "icon": "mdi:hanger",
-        "id": "closet_main_bedroom",
-        "labels": [],
-        "name": "Closet (Bedroom Main)",
-        "picture": null
-      },
-      {
-        "aliases": [],
-        "floor_id": null,
+        "floor_id": "living_area",
+        "humidity_entity_id": null,
         "icon": "mdi:television",
         "id": "tv_room",
         "labels": [],
         "name": "TV Room",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
-        "floor_id": null,
+        "floor_id": "bedroom_area",
+        "humidity_entity_id": null,
         "icon": "mdi:faucet",
         "id": "hall_bedroom_main",
         "labels": [],
         "name": "Hall (Bedroom Main)",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
       },
       {
         "aliases": [],
         "floor_id": null,
+        "humidity_entity_id": null,
         "icon": "mdi:information-box-outline",
         "id": "hall_main",
         "labels": [],
         "name": "Hall (Main)",
-        "picture": null
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "bedroom_area",
+        "humidity_entity_id": null,
+        "icon": "mdi:hanger",
+        "id": "closet_bedroom_main",
+        "labels": [],
+        "name": "Closet (Bedroom Main)",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "1970-01-01T00:00:00+00:00",
+        "modified_at": "1970-01-01T00:00:00+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "audio",
+        "humidity_entity_id": null,
+        "icon": "mdi:earbuds",
+        "id": "spencer",
+        "labels": [],
+        "name": "Spencer's Audio",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-01-20T18:46:19.408733+00:00",
+        "modified_at": "2025-01-20T18:46:42.736059+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "audio",
+        "humidity_entity_id": null,
+        "icon": "mdi:audio-input-rca",
+        "id": "shared",
+        "labels": [],
+        "name": "Shared",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-02-23T03:12:52.938833+00:00",
+        "modified_at": "2025-02-23T03:12:52.938837+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "water_supply",
+        "humidity_entity_id": null,
+        "icon": "mdi:water",
+        "id": "water_supply_01",
+        "labels": [
+          "type_water_supply",
+          "water_supply_01"
+        ],
+        "name": "Water Supply 01",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-03-29T20:38:39.645691+00:00",
+        "modified_at": "2025-07-01T03:29:18.316856+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "grow_zones",
+        "humidity_entity_id": null,
+        "icon": "mdi:sprinkler-fire",
+        "id": "poc_01",
+        "labels": [
+          "water_supply_water_supply_01",
+          "type_root_zone"
+        ],
+        "name": "PoC 01",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-04-21T05:09:17.800164+00:00",
+        "modified_at": "2025-07-02T02:43:39.628704+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "grow_zones",
+        "humidity_entity_id": "sensor.air_monitor_shoot_zone_01_humidity",
+        "icon": "mdi:leaf",
+        "id": "shoot_zone_01",
+        "labels": [
+          "calculate_vpd",
+          "type_shoot_zone"
+        ],
+        "name": "Shoot Zone 01",
+        "picture": null,
+        "temperature_entity_id": "sensor.air_monitor_shoot_zone_01_temperature",
+        "created_at": "2025-04-27T03:25:56.777478+00:00",
+        "modified_at": "2025-07-01T03:30:59.217336+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "grow_zones",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "root_zone_02",
+        "labels": [
+          "water_supply_water_supply_01",
+          "type_root_zone"
+        ],
+        "name": "Root Zone 02",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-05-13T02:55:41.756611+00:00",
+        "modified_at": "2025-07-02T02:43:51.042114+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "grow_zones",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "root_zone_03",
+        "labels": [
+          "water_supply_water_supply_01",
+          "type_root_zone"
+        ],
+        "name": "Root Zone 03",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-05-13T02:56:05.553031+00:00",
+        "modified_at": "2025-07-02T02:44:01.704878+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "grow_zones",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "root_zone_04",
+        "labels": [
+          "water_supply_water_supply_01",
+          "type_root_zone"
+        ],
+        "name": "Root Zone 04",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-05-13T02:56:11.573286+00:00",
+        "modified_at": "2025-07-02T02:44:14.085435+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "grow_zones",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "root_zone_05",
+        "labels": [
+          "water_supply_water_supply_01",
+          "type_root_zone"
+        ],
+        "name": "Root Zone 05",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-05-13T02:56:33.727446+00:00",
+        "modified_at": "2025-07-02T02:44:24.395061+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "none",
+        "labels": [],
+        "name": "None",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-05-17T22:32:41.724306+00:00",
+        "modified_at": "2025-05-17T22:32:41.724308+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "grow_zones",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "shoot_zone_02",
+        "labels": [
+          "type_shoot_zone"
+        ],
+        "name": "Shoot Zone 02",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-06-15T00:41:31.797967+00:00",
+        "modified_at": "2025-07-01T03:31:07.239205+00:00"
       }
     ]
   }

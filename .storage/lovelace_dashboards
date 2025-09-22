@@ -23,7 +23,7 @@
       {
         "show_in_sidebar": true,
         "icon": "mdi:home-lightning-bolt-outline",
-        "title": "Home",
+        "title": " Home",
         "require_admin": false,
         "mode": "storage",
         "url_path": "lovelace-home",
@@ -37,6 +37,24 @@
         "show_in_sidebar": true,
         "require_admin": false,
         "mode": "storage"
+      },
+      {
+        "id": "home_farm",
+        "show_in_sidebar": true,
+        "icon": "mdi:leaf-maple",
+        "title": "Home Farm",
+        "require_admin": false,
+        "mode": "storage",
+        "url_path": "home-farm"
+      },
+      {
+        "id": "shoot_zone",
+        "show_in_sidebar": true,
+        "title": " Grow Areas",
+        "require_admin": false,
+        "mode": "storage",
+        "url_path": "shoot-zone",
+        "icon": "mdi:leaf"
       }
     ]
   }

@@ -98,6 +98,24 @@ rest_command:
     url: https://hc-ping.com/89ba143b-b5bc-4074-bf95-b0897ec23102
     method: GET
 
+  get_cards_from_swimlane:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/swimlanes/{{ swimlaneId }}/cards
+    method: GET
+    headers:
+      Authorization: >
+        Bearer !secret wekan_api_token
+
+  move_card_to_swimlane:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/lists/{{ listId }}/cards/{{ cardId }}
+    method: PUT
+    payload: >
+      {"swimlaneId": "{{ swimlaneId }}"}
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Authorization: >
+        Bearer !secret wekan_api_token
+
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'

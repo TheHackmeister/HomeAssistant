@@ -30,4 +30,50 @@ ignored_entities:
     - device_tracker.pixel_6_work
     - device_tracker.note5
     - person.spencer
-
+    - person.brianna
+    - sensor.spencer_phone_ble_distance_to_hall_bedroom_main_mmwave
+    - sensor.spencer_phone_ble_distance_to_bedroom_main_mmwave
+    - sensor.spencer_phone_ble_distance_to_dinning_room_mmwave
+    - sensor.spencer_phone_ble_unfiltered_distance_to_bedroom_main_mmwave
+    - sensor.spencer_phone_ble_distance_to_kitchen_mmwave
+    - sensor.spencer_phone_ble_distance_to_office_ble_proxy
+    - sensor.spencer_phone_ble_distance_to_tv_room_ble_proxy
+    - select.kitchen_light_strip_playlist
+    - select.kitchen_light_strip_preset
+    - select.tv_led_strip_playlist
+    - select.tv_led_strip_preset
+    - select.fireplace_led_strip_playlist
+    - select.fireplace_led_strip_preset
+    - select.tv_room_led_strip_playlist
+    - select.tv_room_led_strip_preset
+    - select.island_led_strip_playlist
+    - select.island_led_strip_preset
+    - select.kitchen_door_playlist
+    - select.kitchen_door_preset
+    - select.stove_left_playlist
+    - select.stove_left_preset
+    - select.office_playlist
+    - select.office_preset
+    - select.bedroom_main_right_playlist
+    - select.bedroom_main_right_preset
+    - select.stove_right_playlist
+    - select.stove_right_preset
+    - select.bedroom_main_left_playlist
+    - select.bedroom_main_left_preset
+    - select.bedroom_main_dresser_playlist
+    - select.bedroom_main_dresser_preset
+    - select.hall_main_playlist
+    - select.hall_main_preset
+    - select.game_corner_playlist
+    - select.game_corner_preset
+    - select.kitchen_sink_playlist
+    - select.kitchen_sink_preset
+    - select.blue_thing_playlist
+    - select.blue_thing_preset
+    - sensor.burned_kilocalories
+    - sensor.floors_ascended
+    - sensor.floors_descended
+    - sensor.high_stress_duration
+    - sensor.body_battery_drained
+    - sensor.uncat_stress_duration
+    - conversation.home_assistant

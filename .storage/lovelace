@@ -285,7 +285,10 @@
                 "exclude": []
               }
             }
-          ]
+          ],
+          "background": {
+            "image": "https://unsplash.com/photos/gSQbip5HHuc/download?ixid=M3wxMjA3fDB8MXxhbGx8fHx8fHx8fHwxNzIxNTAxOTY1fA&force=true&w=2400"
+          }
         },
         {
           "theme": "Backend-selected",
@@ -408,10 +411,148 @@
           ]
         },
         {
-          "theme": "Backend-selected",
-          "icon": "mdi:battery-10",
-          "badges": [],
+          "icon": "mdi:cast-audio",
+          "subview": false,
           "cards": [
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities",
+                "title": "Kitchen"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "label": "Audio: Area*",
+                    "area": "Kitchen"
+                  }
+                ],
+                "exclude": []
+              },
+              "sort": {
+                "method": "domain",
+                "reverse": false
+              }
+            },
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities",
+                "title": "Office"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "label": "Audio: Area*",
+                    "area": "office"
+                  }
+                ],
+                "exclude": []
+              },
+              "sort": {
+                "method": "domain"
+              }
+            },
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities",
+                "title": "TV Room"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "label": "Area Sound Leader",
+                    "area": "TV Room"
+                  },
+                  {
+                    "domain": "media_player",
+                    "area": "TV Room"
+                  }
+                ],
+                "exclude": []
+              }
+            },
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities",
+                "title": "Bedroom (Main)"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "label": "Audio: Area Leader",
+                    "area": "bedroom_main"
+                  },
+                  {
+                    "domain": "media_player",
+                    "area": "bedroom_main"
+                  }
+                ],
+                "exclude": []
+              }
+            },
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities",
+                "title": "Bathroom Main"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "label": "Audio: Area Leader",
+                    "area": "bathroom_main"
+                  },
+                  {
+                    "domain": "media_player",
+                    "area": "bathroom_main"
+                  }
+                ],
+                "exclude": []
+              }
+            },
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities",
+                "title": "Dining Room"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "label": "Area Sound Leader",
+                    "area": "Dining Room"
+                  },
+                  {
+                    "domain": "media_player",
+                    "area": "Dining Room"
+                  }
+                ],
+                "exclude": []
+              }
+            },
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities",
+                "title": "Porch"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "label": "Area Sound Leader",
+                    "area": "Porch"
+                  },
+                  {
+                    "domain": "media_player",
+                    "area": "Porch"
+                  }
+                ],
+                "exclude": []
+              }
+            },
             {
               "type": "custom:auto-entities",
               "card": {
@@ -420,19 +561,10 @@
               "filter": {
                 "include": [
                   {
-                    "attributes": {
-                      "device_class": "battery"
-                    },
-                    "not": {
-                      "name": "Area*"
-                    }
+                    "entity_id": "*audio*"
                   }
                 ],
                 "exclude": []
-              },
-              "sort": {
-                "method": "state",
-                "numeric": true
               }
             }
           ]
@@ -568,6 +700,56 @@
               },
               "sort": {
                 "method": "friendly_name"
+              }
+            }
+          ]
+        },
+        {
+          "theme": "Backend-selected",
+          "icon": "mdi:battery-10",
+          "badges": [],
+          "cards": [
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "attributes": {
+                      "device_class": "battery"
+                    },
+                    "not": {
+                      "name": "Area*"
+                    }
+                  }
+                ],
+                "exclude": []
+              },
+              "sort": {
+                "method": "state",
+                "numeric": true
+              }
+            }
+          ]
+        },
+        {
+          "icon": "mdi:led-strip-variant",
+          "cards": [
+            {
+              "type": "custom:auto-entities",
+              "card": {
+                "type": "entities"
+              },
+              "filter": {
+                "include": [
+                  {
+                    "name": "*strip",
+                    "domain": "light"
+                  }
+                ],
+                "exclude": []
               }
             }
           ]
@@ -856,6 +1038,32 @@
           ]
         },
         {
+          "type": "sections",
+          "max_columns": 4,
+          "title": "Audio Schedule",
+          "path": "schedules",
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "New section"
+                },
+                {
+                  "type": "custom:scheduler-card",
+                  "include": [
+                    "input_select.spencer_s_mood"
+                  ],
+                  "exclude": []
+                }
+              ]
+            }
+          ],
+          "icon": "mdi:calendar-month",
+          "cards": []
+        },
+        {
           "title": "Debugging",
           "path": "debugging",
           "badges": [],
@@ -1122,6 +1330,30 @@
                   }
                 ],
                 "exclude": []
+              }
+            }
+          ]
+        },
+        {
+          "title": "Testing",
+          "path": "testing",
+          "cards": [
+            {
+              "type": "custom:auto-entities",
+              "filter": {
+                "include": [
+                  {
+                    "area": "",
+                    "label": "Audio: Area Leader"
+                  }
+                ],
+                "exclude": []
+              },
+              "card": {
+                "type": "custom:layout-card",
+                "layout_type": "masonry",
+                "layout": {},
+                "cards": []
               }
             }
           ]
