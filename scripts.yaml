@@ -61,18 +61,18 @@ turn_off_all_lights:
       area_id:
       - bathroom_main
       - dining_room
-      - living_room
+      - tv_room
   mode: single
 vacuum_single_section:
   alias: 'Vacuum: Single Section'
   sequence:
-  - service: mqtt.publish
-    data:
+  - data:
       topic: valetudo/dog/MapSegmentationCapability/clean/set
-      payload_template: "{\"segment_ids\": {% set segments = states.sensor.valetudo_dog_map_segments.attributes
+      payload: "{\"segment_ids\": {% set segments = states.sensor.valetudo_dog_map_segments.attributes
         -%}  {% set search = state_attr(room,\"friendly_name\") | replace('Vacuum
         ', '', 1) -%} [{%- for segmentId in segments -%} {%- if segments[segmentId]
         == search -%}\n  \"{{ segmentId }}\"\n{%- endif -%} {% endfor %}]}"
+    action: mqtt.publish
   - delay:
       hours: 0
       minutes: 0
@@ -81,10 +81,1688 @@ vacuum_single_section:
   - wait_template: '{{ is_state("vacuum.valetudo_dog", "returning") }}'
     continue_on_timeout: true
     enabled: true
-  - service: input_boolean.turn_off
-    data: {}
+  - data: {}
     target:
       entity_id: '{{ room }}'
+    action: input_boolean.turn_off
   mode: queued
   icon: mdi:robot-vacuum
   max: 20
+audio_follow_the_area_leader:
+  alias: 'Audio: Follow the (Area) Leader'
+  sequence:
+  - variables:
+      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in label_entities('Area
+        Sound Leader') %}\n  {% set leader_entities.list = leader_entities.list +
+        [leader] %}\n{% endfor %} {{ leader_entities.list }}\n"
+      l2:
+      - test
+      - another
+      followers: "{% set leader_entities = namespace(list=[]) %} {% for leader in
+        label_entities('Area Sound Leader') %}\n  {% set area = device_attr(device_id(leader),
+        'area_id') %}\n  {% for s in states.media_player | selectattr('entity_id',
+        'in', area_entities(area)) %}\n    {% set leader_entities.list = leader_entities.list
+        + [s.entity_id] %}\n  {% endfor %}\n{% endfor %} {{ leader_entities.list }}\n"
+  - metadata: {}
+    data:
+      message: 'l6: {{ l6 }}'
+    action: persistent_notification.create
+  - repeat:
+      for_each: '{{ leaders }}'
+      sequence:
+      - metadata: {}
+        data:
+          message: a{{ repeat.item }}b
+        action: notify.persistent_notification
+      - variables:
+          followers: "{% set leader_entities = namespace(list=[]) %} {% set area =
+            device_attr(device_id(repeat.item), 'area_id') %} {% for s in states.media_player
+            | selectattr('entity_id', 'in', area_entities(area)) %}\n  {% set follower_entities.list
+            = follower_entities.list + [s.entity_id] %}\n{% endfor %} {{ follower_entities.list
+            }}\n"
+      - if:
+        - condition: state
+          entity_id: input_select.house_mode
+          state: Away
+        then:
+        - metadata: {}
+          data:
+            is_volume_muted: true
+          target:
+            entity_id: '{{ followers }}'
+          action: media_player.volume_mute
+        - metadata: {}
+          target:
+            entity_id: '{{ followers }}'
+          action: homeassistant.turn_off
+        else:
+        - metadata: {}
+          data:
+            is_volume_muted: '{{ is_state(repeat.item, ''off'') }}'
+          target:
+            entity_id: '{{ repeat.item }}'
+          action: media_player.volume_mute
+        - metadata: {}
+          target:
+            entity_id: '{{ repeat.item }}'
+          action: homeassistant.turn_on
+  description: ''
+  icon: mdi:cast-audio
+sleep_me_switch:
+  alias: 'Sleep Me Switch: Dim Lights'
+  sequence:
+  - action: automation.trigger
+    metadata: {}
+    data:
+      entity_id: automation.bedroom_main_turn_off_lightsnew_2
+  - action: script.sleep_me_switch_reset_timer
+    metadata: {}
+    data: {}
+  description: ''
+sleep_me_switch_reset_timer:
+  alias: 'Sleep Me Switch: Reset Timer'
+  sequence:
+  - action: timer.start
+    metadata: {}
+    data:
+      entity_id: timer.sleep_countdown
+  - if:
+    - condition: numeric_state
+      entity_id: automation.sleep_me_pause
+      attribute: current
+      above: 0
+    then:
+    - action: automation.turn_off
+      metadata: {}
+      data:
+        entity_id: automation.sleep_me_pause
+    - action: number.set_value
+      metadata: {}
+      data_template:
+        value: '{{ [states(''number.spencer_laptop_volume_set'') | float + 0.4, 0]
+          | max }}
+
+          '
+      target:
+        entity_id:
+        - number.spencer_laptop_volume_set
+      enabled: false
+    - delay:
+        hours: 0
+        minutes: 0
+        seconds: 1
+        milliseconds: 0
+    - action: automation.turn_on
+      data:
+        entity_id: automation.sleep_me_pause
+  description: ''
+  fields:
+    shared_label:
+      selector:
+        text:
+      required: true
+sleep_me_switch_play_pause:
+  alias: 'Sleep Me Switch: Play/Pause'
+  sequence:
+  - action: script.sleep_me_switch_reset_timer
+    metadata: {}
+    data: {}
+  - action: button.press
+    target:
+      entity_id: button.spencer_laptop_playpause
+    data: {}
+  description: ''
+sleep_me_switch_increase_volume:
+  alias: 'Sleep Me Switch: Increase Volume'
+  sequence:
+  - action: number.set_value
+    metadata: {}
+    data_template:
+      value: '{{ [states(''number.spencer_laptop_volume_set'') | float + 0.05, 0]
+        | max }}
+
+        '
+    target:
+      entity_id:
+      - number.spencer_laptop_volume_set
+  - action: script.sleep_me_switch_reset_timer
+    metadata: {}
+    data: {}
+  description: ''
+  mode: parallel
+  max: 10
+sleep_me_switch_decrease_volume:
+  alias: 'Sleep Me Switch: Decrease Volume'
+  sequence:
+  - action: number.set_value
+    metadata: {}
+    data_template:
+      value: '{{ [states(''number.spencer_laptop_volume_set'') | float - 0.05, 0]
+        | max }}
+
+        '
+    target:
+      entity_id:
+      - number.spencer_laptop_volume_set
+  - action: script.sleep_me_switch_reset_timer
+    metadata: {}
+    data: {}
+  description: ''
+  mode: parallel
+  max: 20
+sleep_me_switch_go_back:
+  alias: 'Sleep Me Switch: Go Back'
+  sequence:
+  - action: script.sleep_me_switch_reset_timer
+    metadata: {}
+    data: {}
+  - action: button.press
+    target:
+      entity_id: button.spencer_laptop_previous
+    data: {}
+  description: ''
+sleep_me_switch_go_forward:
+  alias: 'Sleep Me Switch: Go Forward'
+  sequence:
+  - action: script.sleep_me_switch_reset_timer
+    metadata: {}
+    data: {}
+  - action: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.spencer_laptop_next
+  description: ''
+sleep_me_switch_sleep:
+  alias: 'Sleep Me Switch: Sleep'
+  sequence:
+  - if:
+    - condition: state
+      entity_id: sensor.spencer_laptop_media_info
+      attribute: playing
+      state: Playing
+    then:
+    - action: button.press
+      metadata: {}
+      data: {}
+      target:
+        entity_id: button.spencer_laptop_playpause
+  description: ''
+  fields:
+    shared_label:
+      selector:
+        text:
+      required: true
+audio_mood_morning:
+  sequence:
+  - action: squeezebox.call_method
+    target:
+      entity_id: media_player.lms
+    data:
+      command: favorites
+      parameters:
+      - playlist
+      - play
+      - item_id:8a3fb783.16
+  alias: 'Audio Mood: Morning'
+  description: ''
+audio_mood_afternoon:
+  sequence:
+  - action: squeezebox.call_method
+    target:
+      entity_id: media_player.lms
+    data:
+      command: favorites
+      parameters:
+      - playlist
+      - play
+      - item_id:8a3fb783.14
+  alias: 'Audio Mood: Afternoon'
+  description: ''
+audio_mood_evening:
+  sequence:
+  - action: squeezebox.call_method
+    target:
+      entity_id: media_player.lms
+    data:
+      command: favorites
+      parameters:
+      - playlist
+      - play
+      - item_id:8a3fb783.15
+  alias: 'Audio Mood: Evening'
+  description: ''
+audio_mood_night:
+  sequence:
+  - action: squeezebox.call_method
+    target:
+      entity_id: media_player.lms
+    data:
+      command: favorites
+      parameters:
+      - playlist
+      - play
+      - item_id:8a3fb783.17
+  alias: 'Audio Mood: Night'
+  description: ''
+audio_mood_play_in_area:
+  alias: 'Audio: Play Area Mood'
+  description: Follows an area mood
+  variables:
+    audio_room:
+      description: The room to control (defaults to spencers_audio)
+      default: spencers_audio
+  sequence:
+  - variables:
+      room_mood:
+        '[object Object]':
+  - data:
+      message: 'Audio mood automation triggered for {{ audio_room }}. Mood: {{ room_mood
+        }}'
+      level: info
+    action: system_log.write
+  - target:
+      entity_id: '{{ label_entities("Audio Mood: " + (states.input_select | selectattr(''entity_id'',
+        ''in'', label_entities(''Audio: Mood Leader'')) | map(attribute=''state'')
+        | first)) | first }}
+
+        '
+    action: script.turn_on
+boards_next_week_s_tasks:
+  sequence:
+  - action: rest_command.get_cards_from_swimlane
+    metadata: {}
+    data:
+      swimlaneId: '{{ from_swimlaneId }}'
+      boardId: '{{ boardId }}'
+    response_variable: tasks
+  - if:
+    - condition: template
+      value_template: '{{ tasks | count == 0 }}'
+    then:
+    - action: persistent_notification.create
+      metadata: {}
+      data:
+        message: No board cards found to move. Consider refreshing the credentials
+  - repeat:
+      sequence:
+      - if:
+        - condition: template
+          value_template: '"{{ repeat.item.dueAt is not defined and repeat.item.startAt
+            is not defined }}"'
+        then: []
+        else:
+        - if:
+          - condition: template
+            value_template: '{{ repeat.item.startAt is defined and as_datetime(repeat.item.startAt)
+              < (now() +  timedelta( days=timeDelta )) }}'
+          then:
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: warning
+              message: '{{ repeat.item }}'
+            enabled: true
+          - action: rest_command.move_card_to_swimlane
+            metadata: {}
+            data:
+              cardId: '{{ repeat.item._id }}'
+              listId: '{{ repeat.item.listId }}'
+              boardId: '{{ boardId }}'
+              swimlaneId: '{{ to_swimlaneId }}'
+            response_variable: tasks
+          enabled: true
+          else:
+          - if:
+            - condition: template
+              value_template: '{{ repeat.item.dueAt is defined and repeat.item.dueAt
+                != None and as_datetime(repeat.item.dueAt) < (now() +  timedelta(
+                days=timeDelta )) }}'
+            then:
+            - action: system_log.write
+              metadata: {}
+              data:
+                level: warning
+                message: '{{ repeat.item }}'
+              enabled: true
+            - action: rest_command.move_card_to_swimlane
+              metadata: {}
+              data:
+                cardId: '{{ repeat.item._id }}'
+                listId: '{{ repeat.item.listId }}'
+                boardId: '{{ boardId }}'
+                swimlaneId: '{{ to_swimlaneId }}'
+              response_variable: tasks
+            enabled: true
+      for_each: '{{ tasks.content }}'
+  alias: 'Boards: Move Cards To Swimlane By Date'
+  description: ''
+  fields:
+    boardId:
+      selector:
+        text:
+      name: boardId
+      description: Board ID
+      default: TrfngHQf8PWj9mnqC
+      required: false
+    from_swimlaneId:
+      selector:
+        text:
+      name: From Swimlane ID
+      required: true
+    to_swimlaneId:
+      selector:
+        text:
+      required: true
+      name: To Swimlane ID
+    timeDelta:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: timeDelta
+      required: true
+audio_area_based_media_actions:
+  alias: 'Audio: Area Based Media Actions'
+  fields:
+    remote_entity_id:
+      description: The entity ID of the remote device
+      example: sensor.living_room_remote
+    action:
+      description: The media action to perform (play_pause, volume_up, etc.)
+      example: media_play_pause
+  sequence:
+  - target:
+      area_id: '{{ area_id( remote_entity_id ) }}'
+    action: 'media_player.{{ action }}
+
+      '
+  description: ''
+audio_swap_audio_sources:
+  sequence: []
+  alias: 'Audio: Swap Audio Sources'
+  description: ''
+audio_swap_output:
+  sequence:
+  - variables:
+      current_value: '{{ states(''select.aerofarms_laptop_speaker_select'') }}'
+  - variables:
+      previous_value: "{% set history = state_attr('sensor.history_stats', 'aerofarms_laptop_speaker_select')
+        %} {% if not history %}\n  {% set history = (states.select.aerofarms_laptop_speaker_select.attributes.options
+        | reject('eq', current_value) | list) %}\n{% endif %} {% for entry in history
+        %}\n  {% if entry.state != current_value %}\n    {{ entry.state }}\n    {%
+        break %}\n  {% endif %}\n{% else %}\n  {% set options = states.select.aerofarms_laptop_speaker_select.attributes.options
+        | list %}\n  {% if options and options|length > 1 %}\n    {{ (options | reject('eq',
+        current_value) | list)[0] }}\n  {% else %}\n    {{ current_value }}\n  {%
+        endif %}\n{% endfor %}"
+  - target:
+      entity_id: select.aerofarms_laptop_speaker_select
+    data:
+      option: '{{ previous_value }}'
+    action: select.select_option
+  alias: 'Audio: Swap Output'
+  description: ''
+water_supply_by_area:
+  sequence: []
+  alias: 'Water Supply: By Area'
+  description: ''
+dose_house_plants:
+  sequence:
+  - variables:
+      nutrients:
+      - 'Nutrient: Part A'
+      - 'Nutrient: Part B'
+      - 'Nutrient: pH Up'
+      - 'Nutrient: H2O2'
+      shake_start_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities("Nutrient: Shake")) | map(attribute=''entity_id'')
+        | list }}
+
+        '
+      shake_stop_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities("Stop Nutrient: Shake"))
+        | map(attribute=''entity_id'') | list }}
+
+        '
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      nutrient: 'Nutrient: RO Water'
+      area_id: water_supply_01
+      units: '{{ units | float }}'
+    enabled: true
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      nutrient: 'Nutrient: Shake'
+      area_id: water_supply_01
+      units: 10
+    enabled: true
+  - repeat:
+      sequence:
+      - action: script.dose_nutrient_v2
+        metadata: {}
+        data:
+          nutrient: '{{ repeat.item }}'
+          area_id: '{{ area_id }}'
+          units: '{{ (units | float) * 2.0 }}'
+      - action: script.dose_nutrient_v2
+        metadata: {}
+        data:
+          nutrient: 'Nutrient: Shake'
+          area_id: water_supply_01
+          units: 1
+        enabled: true
+      for_each: '{{ nutrients }}'
+    enabled: true
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      nutrient: 'Nutrient: Shake'
+      area_id: water_supply_01
+      units: 5
+    enabled: true
+  fields:
+    area_id:
+      selector:
+        text:
+      name: area_id
+      default: water_supply_01
+    units:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: Units
+      default: 1
+  alias: 'Dose: House Plants'
+  description: ''
+  icon: mdi:flower
+dose_pressurize_electrolytes:
+  sequence:
+  - variables:
+      pump: '{{ states.switch  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities(nutrient)) | map(attribute=''entity_id'')
+        | list  | first }}
+
+        '
+      sensor: '{{ states.sensor  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities(nutrient~'' Sensor'')) |
+        map(attribute=''entity_id'') | list | first }}
+
+        '
+  - variables:
+      dose_under: '{{ states(''number.''~pump.split(''.'')[1]~''_dose_under'')  }}'
+  - if:
+    - condition: template
+      value_template: '{{ override_dose_under or (states(sensor) | float < dose_under
+        | float) and (states | selectattr("entity_id", ''in'', area_entities( area_id
+        )) | selectattr("entity_id", ''in'', label_entities(''water_supply_mode''))
+        |  map(attribute=''state'') | list | first in [ "Volume", "Timed", "Idle"
+        ])}}'
+    then:
+    - action: script.dose_nutrient_v2
+      metadata: {}
+      data:
+        nutrient: 'Nutrient: Electrolytes'
+        units: '{{ units }}'
+        area_id: '{{ area_id }}'
+        tracked: 25
+    - variables:
+        dose_timed_out: "{{ now() - as_local(state_attr('script.dose_pressurize_electrolytes',
+          'last_triggered')) >= timedelta(0, states('number.'~pump.split('.')[1]~'_dose_seconds')
+          | float) }} \n"
+    - if:
+      - condition: and
+        conditions:
+        - condition: template
+          value_template: '{{ dose_timed_out }}'
+          enabled: true
+        - condition: template
+          value_template: '{{ states | selectattr("entity_id", ''in'', area_entities(
+            area_id )) | selectattr("entity_id", ''in'', label_entities(''water_supply_mode''))
+            |  map(attribute=''state'') | list | first == "Timed" }}'
+          enabled: true
+      then:
+      - action: script.dose_house_plants
+        metadata: {}
+        data:
+          area_id: water_supply_01
+          units: 1
+        enabled: true
+      enabled: true
+    - if:
+      - condition: or
+        conditions:
+        - condition: and
+          conditions:
+          - condition: template
+            value_template: '{{ dose_timed_out }}'
+            enabled: true
+          - condition: template
+            value_template: '{{ states | selectattr("entity_id", ''in'', area_entities(
+              area_id )) | selectattr("entity_id", ''in'', label_entities(''water_supply_mode''))
+              |  map(attribute=''state'') | list | first == "Volume" }}'
+            enabled: true
+        - condition: and
+          conditions:
+          - condition: template
+            value_template: '{{ states | selectattr("entity_id", ''in'', area_entities(
+              area_id )) | selectattr("entity_id", ''in'', label_entities(''nutrient_water_supply_sensor''))
+              |  map(attribute=''state'') | list | first | float < 2.0 }}'
+            enabled: true
+          - condition: template
+            value_template: '{{ states | selectattr("entity_id", ''in'', area_entities(
+              area_id )) | selectattr("entity_id", ''in'', label_entities(''water_supply_mode''))
+              |  map(attribute=''state'') | list | first == "Volume" }}'
+            enabled: true
+      then:
+      - action: script.water_supply_by_volume_plant_mix
+        metadata: {}
+        data:
+          area_id: water_supply_01
+          units: 2
+          target_ph: 6.75
+      enabled: true
+  fields:
+    nutrient:
+      selector:
+        text:
+      name: Nutrient
+      default: 'Nutrient: Electrolytes'
+    area_id:
+      selector:
+        text:
+      name: area_id
+      default: water_supply_01
+    units:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: Units
+      default: 1
+    override_dose_under:
+      selector:
+        boolean: {}
+      name: Override Dose Under
+      description: 'This allows the script to run even if the PSI level is above the
+        typical cutoff. '
+  alias: 'Dose: Pressurize Electrolytes'
+  description: ''
+dose_nutrient:
+  sequence:
+  - variables:
+      pumps: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities(nutrient)) | map(attribute=''entity_id'')
+        | list }}
+
+        '
+  - repeat:
+      sequence:
+      - variables:
+          pump: '{{ repeat.item }}'
+          pump_time: '{% set dose_label_id = labels(repeat.item) | select(''match'',
+            ''dose_seconds'') | list | first %} {% set dose_seconds_label = label_name(dose_label_id)
+            %} {% set dose_seconds = dose_seconds_label.split('':'')[1] | trim | float
+            %}
+
+            {% set dose_double_label_id = labels(repeat.item) | select(''match'',
+            ''dose_double'') | list | first %} {% set dose_double_seconds_label =
+            label_name(dose_double_label_id) %} {% set dose_double_seconds = dose_double_seconds_label.split('':'')[1]
+            | trim | float %}
+
+            {% set dose_offset = (dose_seconds * 2) - dose_double_seconds %} {% set
+            dose = dose_seconds - dose_offset %} {{ dose_offset + (dose * units) }}'
+          followers_different_area: '{% set dose_area_label_id = labels(repeat.item)
+            | select(''match'', ''dose_area'') | list | first %} {% set dose_area_label
+            = label_name(dose_area_label_id)  %}  {% set dose_area =  dose_area_label.split('':'')[1]  if
+            dose_area_label  else '''' %} {{  dose_area | trim  }}
+
+            '
+          followers_in_area: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+            selectattr(''entity_id'', ''in'', label_entities(nutrient~'' Follower''))
+            | map(attribute=''entity_id'') | list }}'
+          pump_followers: '{{ followers_in_area [ followers_different_area ] }}'
+          sensor: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+            selectattr(''entity_id'', ''in'', label_entities(nutrient~'' Sensor''))
+            | map(attribute=''entity_id'') | list | first }}
+
+            '
+          dose_stop: '{% set dose_stop_label_id = labels(sensor) | select(''match'',
+            ''dose_stop'') | list | first %} {% set dose_stop_label = label_name(dose_stop_label_id)
+            %} {{ dose_stop_label.split('':'')[1] if dose_stop_label else '''' }}
+
+            '
+          dose_timeout: '{% set dose_timeout_label_id = labels(pump) | select(''match'',
+            ''dose_timeout'') | list | first %} {% set dose_timeout_label = label_name(dose_timeout_label_id)
+            %}  {{ dose_timeout_label.split('':'')[1] if dose_timeout_label else ''''
+            }}
+
+            '
+      - if:
+        - condition: template
+          value_template: '{{ followers_different_area  | length > 0 }}'
+          enabled: true
+        then:
+        - action: script.turn_on
+          metadata: {}
+          data:
+            entity_id: '{{ this.entity_id }}'
+            variables:
+              area_id: '{{ followers_different_area }}'
+              nutrient: '{{ nutrient~'' Follower'' }}'
+              units: '{{ units | float }}'
+        enabled: true
+      - repeat:
+          sequence:
+          - action: script.turn_on
+            metadata: {}
+            data:
+              entity_id: '{{ this.entity_id }}'
+              variables:
+                area_id: '{{ area_id }}'
+                nutrient: '{{ nutrient~'' Follower'' }}'
+                units: '{{ units | float }}'
+          for_each: '{{ followers_in_area | list }}'
+        enabled: true
+      - action: switch.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id: '{{ pump }}'
+      - if:
+        - condition: template
+          value_template: '{{ sensor | length > 0 }}'
+        then:
+        - wait_template: '{{ states(sensor) | float > dose_stop | float }}'
+          continue_on_timeout: true
+          timeout: 0{{ timedelta(0, dose_timeout | float) }}
+          enabled: true
+        else:
+        - delay: '{{  pump_time | float }}'
+      - action: switch.turn_off
+        metadata: {}
+        data: {}
+        target:
+          entity_id: '{{ pump }}'
+      - repeat:
+          sequence:
+          - action: script.turn_on
+            metadata: {}
+            data:
+              entity_id: '{{ this.entity_id }}'
+              variables:
+                area_id: '{{ area_id }}'
+                nutrient: '{{ nutrient~'' Follower'' }}'
+                units: 0
+          for_each: '{{ followers_in_area | list }}'
+        enabled: true
+      for_each: '{{ pumps }}'
+  fields:
+    nutrient:
+      selector:
+        text:
+      name: Nutrient
+      default: 'Nutrient: Electrolytes'
+    area_id:
+      selector:
+        text:
+      name: area_id
+      default: poc_01
+    units:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: Units
+      default: 1
+  alias: 'Dose: Nutrient'
+  description: ''
+  mode: parallel
+  max: 50
+calibrated_values_initalize_helpers:
+  sequence:
+  - variables:
+      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in label_entities('Calibrated
+        Value (2 Point)') %}\n  {% set leader_entities.list = leader_entities.list
+        + [leader] %}\n{% endfor %} {{ leader_entities.list }}\n"
+      l2:
+      - test
+      - another
+  - repeat:
+      for_each: '{{ leaders }}'
+      sequence:
+      - variables:
+          device_id: '{{ repeat.item }}'
+          device_name: '{{ device_id.split(''.'')[1] }}'
+          friendly_name: '{{ state_attr(repeat.item, ''friendly_name'') or states[repeat.item].name
+            }}'
+          area_id: '{{ area_name(repeat.item) }}'
+          ha_topic: homeassistant
+          device_topic: calibrated_value/{{ device_name }}
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/button/{{ device_name }}_clear/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Calibrated Value\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Clear Calibrations\",\n  \"uniq_id\": \"{{ device_name }}_clear\",\n
+            \ \"cmd_t\": \"~/calibration_data\",\n  \"pl_prs\": \"{}\"\n}\n"
+        enabled: true
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/button/{{ device_name }}_record/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name}}\",\n    \"manufacturer\":
+            \"Calibrated Value\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Record Current Calibration Values\",\n  \"uniq_id\": \"{{
+            device_name }}_record\",\n  \"cmd_t\": \"~/calibration_data\",\n  \"command_template\":
+            \"{{ '{{' \n      }} {states('number.{{ device_name }}_known_calibration_value'):
+            states('{{ device_id }}')} {{ '' \n      }} | combine( state_attr('sensor.{{
+            device_name }}_calibrated_value', 'raw') | from_json ) {{ ''\n      }}
+            | to_json {{ \n    '}}' }}\"\n}\n"
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_known_value/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Calibrated Value\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Known Calibration Value\",\n  \"uniq_id\": \"{{ device_name
+            }}_known_value\",\n  \"mode\": \"box\",\n  \"min\": \"0\",\n  \"max\":
+            \"10000000\",      \n  \"cmd_t\": \"~/known_value\",      \n  \"stat_t\":
+            \"~/known_value\"\n}\n"
+        enabled: true
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/sensor/{{ device_name }}_calibrated_value/config'
+          retain: true
+          payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
+            [ device_name ],\n      \"name\": friendly_name ,\n      \"manufacturer\":
+            \"Calibrated Value\",\n      \"suggested_area\": \"{{ area_id }}\"\n    },\n
+            \   \"name\": \"Calibrated Value\",\n    \"uniq_id\": device_name~\"_calibrated_value\",\n
+            \   \"cmd_t\": \"~/calibrated_value\",\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
+            \   \"state_class\": \"measurement\",\n    \"value_template\": \"{{ \n
+            \     (states( '\"~device_id~\"' ) | float) * ( state_attr('\"~device_id~\"_calibrated_value',
+            'poly[1]')  \n      | float) + ( state_attr('\"~device_id~\"_calibrated_value',
+            'poly[0]')  \n      | float) | float }}\",\n    \"json_attributes_topic\":
+            \"~/calibration_data\",\n    \"json_attributes_template\": \"{% set cal_data
+            = value | from_json %}\n      {% set ns = namespace(sx=0, sy=0, sxy=0,
+            sxx=0) %}\n      {% set n = cal_data.keys()|list|length %}\n      {% for
+            y, x in cal_data.items() %}\n        {% set x = x|float %}\n        {%
+            set y = y|float %}\n        {% set ns.sx = ns.sx + x %}\n        {% set
+            ns.sy = ns.sy + y %}\n        {% set ns.sxy = ns.sxy + (x * y) %}\n        {%
+            set ns.sxx = ns.sxx + (x * x) %}\n      {% endfor %}\n      \n      {%
+            set den = n * ns.sxx - ns.sx * ns.sx %}\n      {% if den != 0 %}\n        {%
+            set a = (n * ns.sxy - ns.sx * ns.sy) / den %}\n        {% set b = (ns.sy
+            - a * ns.sx) / n %}\n      {% elif n != 0 %}\n        {% set a = 0 %}{%
+            set b = ns.sy / n %}\n      {% else %}\n        {% set a = 1 %}{% set
+            b = 0 %}\n      {% endif %}\n      {{ {'raw': value, 'poly[0]': (b)|string,
+            'poly[1]': (a)|string, 'poly[2]': '0', 'poly[3]': '0', 'poly[4]': '0'}
+            | to_json }}\n    \"\n  } | to_json\n}}\n"
+        enabled: true
+  alias: 'Calibrated Values: Initalize Helpers'
+  description: ''
+  icon: mdi:chart-bell-curve-cumulative
+  fields: {}
+water_supply_by_volume_plant_mix:
+  sequence:
+  - variables:
+      nutrients:
+      - 'Nutrient: Part A'
+      - 'Nutrient: Part B'
+      - 'Nutrient: H2O2'
+      - 'Nutrient: pH Up'
+      shake_start_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities("Nutrient: Shake")) | map(attribute=''entity_id'')
+        | list }}
+
+        '
+      shake_stop_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities("Stop Nutrient: Shake"))
+        | map(attribute=''entity_id'') | list }}
+
+        '
+      expected_ro_dose_time: 666
+  - parallel:
+    - action: script.dose_nutrient_v2
+      metadata: {}
+      data:
+        nutrient: 'Nutrient: RO Water'
+        area_id: water_supply_01
+        units: '{{ units | float }}'
+        tracked: 25
+      enabled: true
+    - repeat:
+        sequence:
+        - delay: '{{ (units | float) * (expected_ro_dose_time | float) / ((nutrients
+            | length) + 1) }}'
+          enabled: true
+        - action: script.dose_nutrient_v2
+          metadata: {}
+          data:
+            nutrient: '{{ repeat.item }}'
+            area_id: '{{ area_id }}'
+            units: '{{ (units | float) if '' pH '' not in (repeat.item | string) else
+              1 }}'
+        for_each: '{{ nutrients }}'
+      enabled: true
+  - parallel:
+    - action: script.dose_nutrient_v2
+      metadata: {}
+      data:
+        nutrient: 'Nutrient: Electrolytes'
+        area_id: water_supply_01
+        units: 1
+      enabled: true
+    - action: script.dose_nutrient_v2
+      metadata: {}
+      data:
+        nutrient: 'Nutrient: Water Supply Outlet'
+        area_id: water_supply_01
+        units: 1
+      enabled: true
+  - repeat:
+      sequence:
+      - if:
+        - condition: template
+          value_template: "{{ target_ph - 0.75 >= (states  | selectattr('entity_id',
+            'in', area_entities('water_supply_01'))  |\n    selectattr('entity_id',
+            'in', label_entities('Water Supply: pH')) | list \n    | first\n    ).state
+            | float }}"
+        then:
+        - action: script.dose_nutrient_v2
+          metadata: {}
+          data:
+            nutrient: '{{ ph_up }}'
+            area_id: '{{ area_id }}'
+            units: '{{ units*0 + 1.0 | float }}'
+        - action: script.dose_nutrient_v2
+          metadata: {}
+          data:
+            nutrient: 'Nutrient: Shake'
+            area_id: water_supply_01
+            units: 15
+          enabled: true
+      count: 1
+    enabled: false
+  fields:
+    area_id:
+      selector:
+        text:
+      name: area_id
+      default: water_supply_01
+    units:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: Units
+      default: 1
+    target_ph:
+      selector:
+        number:
+          min: 0
+          max: 14
+          step: 0.01
+      name: target_ph
+      default: 6.5
+  alias: 'Water Supply by Volume: Plant Mix'
+  description: ''
+  icon: mdi:flower
+water_supply_by_volume_cancel_job:
+  sequence:
+  - action: homeassistant.turn_off
+    metadata: {}
+    data:
+      entity_id: "{{ labels() \n   | select('match', 'nutrient') \n   | map('label_entities')
+        \n   | sum(start=[]) \n   | list }}\n"
+  alias: 'Water Supply by Volume: Cancel Job'
+  description: ''
+  fields:
+    area:
+      selector:
+        text:
+      name: Area
+      default: water_supply_01
+calibrated_values_initalize_helpers_v2:
+  sequence:
+  - variables:
+      calibrated_labels: "{{ labels() \n    | select('match', 'calibrated_value(?!_2_point)')\n
+        \   | list\n}}\n"
+      calibrated_sensors_all: "{{ labels() \n    | select('match', 'calibrated_value(?!_2_point)')\n
+        \   | map('label_entities')\n    | sum(start=[])\n    | list\n}}\n"
+      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in label_entities('Calibrated
+        Value (2 Point)') %}\n  {% set leader_entities.list = leader_entities.list
+        + [leader] %}\n{% endfor %} {{ leader_entities.list }}\n"
+      l2:
+      - test
+      - another
+  - repeat:
+      sequence:
+      - variables:
+          calibrated_sensors: "{{ \n  label_entities(repeat.item)\n  | list\n}}\n"
+          device_class: "{{ label_name(repeat.item)\n  | regex_replace('^[^:]*:\\s*([^:]*?)(?:\\s*:.*)?$',
+            '\\\\1')\n}}\n"
+          units: "{{\n  label_name(repeat.item)\n  | regex_replace('^[^:]*:\\s*[^:]*:\\s*(.*)$|^.*$',
+            '\\\\1')\n}}\n"
+      - repeat:
+          for_each: '{{ calibrated_sensors }}'
+          sequence:
+          - variables:
+              device_id: '{{ repeat.item }}'
+              device_name: '{{ device_id.split(''.'')[1] }}'
+              friendly_name: '{{ state_attr(repeat.item, ''friendly_name'') or states[repeat.item].name
+                }}'
+              area_id: '{{ area_name(repeat.item) }}'
+              ha_topic: homeassistant
+              device_topic: calibrated_value/{{ device_name }}
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/button/{{ device_name }}_clear/config'
+              retain: true
+              payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
+                [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n
+                \   \"manufacturer\": \"Calibrated Value\",\n    \"suggested_area\":
+                \"{{ area_id }}\"\n  },\n  \"name\": \"Clear Calibrations\",\n  \"uniq_id\":
+                \"{{ device_name }}_clear\",\n  \"object_id\": \"{{ device_name }}_clear\",\n
+                \ \"cmd_t\": \"~/calibration_data\",\n  \"pl_prs\": \"{}\"\n}\n"
+            enabled: true
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/button/{{ device_name }}_record/config'
+              retain: true
+              payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
+                [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name}}\",\n
+                \   \"manufacturer\": \"Calibrated Value\",\n    \"suggested_area\":
+                \"{{ area_id }}\"\n  },\n  \"name\": \"Record Current Calibration
+                Values\",\n  \"uniq_id\": \"{{ device_name }}_record\",\n  \"object_id\":
+                \"{{ device_name }}_record\",\n  \"cmd_t\": \"~/calibration_data\",\n
+                \ \"retain\": true,\n  \"command_template\": \"{{ '{{' \n      }}
+                {states('number.{{ device_name }}_known_value'): states('{{ device_id
+                }}')} {{ '' \n      }} | combine( state_attr('sensor.{{ device_name
+                }}_calibrated_value', 'raw') | from_json ) {{ ''\n      }} | to_json
+                {{ \n    '}}' }}\"\n}\n"
+            enabled: true
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/number/{{ device_name }}_known_value/config'
+              retain: true
+              payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
+                [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n
+                \   \"manufacturer\": \"Calibrated Value\",\n    \"suggested_area\":
+                \"{{ area_id }}\"\n  },\n  \"name\": \"Known Calibration Value\",\n
+                \ \"uniq_id\": \"{{ device_name }}_known_value\",\n  \"object_id\":
+                \"{{ device_name }}_known_value\",\n  \"mode\": \"box\",\n  \"min\":
+                \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/known_value\",
+                \     \n  \"stat_t\": \"~/known_value\",\n  \"retain\": true\n}\n"
+            enabled: true
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/sensor/{{ device_name }}_calibrated_value/config'
+              retain: true
+              payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
+                [ device_name ],\n      \"name\": friendly_name ,\n      \"manufacturer\":
+                \"Calibrated Value\",\n      \"suggested_area\": \"{{ area_id }}\"\n
+                \   },\n    \"name\": \"Calibrated Value\",\n    \"device_class\":
+                device_class,\n    \"unit_of_measurement\": units,\n    \"uniq_id\":
+                device_name~\"_calibrated_value\",\n    \"object_id\": device_name~\"_calibrated_value\",\n
+                \   \"cmd_t\": \"~/calibrated_value\",\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
+                \   \"retain\": true,\n    \"expire_after\": 60,\n    \"state_class\":
+                \"measurement\",\n    \"suggested_display_precision\": \"2\",\n    \"value_template\":
+                \"{{ \n      (states( '\"~device_id~\"' ) | float) * ( state_attr('\"~device_id~\"_calibrated_value',
+                'poly[1]')  \n      | float) + ( state_attr('\"~device_id~\"_calibrated_value',
+                'poly[0]')  \n      | float) | float }}\",\n    \"json_attributes_topic\":
+                \"~/calibration_data\",\n    \"json_attributes_template\": \"{% set
+                cal_data = value | from_json %}\n      {% set ns = namespace(sx=0,
+                sy=0, sxy=0, sxx=0) %}\n      {% set n = cal_data.keys()|list|length
+                %}\n      {% for y, x in cal_data.items() %}\n        {% set x = x|float
+                %}\n        {% set y = y|float %}\n        {% set ns.sx = ns.sx +
+                x %}\n        {% set ns.sy = ns.sy + y %}\n        {% set ns.sxy =
+                ns.sxy + (x * y) %}\n        {% set ns.sxx = ns.sxx + (x * x) %}\n
+                \     {% endfor %}\n      \n      {% set den = n * ns.sxx - ns.sx
+                * ns.sx %}\n      {% if den != 0 %}\n        {% set a = (n * ns.sxy
+                - ns.sx * ns.sy) / den %}\n        {% set b = (ns.sy - a * ns.sx)
+                / n %}\n      {% elif n != 0 %}\n        {% set a = 0 %}{% set b =
+                ns.sy / n %}\n      {% else %}\n        {% set a = 1 %}{% set b =
+                0 %}\n      {% endif %}\n      {{ {'raw': value, 'poly[0]': (b)|string,
+                'poly[1]': (a)|string, 'poly[2]': '0', 'poly[3]': '0', 'poly[4]':
+                '0'} | to_json }}\n    \"\n  } | to_json\n}}\n"
+            enabled: true
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/number/{{ device_name }}_alert_high/config'
+              retain: true
+              payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
+                [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n
+                \   \"manufacturer\": \"Alert High\",\n    \"suggested_area\": \"{{
+                area_id }}\"\n  },\n  \"name\": \"Alert High Value\",\n  \"uniq_id\":
+                \"{{ device_name }}_alert_high\",\n  \"object_id\": \"{{ device_name
+                }}_alert_high\",\n  \"mode\": \"box\",\n  \"min\": \"0\",\n  \"max\":
+                \"10000000\",      \n  \"cmd_t\": \"~/alert_high\",      \n  \"stat_t\":
+                \"~/alert_high\",\n  \"retain\": true\n}\n"
+            enabled: true
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/number/{{ device_name }}_alert_low/config'
+              retain: true
+              payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
+                [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n
+                \   \"manufacturer\": \"Alert Low\",\n    \"suggested_area\": \"{{
+                area_id }}\"\n  },\n  \"name\": \"Alert Low Value\",\n  \"uniq_id\":
+                \"{{ device_name }}_alert_low\",\n  \"object_id\": \"{{ device_name
+                }}_alert_low\",\n  \"mode\": \"box\",\n  \"min\": \"0\",\n  \"max\":
+                \"10000000\",      \n  \"cmd_t\": \"~/alert_low\",      \n  \"stat_t\":
+                \"~/alert_low\",\n  \"retain\": true\n}\n"
+            enabled: true
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/number/{{ device_name }}_alert_check_minutes/config'
+              retain: true
+              payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
+                [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n
+                \   \"manufacturer\": \"Low Alert\",\n    \"suggested_area\": \"{{
+                area_id }}\"\n  },\n  \"name\": \"Alert Check Minutes\",\n  \"uniq_id\":
+                \"{{ device_name }}_alert_check_minutes\",\n  \"object_id\": \"{{
+                device_name }}_alert_check_minutes\",\n  \"mode\": \"box\",\n  \"min\":
+                \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/alert_check_minutes\",
+                \     \n  \"stat_t\": \"~/alert_check_minutes\",\n  \"retain\": true\n}\n"
+            enabled: true
+      for_each: '{{ calibrated_labels }}'
+  alias: 'Calibrated Values: Initalize Helpers (v2)'
+  description: ''
+  icon: mdi:chart-bell-curve-cumulative
+  fields: {}
+dose_nutrient_v2:
+  sequence:
+  - variables:
+      switches: '{{ states.switch | selectattr(''entity_id'', ''in'', area_entities(area_id))
+        | selectattr(''entity_id'', ''in'', label_entities(nutrient)) | map(attribute=''entity_id'')
+        | list }}
+
+        '
+      lights: '{{ states.light | selectattr(''entity_id'', ''in'', area_entities(area_id))
+        | selectattr(''entity_id'', ''in'', label_entities(nutrient)) | map(attribute=''entity_id'')
+        | list }}
+
+        '
+      switches_and_lights: '{{ switches + lights }}
+
+        '
+      pumps: '{{ switches + lights | list }}
+
+        '
+  - repeat:
+      sequence:
+      - variables:
+          pump: '{{ repeat.item }}'
+          dose_seconds_entity_id: '{{ repeat.item ~ ''_dose_seconds'' }}'
+          dose_time: '{% set dose_seconds = states( ''number.''~repeat.item.split(''.'')[1]~''_dose_seconds'')
+            | float(1) %} {% set dose_double_seconds = states( ''number.''~repeat.item.split(''.'')[1]~''_dose_double'')
+            | float(2) %}
+
+            {% set dose_offset = (dose_seconds * 2) - dose_double_seconds %} {% set
+            dose = dose_seconds - dose_offset %} {{ dose_offset + (dose * units) }}
+
+            '
+          dose_sensor_different_area: '{% set dose_area_label_id = labels(repeat.item)
+            | select(''match'', ''dose_area'') | list | first %} {% set dose_area_label
+            = label_name(dose_area_label_id)  %}  {% set dose_area =  dose_area_label.split('':'')[1]  if
+            dose_area_label  else '''' %} {{  dose_area | trim  }}
+
+            '
+          dose_sensor: '{{ states.sensor  | selectattr(''entity_id'', ''in'', area_entities(dose_sensor_different_area
+            if dose_sensor_different_area else area_id))  | selectattr(''entity_id'',
+            ''in'', label_entities(nutrient~'' Sensor'')) | map(attribute=''entity_id'')
+            | list | first }}'
+          dose_stop_above_entity: '{{  ''number.''~ pump.split(''.'')[1] ~''_dose_stop_above''
+            }}
+
+            '
+          dose_stop_above: '{{  states(''number.''~ pump.split(''.'')[1] ~''_dose_stop_above'')
+            | float(0) }}
+
+            '
+          followers_different_area: '{% set dose_area_label_id = labels(repeat.item)
+            | select(''match'', ''dose_area'') | list | first %} {% set dose_area_label
+            = label_name(dose_area_label_id) %}  {% set dose_area =  dose_area_label.split('':'')[1]
+            if dose_area_label  else '''' %} {{  dose_area | trim  }}
+
+            '
+          followers_in_area: '{{ states.switch  | selectattr(''entity_id'', ''in'',
+            area_entities(area_id))  | selectattr(''entity_id'', ''in'', label_entities(nutrient~''
+            Follower'')) | map(attribute=''entity_id'') | list }}'
+          pump_followers: '{{ followers_in_area [ followers_different_area ] }}'
+      - if:
+        - condition: template
+          value_template: '{{ followers_different_area  | length > 0 }}'
+          enabled: true
+        then:
+        - action: script.turn_on
+          metadata: {}
+          data:
+            entity_id: '{{ this.entity_id }}'
+            variables:
+              area_id: '{{ followers_different_area }}'
+              nutrient: '{{ nutrient~'' Follower'' }}'
+              units: '{{ units | float }}'
+        enabled: true
+      - repeat:
+          sequence:
+          - action: script.turn_on
+            metadata: {}
+            data:
+              entity_id: '{{ this.entity_id }}'
+              variables:
+                area_id: '{{ area_id }}'
+                nutrient: '{{ nutrient~'' Follower'' }}'
+                units: '{{ units | float }}'
+          for_each: '{{ followers_in_area | list }}'
+        enabled: true
+      - if:
+        - condition: template
+          value_template: '{{ dose_sensor | count > 0 }}'
+        then:
+        - variables:
+            starting_value: '{{ states(dose_sensor) | float }}'
+      - action: homeassistant.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id: '{{ pump }}'
+      - if:
+        - condition: template
+          value_template: '{{ dose_sensor | length > 0 and dose_stop_above > 0 }}'
+        then:
+        - wait_template: '{{ states(dose_sensor) | float > dose_stop_above | float
+            }}'
+          continue_on_timeout: true
+          timeout: 0{{ timedelta(0, units * (dose_time | float) ) }}
+          enabled: true
+        else:
+        - delay: '{{ dose_time }}'
+      - action: homeassistant.turn_off
+        metadata: {}
+        data: {}
+        target:
+          entity_id: '{{ pump }}'
+      - repeat:
+          sequence:
+          - action: script.turn_on
+            metadata: {}
+            data:
+              entity_id: '{{ this.entity_id }}'
+              variables:
+                area_id: '{{ area_id }}'
+                nutrient: '{{ nutrient~'' Follower'' }}'
+                units: 0
+          for_each: '{{ followers_in_area | list }}'
+        enabled: true
+      - if:
+        - condition: template
+          value_template: '{{ dose_sensor | count > 0 and tracked > 0 }}'
+        then:
+        - delay: '{{ tracked | float }}'
+        - variables:
+            ending_value: '{{ states(dose_sensor) | float }}'
+            dose_last: '{{ ''number.''~pump.split(''.'')[1]~''_dose_last'' }}'
+            difference: '{{ starting_value - ending_value if starting_value - ending_value
+              > 0 else states(dose_last) | float(0) }}'
+            something_with_getting_the_dose_expected_sensor: or alternatively use
+              a reading.
+          enabled: true
+        - action: number.set_value
+          metadata: {}
+          data:
+            value: '{{ difference }}'
+          enabled: true
+          target:
+            entity_id: '{{ ''number.''~pump.split(''.'')[1]~''_dose_last'' }}'
+        - action: number.set_value
+          metadata: {}
+          data:
+            value: '{{ states(''number.''~pump.split(''.'')[1]~''_dose_total'') |
+              float(0) + difference }}'
+          target:
+            entity_id: '{{ ''number.''~pump.split(''.'')[1]~''_dose_total'' }}'
+      for_each: '{{ pumps }}'
+  fields:
+    nutrient:
+      selector:
+        select:
+          options:
+          - 'Nutrient: Electrolytes'
+          - 'Nutrient: Drain'
+          - 'Nutrient: Part A'
+          - 'Nutrient: Part B'
+          - 'Nutrient: H2O2'
+          - 'Nutrient: ph Up'
+          - 'Nutrient: Water Supply'
+          - 'Nutrient: Water Supply Outlet'
+          - 'Nutrient: RO Water'
+          - 'Nutrient: Shake'
+          - 'Nutrient: Light'
+      name: Nutrient
+      default: 'Nutrient: Nutrient: Electrolytes'
+      required: true
+    area_id:
+      selector:
+        select:
+          options:
+          - water_supply_01
+          - poc_01
+          - root_zone_02
+          - root_zone_03
+          - root_zone_04
+          - root_zone_05
+          - shoot_zone_01
+      name: area_id
+      default: poc_01
+      required: true
+    units:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: Units
+      default: 1
+    tracked:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: tracked
+      default: 0
+      description: '0 = no tracking, more than that will wait that many seconds after
+        dosing but before recording the value. '
+  alias: 'Dose: Nutrient (v2)'
+  description: ''
+  mode: parallel
+  max: 50
+nutrient_dosing_initalize_helpers_v2:
+  sequence:
+  - variables:
+      nutrient_labels: "{{ labels() \n    | select('match', 'nutrient.*(?!follower)')\n
+        \   | list\n}}\n"
+      nutrient_switches_all: "{{ labels() \n    | select('match', 'nutrient_.*(?!follower)')\n
+        \   | map('label_entities')\n    | sum(start=[])\n    | select('match', '^(switch|light)\\.')\n
+        \   | list\n}}\n"
+      nutrient_sensors: "{{ labels() \n    | select('match', 'nutrient_.*_sensor')\n
+        \   | map('label_entities')\n    | sum(start=[])\n    | select('match', '^sensor\\.')\n
+        \   | list\n}}\n"
+      dose_stop_above_entities: "{{ label_entities('dose_stop_above') \n    | list\n}}\n"
+      dose_under_entities: "{{ label_entities('dose_under') \n    | list\n}}\n"
+  - repeat:
+      for_each: '{{ nutrient_switches_all }}'
+      sequence:
+      - variables:
+          device_id: '{{ repeat.item }}'
+          device_name: '{{ device_id.split(''.'')[1] }}'
+          friendly_name: '{{ state_attr(repeat.item, ''friendly_name'') or states[repeat.item].name
+            }}'
+          area_id: '{{ area_name(repeat.item) }}'
+          ha_topic: homeassistant
+          device_topic: nutrients/{{ device_name }}
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_dose_seconds/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Nutrient Dosing\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Dose Seconds\",\n  \"uniq_id\": \"{{ device_name }}_dose_seconds\",\n
+            \ \"object_id\": \"{{ device_name }}_dose_seconds\",\n  \"mode\": \"box\",\n
+            \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_seconds\",
+            \     \n  \"stat_t\": \"~/dose_seconds\",\n  \"retain\": true\n}\n"
+        enabled: true
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_dose_last/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Nutrient Dosing\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Dose Last\",\n  \"uniq_id\": \"{{ device_name }}_dose_last\",\n
+            \ \"object_id\": \"{{ device_name }}_dose_last\",\n  \"mode\": \"box\",\n
+            \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_last\",
+            \     \n  \"stat_t\": \"~/dose_last\",\n  \"retain\": true\n}\n"
+        enabled: true
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_dose_total/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Nutrient Dosing\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Dose Total\",\n  \"uniq_id\": \"{{ device_name }}_dose_total\",\n
+            \ \"object_id\": \"{{ device_name }}_dose_total\",\n  \"mode\": \"box\",\n
+            \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_total\",
+            \     \n  \"stat_t\": \"~/dose_total\",\n  \"retain\": true\n}\n"
+        enabled: true
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_dose_double/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Nutrient Dosing\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Dose Double\",\n  \"uniq_id\": \"{{ device_name }}_dose_double\",\n
+            \ \"object_id\": \"{{ device_name }}_dose_double\",\n  \"mode\": \"box\",\n
+            \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_double\",
+            \     \n  \"stat_t\": \"~/dose_double\",\n  \"retain\": true\n}\n"
+        enabled: true
+  - repeat:
+      for_each: '{{ dose_stop_above_entities }}'
+      sequence:
+      - variables:
+          device_id: '{{ repeat.item }}'
+          device_name: '{{ device_id.split(''.'')[1] }}'
+          friendly_name: '{{ state_attr(repeat.item, ''friendly_name'') or states[repeat.item].name
+            }}'
+          area_id: '{{ area_name(repeat.item) }}'
+          ha_topic: homeassistant
+          device_topic: nutrients/{{ device_name }}
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_dose_stop_above/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Nutrient Dosing\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Dose Stop Above\",\n  \"uniq_id\": \"{{ device_name }}_dose_stop_above\",\n
+            \ \"object_id\": \"{{ device_name }}_dose_stop_above\",\n  \"mode\": \"box\",\n
+            \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_stop_above\",
+            \     \n  \"stat_t\": \"~/dose_stop_above\",\n  \"retain\": true\n}\n"
+        enabled: true
+  - repeat:
+      for_each: '{{ dose_under_entities }}'
+      sequence:
+      - variables:
+          device_id: '{{ repeat.item }}'
+          device_name: '{{ device_id.split(''.'')[1] }}'
+          friendly_name: '{{ state_attr(repeat.item, ''friendly_name'') or states[repeat.item].name
+            }}'
+          area_id: '{{ area_name(repeat.item) }}'
+          ha_topic: homeassistant
+          device_topic: nutrients/{{ device_name }}
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_dose_under/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Nutrient Dosing\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Dose Under\",\n  \"uniq_id\": \"{{ device_name }}_dose_under\",\n
+            \ \"object_id\": \"{{ device_name }}_dose_under\",\n  \"mode\": \"box\",\n
+            \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_under\",
+            \     \n  \"stat_t\": \"~/dose_under\",\n  \"retain\": true\n}\n"
+        enabled: true
+  - repeat:
+      sequence:
+      - variables:
+          calibrated_sensors: "{{ \n  label_entities(repeat.item)\n  | list\n}}\n"
+          device_class: "{{ label_name(repeat.item)\n  | regex_replace('^[^:]*:\\s*([^:]*?)(?:\\s*:.*)?$',
+            '\\\\1')\n}}\n"
+          units: "{{\n  label_name(repeat.item)\n  | regex_replace('^[^:]*:\\s*[^:]*:\\s*(.*)$|^.*$',
+            '\\\\1')\n}}\n"
+      for_each: '{{ nutrient_labels }}'
+    enabled: false
+  alias: 'Nutrient Dosing: Initalize Helpers (v2)'
+  description: ''
+  icon: mdi:chart-bell-curve-cumulative
+  fields: {}
+water_supply_by_volume_plant_mix_shake:
+  sequence:
+  - variables:
+      nutrients:
+      - 'Nutrient: Part A'
+      - 'Nutrient: Part B'
+      - 'Nutrient: H2O2'
+      ph_up: 'Nutrient: pH Up'
+      shake_start_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities("Nutrient: Shake")) | map(attribute=''entity_id'')
+        | list }}
+
+        '
+      shake_stop_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
+        selectattr(''entity_id'', ''in'', label_entities("Stop Nutrient: Shake"))
+        | map(attribute=''entity_id'') | list }}
+
+        '
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      nutrient: 'Nutrient: RO Water'
+      area_id: water_supply_01
+      units: '{{ units | float }}'
+    enabled: true
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      nutrient: 'Nutrient: Shake'
+      area_id: water_supply_01
+      units: 10
+    enabled: true
+  - repeat:
+      sequence:
+      - action: script.dose_nutrient_v2
+        metadata: {}
+        data:
+          nutrient: '{{ repeat.item }}'
+          area_id: '{{ area_id }}'
+          units: '{{ (units | float) }}'
+      - action: script.dose_nutrient_v2
+        metadata: {}
+        data:
+          nutrient: 'Nutrient: Shake'
+          area_id: water_supply_01
+          units: 1
+        enabled: true
+      for_each: '{{ nutrients }}'
+    enabled: true
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      nutrient: 'Nutrient: Shake'
+      area_id: water_supply_01
+      units: 10
+    enabled: true
+  - repeat:
+      sequence:
+      - if:
+        - condition: template
+          value_template: "{{ target_ph - 0.75 >= (states  | selectattr('entity_id',
+            'in', area_entities('water_supply_01'))  |\n    selectattr('entity_id',
+            'in', label_entities('Water Supply: pH')) | list \n    | first\n    ).state
+            | float }}"
+        then:
+        - action: script.dose_nutrient_v2
+          metadata: {}
+          data:
+            nutrient: '{{ ph_up }}'
+            area_id: '{{ area_id }}'
+            units: '{{ units*0 + 1.0 | float }}'
+        - action: script.dose_nutrient_v2
+          metadata: {}
+          data:
+            nutrient: 'Nutrient: Shake'
+            area_id: water_supply_01
+            units: 15
+          enabled: true
+      count: 1
+  fields:
+    area_id:
+      selector:
+        text:
+      name: area_id
+      default: water_supply_01
+    units:
+      selector:
+        number:
+          min: 1
+          max: 100
+      name: Units
+      default: 1
+    target_ph:
+      selector:
+        number:
+          min: 0
+          max: 14
+          step: 0.01
+      name: target_ph
+      default: 6.5
+  alias: 'Water Supply by Volume: Plant Mix (Shake)'
+  description: ''
+  icon: mdi:flower
+calculated_areas_initalize_helpers:
+  sequence:
+  - repeat:
+      sequence:
+      - variables:
+          area_id: '{{ repeat.item }}'
+          area: '{{ area_name(repeat.item) }}'
+          ha_topic: homeassistant
+          device_topic: tracked_area/{{ area_id }}
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/sensor/{{ area_id }}_vpd/config'
+          retain: true
+          payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
+            [ area_id ],\n      \"name\": area ,\n      \"manufacturer\": \"Tracked
+            Area\",\n      \"suggested_area\": area\n    },\n    \"name\": \"VPD\",\n
+            \   \"device_class\": \"pressure\",\n    \"unit_of_measurement\": \"kPh\",\n
+            \   \"uniq_id\": area_id~\"_vpd\",\n    \"object_id\": area_id~\"_vpd\",\n
+            \   \"cmd_t\": \"~/calculated_value\",\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
+            \   \"retain\": true,\n    \"expire_after\": 60,\n    \"state_class\":
+            \"measurement\",\n    \"suggested_display_precision\": \"2\",\n    \"value_template\":
+            \"{# Get temperature sensors from area #}\n      {% set temp_sensors =
+            states.sensor \n          | selectattr('entity_id', 'in', area_entities('\"~area_id~\"'))
+            \n          | selectattr('attributes.device_class', 'defined') \n          |
+            selectattr('attributes.device_class', 'match', 'temperature') \n          |
+            list %}\n      \n      {# Get humidity sensors from area #}\n      {%
+            set humidity_sensors = states.sensor \n          | selectattr('entity_id',
+            'in', area_entities('\"~area_id~\"')) \n          | selectattr('attributes.device_class',
+            'defined') \n          | selectattr('attributes.device_class', 'match',
+            'humidity') \n          | list %}\n      \n      {% if temp_sensors |
+            length > 0 and humidity_sensors | length > 0 %}\n        {% set ns = namespace(celsius_temps=[])
+            %}\n        {% for sensor in temp_sensors %}\n          {% set temp =
+            sensor.state | float %}\n          {% set unit = sensor.attributes.unit_of_measurement
+            %}\n          {% if unit == '°F' %}\n            {% set celsius_temp =
+            (temp - 32) * 5/9 %}\n          {% else %}\n            {% set celsius_temp
+            = temp %}\n          {% endif %}\n          {% set ns.celsius_temps =
+            ns.celsius_temps + [celsius_temp] %}\n        {% endfor %}\n        \n
+            \       {% set avg_temp = ns.celsius_temps | average %}\n        \n        \n
+            \       {% set avg_humidity = humidity_sensors \n            | map(attribute='state')
+            \n            | map('float', 0) \n            | average %}\n      \n        {#
+            Calculate saturation vapor pressure using Antoine equation #}\n        {%
+            set svp = 0.61078 * (10 ** ((7.5 * avg_temp) / (237.3 + avg_temp))) %}\n
+            \       \n        {# Calculate actual vapor pressure #}\n        {% set
+            avp = svp * (avg_humidity / 100) %}\n      \n        {# Calculate VPD
+            in kPa #}\n        {% set vpd = svp - avp %}\n        \n        {{ vpd
+            | round(2) }}\n      {% else %}\n        unavailable\n      {% endif %}\n
+            \   \"\n  } | to_json\n}}\n"
+        enabled: true
+      for_each: '{{ label_areas(''Type: Shoot Zone'') }}'
+  - repeat:
+      sequence:
+      - variables:
+          area_id: '{{ repeat.item }}'
+          area: '{{ area_name(repeat.item) }}'
+          ha_topic: homeassistant
+          device_topic: tracked_area/{{ area_id }}
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ area_id }}_tracked_psi/config'
+          retain: true
+          payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
+            [ area_id ],\n      \"name\": area ,\n      \"manufacturer\": \"Tracked
+            Area\",\n      \"suggested_area\": area\n    },\n    \"name\": \"Tracked
+            PSI\",\n    \"device_class\": \"pressure\",\n    \"unit_of_measurement\":
+            \"PSI\",\n    \"uniq_id\": area_id~\"_tracked_psi\",\n    \"object_id\":
+            area_id~\"_tracked_psi\",\n    \"retain\": true,\n    \"expire_after\":
+            60,\n    \"state_class\": \"total_increasing\",\n    \"cmd_t\": \"~/tracked_psi\",\n
+            \   \"stat_t\": \"~/tracked_psi\",\n    \"initial\": 0,\n    \"optimistic\":
+            true,\n    \"min\": 0,\n    \"max\": 2000,\n    \"step\": 0.10,\n    \"mode\":
+            \"box\",\n    \"suggested_display_precision\": \"2\"\n  } | to_json\n}}\n"
+        enabled: true
+      - action: mqtt.publish
+        data:
+          topic: '{{ device_topic~"/tracked_psi" }}'
+          retain: true
+          payload: '0'
+        enabled: false
+      for_each: '{{ label_areas(''Type: Root Zone'') }}'
+    enabled: true
+  alias: 'Area Types: Initalize Helpers'
+  description: ''
+  icon: mdi:chart-bell-curve-cumulative
+  fields: {}
+send_alert:
+  sequence:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ alert_severity in [ ''low'', ''medium'', ''high'' ] }} '
+      sequence:
+      - data:
+          title: '{{ alert_title }}'
+          message: 'Alert: {{ alert_message }}'
+          notification_id: low_alert_{{ alert_title.replace('.', '_').replace(' ',
+            '_') }}
+        action: persistent_notification.create
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ alert_severity in [ ''high'', ''medium'' ]  }}'
+      sequence:
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ alert_message }}'
+          title: '{{ alert_title }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ alert_severity in [ ''high'' ]  }}'
+      sequence:
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: 'URGENT: {{ alert_message }}'
+          title: '{{ alert_title }}'
+          data:
+            priority: high
+            channel: urgent_alerts
+      - action: script.high_severity_alert_handler
+        data:
+          title: '{{ alert_title }}'
+          message: '{{ alert_message }}'
+        enabled: false
+  fields:
+    alert_title:
+      selector:
+        text:
+      name: Alert Title
+      description: The title to use for the alert.
+      default: Change the alert_title
+    alert_message:
+      selector:
+        text:
+      name: Alert Message
+      description: Alert message to send
+      default: Change the alert_message
+    alert_severity:
+      selector:
+        select:
+          options:
+          - low
+          - medium
+          - high
+      name: Alert Severity
+      default: low
+  alias: Send Alert
+  description: Sends alerts with different notification methods based on severity
+    level

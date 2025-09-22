@@ -1,0 +1,321 @@
+blueprint:
+  name: Ikea E2123 - Z2M 2.0 - Generic use
+  description: This blueprint is for Ikea E2123 generic use.
+  domain: automation
+  input:
+    remote:
+      name: Remote
+      description: The MQTT device created by Z2M
+      selector:
+        device:
+          filter:
+          - integration: mqtt
+          multiple: false
+    play_pause:
+      name: Play Button Click
+      description: Action to perform (firmware 1.0.35)
+      selector:
+        action: {}
+      default: []
+    toggle:
+      name: Play Button Click
+      description: Action to perform (firmware 1.0.32)
+      selector:
+        action: {}
+      default: []
+    track_next:
+      name: Next track Button Click
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    track_previous:
+      name: Previous track click
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    volume_up:
+      name: Volume up click
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    volume_up_hold:
+      name: Volume up click hold
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    volume_down:
+      name: Volume down click
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    volume_down_hold:
+      name: Volume down click hold
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_1_initial_press:
+      name: Dots 1 click
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_1_short_release:
+      name: Dots 1 click short release
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_1_double_press:
+      name: Dots 1 double press
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_1_long_press:
+      name: Dots 1 long press
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_1_long_release:
+      name: Dots 1 long release
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_2_initial_press:
+      name: Dots 2 click
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_2_short_release:
+      name: Dots 2 click short release
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_2_double_press:
+      name: Dots 2 double press
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_2_long_press:
+      name: Dots 2 long press
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+    dots_2_long_release:
+      name: Dots 2 long release
+      description: Action to perform
+      selector:
+        action: {}
+      default: []
+  source_url: https://github.com/Dhy19971/Home-assistant-blueprint/blob/main/Z2M-2.0/Ikea/Ikea-E2123-Generic.yaml
+mode: parallel
+max: 10
+triggers:
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: play_pause
+  id: play_pause
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: toggle
+  id: toggle
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: track_next
+  id: track_next
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: track_next
+  id: track_next
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: volume_up
+  id: volume_up
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: volume_up_hold
+  id: volume_up_hold
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: volume_down
+  id: volume_down
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: volume_down_hold
+  id: volume_down_hold
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_1_initial_press
+  id: dots_1_initial_press
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_1_short_release
+  id: dots_1_short_release
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_1_double_press
+  id: dots_1_double_press
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_1_long_release
+  id: dots_1_long_release
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_2_initial_press
+  id: dots_2_initial_press
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_2_short_release
+  id: dots_2_short_release
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_2_double_press
+  id: dots_2_double_press
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_2_long_press
+  id: dots_2_long_press
+  trigger: device
+- domain: mqtt
+  device_id: !input remote
+  type: action
+  subtype: dots_2_long_release
+  id: dots_2_long_release
+  trigger: device
+conditions: []
+actions:
+- choose:
+  - conditions:
+    - condition: trigger
+      id:
+      - play_pause
+    sequence: !input play_pause
+- choose:
+  - conditions:
+    - condition: trigger
+      id:
+      - toggle
+    sequence: !input toggle
+  - conditions:
+    - condition: trigger
+      id:
+      - track_next
+    sequence: !input track_next
+  - conditions:
+    - condition: trigger
+      id:
+      - track_previous
+    sequence: !input track_previous
+  - conditions:
+    - condition: trigger
+      id:
+      - volume_up
+    sequence: !input volume_up
+  - conditions:
+    - condition: trigger
+      id:
+      - volume_up_hold
+    sequence: !input volume_up_hold
+  - conditions:
+    - condition: trigger
+      id:
+      - volume_down
+    sequence: !input volume_down
+  - conditions:
+    - condition: trigger
+      id:
+      - volume_down_hold
+    sequence: !input volume_down_hold
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_1_initial_press
+    sequence: !input dots_1_initial_press
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_1_short_release
+    sequence: !input dots_1_short_release
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_1_double_press
+    sequence: !input dots_1_double_press
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_1_long_press
+    sequence: !input dots_1_long_press
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_1_long_release
+    sequence: !input dots_1_long_release
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_2_initial_press
+    sequence: !input dots_2_initial_press
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_2_short_release
+    sequence: !input dots_2_short_release
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_2_double_press
+    sequence: !input dots_2_double_press
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_2_long_press
+    sequence: !input dots_2_long_press
+  - conditions:
+    - condition: trigger
+      id:
+      - dots_2_long_release
+    sequence: !input dots_2_long_release

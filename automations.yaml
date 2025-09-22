@@ -1,0 +1,1837 @@
+- id: '1718079239094'
+  alias: 'Music: Play Classical'
+  description: ''
+  trigger: []
+  condition: []
+  action:
+  - service: squeezebox.call_method
+    target:
+      entity_id: media_player.media_player
+    data:
+      parameters:
+      - playlist
+      - play
+      - menu:pyrrha
+      - isContextMenu:1
+      - item_id:955c6523.1
+      command: pyrrha
+  mode: single
+- id: '1719779922816'
+  alias: 'Audio: Play Pandora andor WavIn'
+  description: ''
+  trigger: []
+  condition: []
+  action:
+  - service: squeezebox.call_method
+    data:
+      command: favorites
+      parameters:
+      - playlist
+      - play
+      - menu:favorites
+      - isContextMenu:1
+      - item_id:2341f31f.13
+    target:
+      device_id:
+      - 496d832a4d14eae54361943af8d52524
+      - 91449757158429b16cb12598dfe5e250
+      - 70e10e6dc405257086560b800db43a85
+  - service: squeezebox.call_method
+    target:
+      entity_id: media_player.office
+    data:
+      command: pyrrha
+      parameters:
+      - playlist
+      - play
+      - menu:pyrrha
+      - isContextMenu:1
+      - item_id:955c6523.3
+    enabled: false
+  mode: single
+- id: '1719781638489'
+  alias: 'Audio: spencer-laptop to Home-Audio'
+  description: ''
+  trigger: []
+  condition: []
+  action:
+  - service: squeezebox.call_method
+    data:
+      command: favorites
+      parameters:
+      - playlist
+      - play
+      - menu:favorites
+      - isContextMenu:1
+      - item_id:4873e51a.12
+    target:
+      device_id:
+      - 283115d4c87f7e8837ef2710975ef5f7
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 3
+      milliseconds: 0
+  - service: select.select_option
+    metadata: {}
+    data:
+      option: Home-Audio
+    target:
+      entity_id: select.spencer_laptop_speaker_select
+  mode: single
+- id: '1719782249830'
+  alias: 'Audio: Sleep Fade'
+  description: ''
+  trigger: []
+  condition: []
+  action:
+  - service: switch.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: switch.spencer_laptop_screen_onoff
+  - service: squeezebox.call_method
+    data:
+      command: sleep
+      parameters:
+      - 1800
+    target:
+      device_id: 70e10e6dc405257086560b800db43a85
+  - delay:
+      hours: 0
+      minutes: 30
+      seconds: 0
+      milliseconds: 0
+  - service: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.spencer_laptop_playpause
+  - service: select.select_option
+    metadata: {}
+    data:
+      option: Family 17h/19h HD Audio Controller Analog Stereo
+    target:
+      entity_id: select.spencer_laptop_speaker_select
+  mode: single
+- id: '1719782664118'
+  alias: 'Audio: media-player to Home-Audio'
+  description: ''
+  trigger: []
+  condition: []
+  action:
+  - service: squeezebox.call_method
+    data:
+      command: favorites
+      parameters:
+      - playlist
+      - play
+      - menu:favorites
+      - isContextMenu:1
+      - item_id:2341f31f.13
+    target:
+      device_id:
+      - 496d832a4d14eae54361943af8d52524
+      - c30df65c890891e92fc68447e0ef1587
+      - 91449757158429b16cb12598dfe5e250
+      - 70e10e6dc405257086560b800db43a85
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 3
+      milliseconds: 0
+  - service: select.select_option
+    metadata: {}
+    data:
+      option: Home-Audio
+    target:
+      entity_id:
+      - select.media_player_speaker_select
+  mode: single
+- id: '1720676200768'
+  alias: 'Climate Mode: Super'
+  description: ''
+  trigger:
+  - platform: state
+    entity_id:
+    - input_select.climate_mode
+    to: Super Cool
+  - platform: state
+    entity_id:
+    - input_select.climate_mode
+    to: Super Heat
+  - platform: time
+    at: '19:00:00'
+  condition:
+  - condition: and
+    conditions:
+    - condition: state
+      entity_id: input_select.house_mode
+      state: Day
+    - condition: or
+      conditions:
+      - condition: state
+        entity_id: input_select.climate_mode
+        state: Super Heat
+      - condition: state
+        entity_id: input_select.climate_mode
+        state: Super Cool
+  action:
+  - if:
+    - condition: or
+      conditions:
+      - condition: state
+        entity_id: input_select.climate_mode_providing
+        state: Heat
+      - condition: state
+        entity_id: input_select.climate_mode_providing
+        state: Both
+    then:
+    - service: climate.set_temperature
+      data_template:
+        temperature: '{{ states.input_number.climate_mode_heating_super.state }}'
+      target:
+        area_id: living_room
+  - if:
+    - condition: or
+      conditions:
+      - condition: state
+        entity_id: input_select.climate_mode_providing
+        state: Cool
+      - condition: state
+        entity_id: input_select.climate_mode_providing
+        state: Both
+    then:
+    - service: climate.set_temperature
+      data_template:
+        temperature: '{{ states.input_number.climate_mode_cooling_super.state }}'
+      target:
+        area_id: living_room
+  mode: single
+- id: '1721631232619'
+  alias: 'Bedroom Main: Turn Off Lightsnew'
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 80658f61524311c7df4dae373f78b535
+    type: action
+    subtype: brightness_down_click
+    trigger: device
+  conditions: []
+  actions:
+  - metadata: {}
+    data: {}
+    target:
+      area_id:
+      - bathroom_main
+      - closet_bedroom_main
+      - bedroom_main
+      - hall_bedroom_main
+    action: light.turn_off
+  - if:
+    - condition: state
+      entity_id: input_boolean.night_mode
+      state: 'on'
+    then:
+    - metadata: {}
+      data: {}
+      target:
+        entity_id:
+        - switch.spencer_laptop_screen_onoff
+      action: switch.turn_off
+    - action: button.press
+      metadata: {}
+      data:
+        entity_id: button.spencer_laptop_bash_shutoff_screen
+  - action: media_player.media_pause
+    metadata: {}
+    data: {}
+    target:
+      area_id:
+      - living_room
+      - spencer
+  mode: single
+- id: '1724370598242'
+  alias: 'Audio: Follow The Leader'
+  description: ''
+  triggers:
+  - entity_id:
+    - sensor.audio_area_leaders_off
+    trigger: state
+  conditions: []
+  actions:
+  - variables:
+      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in label_entities('Audio:
+        Area Leader') %}\n  {% set leader_entities.list = leader_entities.list + [leader]
+        %}\n{% endfor %} {{ leader_entities.list }}\n"
+  - repeat:
+      for_each: '{{ leaders }}'
+      sequence:
+      - variables:
+          followers: "{% set follower_entities = namespace(list=[]) %}  {% set area
+            = device_attr(device_id(repeat.item), 'area_id') %}  {% for s in states.media_player
+            | selectattr('entity_id', 'in', area_entities(area)) | selectattr('entity_id',
+            'in', label_entities('Audio: Area Follower')) %}\n  {% set follower_entities.list
+            = follower_entities.list + [s.entity_id] %}\n{% endfor %}  {{ follower_entities.list
+            }}\n"
+      - metadata: {}
+        data:
+          message: '{{ repeat.item }}: {{ followers }}'
+        enabled: false
+        action: persistent_notification.create
+      - if:
+        - condition: state
+          entity_id: input_select.audio_mode
+          state: Away
+        then:
+        - metadata: {}
+          data:
+            is_volume_muted: true
+          target:
+            entity_id: '{{ followers }}:{{ is_state(repeat.item, ''off'') }}'
+          action: media_player.volume_mute
+      - if:
+        - condition: state
+          entity_id: input_select.audio_mode
+          state: Presence
+        then:
+        - metadata: {}
+          data:
+            is_volume_muted: '{{ is_state(repeat.item, ''off'') }}'
+          target:
+            entity_id: '{{ followers }}'
+          action: media_player.volume_mute
+        - if:
+          - condition: template
+            value_template: '{{ is_state(repeat.item, ''off'') }}'
+          then:
+          - action: light.turn_off
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+          else:
+          - action: light.turn_on
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+  mode: restart
+- id: '1724383570007'
+  alias: 'House Mode: Night'
+  description: ''
+  triggers:
+  - entity_id:
+    - input_select.house_mode
+    from: Day
+    to: Night
+    trigger: state
+  conditions: []
+  actions:
+  - data: {}
+    target:
+      area_id:
+      - tv_room
+      - shared
+    action: media_player.turn_off
+  - data: {}
+    target:
+      area_id:
+      - shared
+    action: media_player.media_pause
+  - data: {}
+    target:
+      entity_id: input_boolean.night_mode
+    action: input_boolean.turn_on
+  - data: {}
+    target:
+      entity_id: switch.adaptive_lighting_sleep_mode_hall_bedroom_main_lights
+    action: switch.turn_on
+  - data:
+      brightness_pct: 8
+      kelvin: 2000
+    target:
+      entity_id: light.bedroom_main_lights
+    action: light.turn_on
+  - data: {}
+    target:
+      entity_id: switch.adaptive_lighting_bedroom_main_lights
+    action: switch.turn_off
+  - metadata: {}
+    data:
+      value: '0.5'
+    target:
+      label_id: audio_50_at_night
+    action: number.set_value
+  - action: select.select_option
+    target:
+      entity_id: select.aerofarms_laptop_speaker_select
+    data:
+      option: Built-in Audio Analog Stereo
+  - metadata: {}
+    data:
+      is_volume_muted: true
+    target:
+      label_id: house_mode_turn_off_at_night
+    action: media_player.volume_mute
+  - action: light.turn_off
+    metadata: {}
+    data: {}
+    target:
+      area_id: shoot_zone_01
+  - data: {}
+    target:
+      entity_id:
+      - light.tv_room_side_table_light
+      - light.dining_room_game_corner_light_light
+      - light.hall_light_status
+      area_id:
+      - dining_room
+      - tv_room
+    action: light.turn_off
+    enabled: true
+  mode: single
+- id: '1724384009940'
+  alias: 'House Mode: Day'
+  description: ''
+  triggers:
+  - entity_id:
+    - input_select.house_mode
+    from: Night
+    to: Day
+    trigger: state
+  conditions: []
+  actions:
+  - data: {}
+    target:
+      entity_id: input_boolean.night_mode
+    action: input_boolean.turn_off
+  - data: {}
+    target:
+      entity_id: switch.adaptive_lighting_sleep_mode_hall_bedroom_main_lights
+    action: switch.turn_off
+  - data: {}
+    target:
+      entity_id: switch.adaptive_lighting_bedroom_main_lights
+    action: switch.turn_on
+  - metadata: {}
+    data:
+      is_volume_muted: false
+    target:
+      label_id: house_mode_turn_on_at_day
+    action: media_player.volume_mute
+  - metadata: {}
+    data:
+      value: 1
+    target:
+      label_id: audio_100_at_day
+    action: number.set_value
+  - action: light.turn_on
+    metadata: {}
+    data: {}
+    target:
+      area_id: shoot_zone_01
+  mode: single
+- id: '1724520206274'
+  alias: 'Audio: Fix Snapcast After Changing Speakers'
+  description: ''
+  trigger:
+  - platform: device
+    device_id: 81b7a08c1f3d882890e50e64b572c879
+    domain: select
+    entity_id: d89945c7e1b8e8df43aef241acfcc081
+    type: current_option_changed
+    to: Home Audio
+  condition: []
+  action:
+  - device_id: 81b7a08c1f3d882890e50e64b572c879
+    domain: button
+    entity_id: 100343e4fc0c987b6395f590f34bc6fa
+    type: press
+  mode: single
+- id: '1731301792172'
+  alias: 'Sleep Me: Buttons'
+  description: ''
+  use_blueprint:
+    path: amorfinvdev/somrig.yaml
+    input:
+      remote_name: Button (Spencer Sleep)
+      dots_1_press_action:
+      - action: script.sleep_me_switch
+        metadata: {}
+        data: {}
+      dots_2_press_action:
+      - action: script.sleep_me_switch_play_pause
+        metadata: {}
+        data: {}
+      dots_1_double_press_action:
+      - action: script.sleep_me_switch_go_back
+        metadata: {}
+        data: {}
+      dots_2_double_press_action:
+      - action: script.sleep_me_switch_go_forward
+        metadata: {}
+        data: {}
+      dots_1_hold_action:
+      - action: script.sleep_me_switch_increase_volume
+        metadata: {}
+        data: {}
+      dots_2_hold_action:
+      - action: script.sleep_me_switch_decrease_volume
+        metadata: {}
+        data: {}
+      helper_hold_delay: 580
+- id: '1731802828699'
+  alias: 'Sleep Me: Pause '
+  description: ''
+  triggers:
+  - entity_id:
+    - timer.sleep_countdown
+    from: active
+    to: idle
+    trigger: state
+  conditions:
+  - condition: state
+    entity_id: sensor.spencer_laptop_media_info
+    state: playing
+  actions:
+  - variables:
+      previous_volume: '{{ states(''number.spencer_laptop_volume_set'')  }}
+
+        '
+  - action: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.spencer_laptop_playpause
+  - action: number.set_value
+    metadata: {}
+    data_template:
+      value: '{{ [states(''number.spencer_laptop_volume_set'') | float - 15, 0] |
+        max }}
+
+        '
+    target:
+      entity_id:
+      - number.spencer_laptop_volume_set
+    enabled: false
+  - delay:
+      hours: 0
+      minutes: 1
+      seconds: 0
+      milliseconds: 0
+    enabled: true
+  - action: number.set_value
+    metadata: {}
+    data_template:
+      value: 0
+    target:
+      entity_id:
+      - number.spencer_laptop_volume_set
+    enabled: true
+  - action: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.spencer_laptop_playpause
+  - repeat:
+      count: 20
+      sequence:
+      - action: button.press
+        metadata: {}
+        data: {}
+        target:
+          entity_id: button.spencer_laptop_previous
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 1
+          milliseconds: 0
+  - action: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.spencer_laptop_playpause
+  - action: number.set_value
+    metadata: {}
+    data_template:
+      value: '{{ previous_volume }}
+
+        '
+    target:
+      entity_id:
+      - number.spencer_laptop_volume_set
+    enabled: true
+  mode: single
+- id: '1737094667679'
+  alias: Buttons (Audio)
+  description: ''
+  use_blueprint:
+    path: Dhy19971/Ikea-E2123-Generic.yaml
+    input:
+      remote: 6211fe549e39627bb28f0b723cb77f4e
+      play_pause: []
+      toggle:
+      - action: script.audio_area_based_media_actions
+        metadata: {}
+        data:
+          remote_entity_id: '{{ this.entity_id }}
+
+            '
+          action: media_play_pause
+      volume_up_hold:
+      - action: script.audio_area_based_media_actions
+        metadata: {}
+        data:
+          remote_entity_id: '{{ this.entity_id }}
+
+            '
+          action: volume_up
+      volume_down_hold:
+      - action: script.audio_area_based_media_actions
+        metadata: {}
+        data:
+          remote_entity_id: '{{ this.entity_id }}
+
+            '
+          action: volume_down
+      track_next:
+      - action: script.audio_mood_play_in_area
+        metadata: {}
+        data: {}
+      - action: script.audio_area_based_media_actions
+        metadata: {}
+        data:
+          remote_entity_id: '{{ this.entity_id }}
+
+            '
+          action: media_play_pause
+        enabled: false
+      track_previous:
+      - action: script.audio_area_based_media_actions
+        metadata: {}
+        data:
+          remote_entity_id: '{{ this.entity_id }}
+
+            '
+          action: media_next_track
+      volume_up: []
+      dots_1_initial_press:
+      - action: automation.trigger
+        metadata: {}
+        data:
+          skip_condition: true
+        target:
+          entity_id: automation.tv_room_media_player_source
+- id: '1737403021395'
+  alias: 'Audio: Play Triggers'
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_select.house_mode
+    from: Night
+    to: Day
+  - trigger: state
+    entity_id:
+    - input_select.house_mode
+    from: Away
+    to: Day
+    enabled: false
+  - trigger: state
+    entity_id:
+    - input_select.spencer_s_mood
+    id: mood_change
+  - trigger: state
+    entity_id:
+    - automation.house_lock_first_door_close_after_arrival
+    attribute: last_triggered
+  - type: turned_off
+    device_id: c5e71d0e351b7c8e579e2ca6d64d13ce
+    entity_id: 746b8bfe6f6d78b928f98adc57221a35
+    domain: binary_sensor
+    trigger: device
+    enabled: false
+  - trigger: state
+    entity_id:
+    - binary_sensor.aerofarms_laptop_microphone_used
+    from: 'on'
+    to: 'off'
+  conditions:
+  - condition: or
+    conditions:
+    - condition: and
+      conditions:
+      - condition: trigger
+        id:
+        - mood_change
+      - condition: state
+        entity_id: media_player.lms
+        state: playing
+    - condition: not
+      conditions:
+      - condition: trigger
+        id:
+        - mood_change
+  actions:
+  - action: script.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: script.audio_mood_play_in_area
+  mode: single
+- id: '1737403304765'
+  alias: 'Audio Triggers: Stop'
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_select.house_mode
+    from: Day
+    to: Night
+    enabled: false
+  - trigger: state
+    entity_id:
+    - input_select.house_mode
+    to: Away
+  - type: turned_on
+    device_id: c5e71d0e351b7c8e579e2ca6d64d13ce
+    entity_id: 746b8bfe6f6d78b928f98adc57221a35
+    domain: binary_sensor
+    trigger: device
+  conditions: []
+  actions:
+  - action: media_player.media_stop
+    metadata: {}
+    data: {}
+    target:
+      area_id:
+      - living_room
+      - spencer
+  mode: single
+- id: '1737404355908'
+  alias: 'Audio: Trigger Night'
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_select.house_mode
+    to: Night
+  conditions: []
+  actions:
+  - action: input_select.select_option
+    metadata: {}
+    data:
+      option: Night
+    target:
+      label_id: audio_mood_leader
+  - action: script.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: script.audio_mood_play_in_area
+  mode: single
+- id: '1737404488765'
+  alias: 'Audio Triggers: Night'
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_select.house_mode
+    to: Night
+  conditions: []
+  actions:
+  - action: input_select.select_option
+    metadata: {}
+    data:
+      option: Night
+    target:
+      label_id: audio_mood_leader
+  mode: single
+- id: '1737508969509'
+  alias: 'House Lock: When unlocked for 10 minutes'
+  description: ''
+  triggers:
+  - entity_id:
+    - lock.touchscreen_deadbolt_z_wave_plus
+    to: unlocked
+    for:
+      hours: 0
+      minutes: 10
+      seconds: 0
+    id: Unlocked for 10 minutes
+    trigger: state
+  conditions: []
+  actions:
+  - data: {}
+    target:
+      entity_id: automation.house_lock_lock_validation
+    action: automation.trigger
+  mode: single
+- id: '1737509009041'
+  alias: 'House Lock: First door close after arrival'
+  description: ''
+  triggers:
+  - entity_id:
+    - binary_sensor.contact_front_door
+    to: 'off'
+    from: 'on'
+    id: Door Closed
+    trigger: state
+  conditions:
+  - condition: trigger
+    id: Door Closed
+    enabled: false
+  - condition: template
+    value_template: '{{ as_timestamp(now()) - as_timestamp(states.sensor.house_home_count.last_changed)
+      <  timedelta(minutes=10).total_seconds() }}'
+  actions:
+  - data: {}
+    target:
+      entity_id: automation.house_lock_lock_validation
+    action: automation.trigger
+  mode: single
+- id: '1739773495929'
+  alias: 'Boards: Move This Week''s Cards'
+  description: ''
+  triggers:
+  - trigger: time
+    at: '23:55:15'
+  conditions: []
+  actions:
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: M4ep8PQ4ooQzxrMAy
+      to_swimlaneId: mi4eKny3uXdGWWmYr
+      timeDelta: 7
+      boardId: TrfngHQf8PWj9mnqC
+  mode: single
+- id: '1739829986815'
+  alias: 'Boards: Move Tomorrow''s Cards'
+  description: ''
+  triggers:
+  - trigger: time
+    at: '23:55:30'
+  conditions: []
+  actions:
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: mi4eKny3uXdGWWmYr
+      to_swimlaneId: 8M8Py44KDk8A7mcj4
+      boardId: TrfngHQf8PWj9mnqC
+      timeDelta: 1
+  mode: single
+- id: '1739830023654'
+  alias: 'Boards: Move Today''s Cards'
+  description: ''
+  triggers:
+  - trigger: time
+    at: '23:55:45'
+  conditions: []
+  actions:
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: 8M8Py44KDk8A7mcj4
+      to_swimlaneId: diPoL2ZNgbaPj9xAh
+      boardId: TrfngHQf8PWj9mnqC
+      timeDelta: 0
+  mode: single
+- id: '1739830178317'
+  alias: 'Boards: Move Next Week''s Cards'
+  description: ''
+  triggers:
+  - trigger: time
+    at: '23:55:00'
+  conditions: []
+  actions:
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: 44anFDcaRYyswRToE
+      to_swimlaneId: M4ep8PQ4ooQzxrMAy
+      boardId: TrfngHQf8PWj9mnqC
+      timeDelta: 14
+  mode: single
+- id: '1740538556975'
+  alias: 'Area: Pause Follow the Leader'
+  description: ''
+  triggers:
+  - entity_id:
+    - number.audio_area_pause_leaders_count
+    trigger: state
+  conditions: []
+  actions:
+  - variables:
+      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in label_entities('Audio:
+        Area Pause Leader') %}\n  {% set leader_entities.list = leader_entities.list
+        + [leader] %}\n{% endfor %} {{ leader_entities.list }}\n"
+      any_leader_active: "{{- states | selectattr('entity_id', 'in', label_entities('Audio:
+        Area Pause Leader')) | \nselectattr('state', 'in', ['on', 'playing', 'Playing',
+        'ringing', 'offhook']) | \nlist | count > 0 -}}\n"
+  - repeat:
+      for_each: '{{ leaders }}'
+      sequence:
+      - variables:
+          followers: "{% set follower_entities = namespace(list=[]) %}  {% set area
+            = device_attr(device_id(repeat.item), 'area_id') %}  {% for s in states.media_player
+            | selectattr('entity_id', 'in', area_entities(area)) | selectattr('entity_id',
+            'in', label_entities('Audio: Area Pause Follower')) %}\n  {% set follower_entities.list
+            = follower_entities.list + [s.entity_id] %}\n{% endfor %}  {{ follower_entities.list
+            }}\n"
+      - metadata: {}
+        data:
+          message: '{{ repeat.item }}: {{ followers }}'
+        enabled: false
+        action: persistent_notification.create
+      - if:
+        - condition: state
+          entity_id: input_select.audio_mode
+          state: Away
+        then:
+        - metadata: {}
+          data: {}
+          target:
+            entity_id: '{{ followers }}:{{ is_state(repeat.item, ''off'') }}'
+          action: media_player.media_play_pause
+      - if:
+        - condition: state
+          entity_id: input_select.audio_mode
+          state: Presence
+        then:
+        - if:
+          - condition: template
+            value_template: '{{ not any_leader_active }}'
+          then:
+          - action: light.turn_off
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+          else:
+          - action: light.turn_on
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+          enabled: false
+        - if:
+          - condition: template
+            value_template: '{{ any_leader_active }}'
+          then:
+          - action: media_player.media_pause
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+          else:
+          - action: media_player.media_play
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+  mode: restart
+- id: '1740542288189'
+  alias: 'Audio: Pause Follow The Leader (Better?)'
+  description: ''
+  triggers:
+  - entity_id:
+    - number.audio_area_pause_leaders_count
+    trigger: state
+  conditions: []
+  actions:
+  - variables:
+      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in\nlabel_entities('Audio:
+        Area Pause Leader') %}\n  {% set leader_entities.list = leader_entities.list
+        + [leader] %}\n{% endfor %} {{ leader_entities.list }}\n"
+  - repeat:
+      for_each: '{{ leaders }}'
+      sequence:
+      - variables:
+          followers: "{% set follower_entities = namespace(list=[]) %}  {% set area
+            = device_attr(device_id(repeat.item), 'area_id') %}  {% for s in states.media_player
+            | selectattr('entity_id', 'in', area_entities(area)) | selectattr('entity_id',
+            'in', label_entities('Audio: Area Pause Follower')) %}\n  {% set follower_entities.list
+            = follower_entities.list + [s.entity_id] %}\n{% endfor %}  {{ follower_entities.list
+            }}\n"
+          area_leaders_active: "{% set leader_entities = namespace(list=[]) %} {%
+            set area = device_attr(device_id(repeat.item), 'area_id') %} {% for s
+            in states\n  | selectattr('entity_id', 'in', label_entities('Audio: Area
+            Pause Leader'))\n  | selectattr('entity_id', 'in', area_entities(area))\n
+            \ | selectattr('state', 'in', ['on', 'playing', 'Playing', 'ringing',
+            'offhook'])\n%}\n  {% set leader_entities.list = leader_entities.list
+            + [s.entity_id] %}\n{% endfor %} {{ leader_entities.list | count > 0 }}\n"
+          test: '{{ repeat.item }}
+
+            '
+          test2: '{{ area }}
+
+            '
+      - metadata: {}
+        data:
+          message: '{{ repeat.item }}: {{ followers }}'
+        enabled: false
+        action: persistent_notification.create
+      - if:
+        - condition: state
+          entity_id: input_select.audio_mode
+          state: Away
+        then:
+        - metadata: {}
+          data: {}
+          target:
+            entity_id: '{{ followers }}:{{ is_state(repeat.item, ''off'') }}'
+          action: media_player.media_play_pause
+      - if:
+        - condition: state
+          entity_id: input_select.audio_mode
+          state: Presence
+        then:
+        - if:
+          - condition: template
+            value_template: '{{ not any_leader_active }}'
+          then:
+          - action: light.turn_off
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+          else:
+          - action: light.turn_on
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+          enabled: false
+        - if:
+          - condition: template
+            value_template: '{{ area_leaders_active }}'
+          then:
+          - action: media_player.media_pause
+            metadata: {}
+            data: {}
+            target:
+              entity_id: '{{ followers | list }}'
+          else:
+          - if:
+            - condition: not
+              conditions:
+              - condition: state
+                entity_id: input_boolean.night_mode
+                state: 'on'
+            then:
+            - action: media_player.media_play
+              metadata: {}
+              data: {}
+              target:
+                entity_id: '{{ followers | list }}'
+  mode: restart
+- id: '1740624374579'
+  alias: 'TV Room: Media Player (Source)'
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
+    type: action
+    subtype: 3_single
+    trigger: device
+  - trigger: numeric_state
+    entity_id:
+    - sensor.media_player_idle
+    below: 1
+    id: media-player
+  conditions:
+  - condition: or
+    conditions:
+    - condition: not
+      conditions:
+      - condition: trigger
+        id:
+        - media-player
+    - condition: and
+      conditions:
+      - condition: trigger
+        id:
+        - media-player
+      - condition: device
+        device_id: 75e1f9ce994937c60f35ce0ba1e12688
+        domain: media_player
+        entity_id: 582ee30cf5bad29fd35d395dc038973a
+        type: is_off
+  actions:
+  - data: {}
+    target:
+      area_id: tv_room
+    action: media_player.turn_on
+  - data:
+      source: HDMI-2
+    target:
+      area_id: tv_room
+    action: media_player.select_source
+  mode: single
+- id: '1740626586323'
+  alias: 'Audio: (Buttons) Custom'
+  description: ''
+  use_blueprint:
+    path: Dhy19971/Ikea-E2123-Generic.yaml
+    input:
+      remote: 6211fe549e39627bb28f0b723cb77f4e
+      play_pause: []
+      toggle: []
+      volume_up_hold: []
+      volume_down_hold: []
+      track_next: []
+      track_previous: []
+      volume_up: []
+      dots_1_initial_press:
+      - action: script.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id: script.audio_swap_audio_sources
+        enabled: false
+      - action: script.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id: script.audio_swap_output
+      dots_1_double_press:
+      - action: light.toggle
+        metadata: {}
+        data: {}
+        target:
+          area_id: office
+      dots_2_initial_press:
+      - action: input_boolean.toggle
+        metadata: {}
+        data: {}
+        target:
+          entity_id:
+          - input_boolean.ads_playing_spencer_2
+      dots_2_double_press:
+      - action: media_player.toggle
+        metadata: {}
+        data: {}
+        target:
+          area_id: tv_room
+      dots_2_long_release:
+      - action: light.toggle
+        metadata: {}
+        data: {}
+        target:
+          entity_id: light.tv_room_side_table_light
+      dots_1_long_release:
+      - action: scene.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id: scene.cooking
+- id: '1745215206664'
+  alias: 'Dose: Every 3 minutes(Currently 5)'
+  description: ''
+  triggers:
+  - trigger: time_pattern
+    minutes: /3
+    enabled: true
+  conditions: []
+  actions:
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: poc_01
+      units: 1
+      nutrient: 'Nutrient: Electrolytes'
+      tracked: 25
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_02
+      nutrient: 'Nutrient: Electrolytes'
+      units: 1
+      tracked: 25
+    enabled: true
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_03
+      units: 1
+      nutrient: 'Nutrient: Electrolytes'
+      tracked: 25
+    enabled: true
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_04
+      units: 1
+      nutrient: 'Nutrient: Electrolytes'
+      tracked: 25
+    enabled: true
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_05
+      units: 1
+      nutrient: 'Nutrient: Electrolytes'
+      tracked: 25
+    enabled: true
+  - action: script.dose_pressurize_electrolytes
+    metadata: {}
+    data:
+      nutrient: 'Nutrient: Electrolytes'
+      area_id: water_supply_01
+      units: 1
+  mode: parallel
+  max: 50
+- id: '1745705729454'
+  alias: 'Dose: Drain and Refill Daily'
+  description: ''
+  triggers:
+  - trigger: time_pattern
+    minutes: '20'
+    hours: '16'
+  - trigger: time_pattern
+    minutes: '20'
+    hours: '4'
+    enabled: false
+  - trigger: time_pattern
+    minutes: '30'
+    hours: '9'
+  conditions: []
+  actions:
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: poc_01
+      nutrient: 'Nutrient: Drain'
+      units: 1
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 30
+      milliseconds: 0
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_02
+      nutrient: 'Nutrient: Drain'
+      units: 1
+    enabled: true
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 30
+      milliseconds: 0
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_03
+      nutrient: 'Nutrient: Drain'
+      units: 1
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 30
+      milliseconds: 0
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_04
+      nutrient: 'Nutrient: Drain'
+      units: 1
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 30
+      milliseconds: 0
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: root_zone_05
+      nutrient: 'Nutrient: Drain'
+      units: 1
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 30
+      milliseconds: 0
+  - action: script.dose_house_plants
+    metadata: {}
+    data:
+      area_id: water_supply_01
+      units: 1.5
+    enabled: false
+  mode: parallel
+  max: 50
+- id: '1747507549151'
+  alias: 'Calibrated Value: template evalutation trigger'
+  description: ''
+  triggers:
+  - trigger: time_pattern
+    hours: '*'
+    minutes: '*'
+    seconds: '*'
+  conditions: []
+  actions:
+  - action: mqtt.publish
+    metadata: {}
+    data:
+      topic: calibrated_value/update_every_second
+      retain: true
+      payload: '{{ now() }}
+
+        '
+  mode: single
+- id: '1748107265361'
+  alias: 'Water Supply: Error Handling'
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.water_supply_01_sensors_fill_distance
+    to: unknown
+    id: fill_sensor
+  - trigger: numeric_state
+    entity_id:
+    - number.water_supply_01_sensors_ph_known_calibration_value
+    above: 8.5
+    id: high_ph
+  - trigger: numeric_state
+    entity_id:
+    - number.water_supply_01_sensors_fill_distance_known_calibration_value
+    below: -20
+    id: fill_sensor_too_low
+  - trigger: numeric_state
+    entity_id:
+    - number.water_supply_01_sensors_fill_distance_known_calibration_value
+    above: 14
+    id: fill_sensor_too_high
+  - trigger: numeric_state
+    entity_id:
+    - sensor.water_supply_01_sensors_bus_psi
+    above: 110
+    id: psi_too_high
+  - trigger: numeric_state
+    entity_id:
+    - sensor.water_supply_01_sensors_bus_psi
+    below: -6
+    id: psi_unplugged_too_low
+  - trigger: numeric_state
+    entity_id:
+    - sensor.water_supply_01_sensors_bus_psi
+    below: 40
+    id: psi_too_low
+    for:
+      hours: 0
+      minutes: 30
+      seconds: 0
+  - trigger: numeric_state
+    entity_id:
+    - sensor.water_supply_01_psi_derivative
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 20
+    below: -2
+    id: psi_declining
+  - alias: When the pump doesn't increase PSI for 10 minutes
+    trigger: template
+    value_template: "{{ \n        (states | selectattr('entity_id', 'in', area_entities('water_supply_01'))
+      | selectattr('entity_id', 'in', label_entities('Nutrient: Water Supply')) |
+      map(attribute='state') | list | unique | list | length) != 1 }}"
+    for:
+      hours: 0
+      minutes: 10
+      seconds: 0
+    id: pump_dry
+  - trigger: numeric_state
+    entity_id:
+    - sensor.water_supply_01_psi_derivative
+    below: -500
+    id: tank_disconnect
+  - trigger: state
+    entity_id:
+    - input_select.water_supply_01_mode
+    from: Volume
+    for:
+      hours: 0
+      minutes: 30
+      seconds: 0
+    id: out_of_volume_mode
+  - trigger: template
+    value_template: '{{ states.binary_sensor | selectattr(''attributes.device_class'',
+      ''defined'') |  selectattr(''attributes.device_class'', ''match'', ''moisture'')
+      |  selectattr(''state'', ''eq'', ''on'') | list | count }}'
+    id: any_leak_detected
+    enabled: true
+  conditions:
+  - condition: state
+    entity_id: input_select.water_supply_01_mode
+    state: Volume
+    enabled: false
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - fill_sensor
+      sequence:
+      - action: input_select.select_option
+        metadata: {}
+        target:
+          entity_id: input_select.water_supply_01_mode
+        data:
+          option: Idle
+      - wait_for_trigger:
+        - trigger: state
+          entity_id:
+          - sensor.water_supply_01_sensors_fill_distance
+          from: unknown
+        timeout:
+          hours: 2
+          minutes: 0
+          seconds: 0
+          milliseconds: 0
+      - action: input_select.select_option
+        metadata: {}
+        target:
+          entity_id: input_select.water_supply_01_mode
+        data:
+          option: Volume
+      - variables:
+          error_text: Fill Sensor Offline
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - high_ph
+      sequence:
+      - variables:
+          error_text: High PH
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - leak_detected
+      sequence:
+      - variables:
+          error_text: Leak Detected!
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - any_leak_detected
+      sequence:
+      - variables:
+          error_text: "{% set last_changed = states\n | selectattr('entity_id' , 'contains',
+            '_leak')\n | sort(attribute='last_changed', reverse=true)\n | first %}\nLeak
+            detected at {{ now() }}! <BR> Last triggered sensor: {{ last_changed.entity_id
+            }} in {{ area_name(last_changed.entity_id) }}\n"
+        enabled: true
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - fill_sensor_too_low
+      sequence:
+      - variables:
+          error_text: Fill sensor too low
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - fill_sensor_too_high
+      sequence:
+      - variables:
+          error_text: Fill sensor too high
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - psi_too_high
+      sequence:
+      - variables:
+          error_text: PSI too high
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - psi_unplugged_too_low
+      sequence:
+      - variables:
+          error_text: PSI unrealistically too low. Check sensor plugged in?
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - psi_too_low
+      sequence:
+      - variables:
+          error_text: PSI too low for longer than 30 mins!
+        enabled: true
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - psi_declining
+      sequence:
+      - variables:
+          error_text: "{% set last_changed = states\n | selectattr('entity_id', 'in',
+            label_entities('Nutrient: Electrolytes'))\n | sort(attribute='last_changed',
+            reverse=true)\n | first %}\nPSI Decling at {{ now() }}. <BR> Last triggered
+            RZ: {{ area_name(last_changed.entity_id) }}({{ last_changed.state }})
+            at {{ last_changed.last_changed }}\n"
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+        enabled: true
+    - conditions:
+      - condition: trigger
+        id:
+        - pump_dry
+      sequence:
+      - variables:
+          error_text: Pump Dry
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    - conditions:
+      - condition: trigger
+        id:
+        - tank_disconnect
+      - condition: state
+        entity_id: input_select.water_supply_01_mode
+        state: Volume
+      sequence:
+      - wait_for_trigger:
+        - trigger: numeric_state
+          entity_id:
+          - sensor.water_supply_01_sensors_bus_psi
+          for:
+            hours: 0
+            minutes: 0
+            seconds: 3
+          below: 40
+        timeout:
+          hours: 0
+          minutes: 0
+          seconds: 30
+          milliseconds: 0
+        continue_on_timeout: false
+      - variables:
+          error_text: Tank Disconnected
+      - data:
+          message: '{{ error_text }}'
+        action: notify.persistent_notification
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+        enabled: true
+      - action: input_select.select_option
+        metadata: {}
+        data:
+          option: Error
+        target:
+          entity_id: input_select.water_supply_01_mode
+        enabled: false
+      - wait_for_trigger:
+        - trigger: numeric_state
+          entity_id:
+          - sensor.water_supply_01_psi_derivative
+          above: 500
+        timeout:
+          hours: 0
+          minutes: 30
+          seconds: 0
+          milliseconds: 0
+        continue_on_timeout: false
+      - action: input_select.select_option
+        metadata: {}
+        data:
+          option: Volume
+        target:
+          entity_id: input_select.water_supply_01_mode
+      - variables:
+          error_text: Tank Reconnected
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+        enabled: true
+    - conditions:
+      - condition: trigger
+        id:
+        - out_of_volume_mode
+      sequence:
+      - variables:
+          error_text: Out of Volume mode for 30 mins!
+        enabled: true
+      - action: notify.mobile_app_pixel_6
+        metadata: {}
+        data:
+          message: '{{ error_text }}'
+    default:
+    - variables:
+        error_text: Error notification!
+    - action: notify.mobile_app_pixel_6
+      metadata: {}
+      data:
+        message: '{{ error_text }}'
+  - data:
+      message: '{{ error_text }}'
+    action: notify.persistent_notification
+  mode: single
+- id: '1748129657198'
+  alias: 'Water Supply by Volume: Refill'
+  description: ''
+  triggers:
+  - trigger: numeric_state
+    entity_id:
+    - sensor.water_supply_01_sensors_fill_distance_calibrated_value
+    below: 2
+    enabled: false
+  - trigger: state
+    entity_id:
+    - input_select.water_supply_01_mode
+    to: Volume
+  conditions:
+  - condition: state
+    entity_id: input_select.water_supply_01_mode
+    state: Volume
+  - condition: numeric_state
+    entity_id: sensor.water_supply_01_sensors_fill_distance_calibrated_value
+    below: 2
+  actions:
+  - action: script.water_supply_by_volume_plant_mix
+    metadata: {}
+    data:
+      area_id: water_supply_01
+      target_ph: 6.75
+      units: 3
+  mode: single
+- id: '1749443466536'
+  alias: 'Sleep Me: New'
+  description: ''
+  use_blueprint:
+    path: amorfinvdev/somrig.yaml
+    input:
+      remote_name: Button (Spencer Sleep New)
+      dots_1_press_action:
+      - action: script.sleep_me_switch
+        metadata: {}
+        data: {}
+      dots_2_press_action:
+      - action: script.sleep_me_switch_play_pause
+        metadata: {}
+        data: {}
+      dots_1_double_press_action:
+      - action: script.sleep_me_switch_go_back
+        metadata: {}
+        data: {}
+      dots_2_double_press_action:
+      - action: script.sleep_me_switch_go_forward
+        metadata: {}
+        data: {}
+      dots_1_hold_action:
+      - action: script.sleep_me_switch_increase_volume
+        metadata: {}
+        data: {}
+      dots_2_hold_action:
+      - action: script.sleep_me_switch_decrease_volume
+        metadata: {}
+        data: {}
+      helper_hold_delay: 500
+- id: '1749855717033'
+  alias: 'Dose:  lights every hour'
+  description: ''
+  triggers:
+  - trigger: time_pattern
+    minutes: '20'
+    hours: /1
+  conditions:
+  - condition: time
+    after: 07:00:00
+    weekday:
+    - sun
+    - mon
+    - tue
+    - thu
+    - wed
+    - sat
+    - fri
+    before: '20:00:00'
+  - condition: state
+    entity_id: input_boolean.night_mode
+    state: 'off'
+  actions:
+  - action: script.dose_nutrient_v2
+    metadata: {}
+    data:
+      area_id: shoot_zone_01
+      units: 1
+      nutrient: 'Nutrient: Light'
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 25
+      milliseconds: 0
+  mode: parallel
+  max: 50
+- id: '1757899089642'
+  alias: Alerting
+  description: ''
+  triggers:
+  - trigger: time_pattern
+    hours: '*'
+    minutes: '*'
+    seconds: '0'
+    enabled: true
+  conditions: []
+  actions:
+  - repeat:
+      for_each: '{%- set alert_entities = states | selectattr(''entity_id'', ''match'',
+        ''.*_calibrated_value$'') | map(attribute=''entity_id'') | list -%} {{ alert_entities
+        }}'
+      sequence:
+      - variables:
+          alert_entity: '{{ repeat.item }}'
+          check_minutes_entity: '{{ alert_entity.replace(''_calibrated_value'', ''_alert_check_minutes'').replace(''sensor.'',
+            ''number.'') }}'
+          alert_low_entity: '{{ alert_entity.replace(''_calibrated_value'', ''_alert_low'').replace(''sensor.'',
+            ''number.'') }}'
+          alert_high_entity: '{{ alert_entity.replace(''_calibrated_value'', ''_alert_high'').replace(''sensor.'',
+            ''number.'') }}'
+      - condition: template
+        value_template: "{%- set check_minutes = states(check_minutes_entity) | int(0)
+          -%} {%- if check_minutes > 0 -%}\n  {{ (now().minute % check_minutes) ==
+          0 }}\n{%- else -%}\n  false\n{%- endif -%}"
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ states(alert_entity) in [''unknown'', ''unavailable'']
+              }}'
+          sequence:
+          - action: script.send_alert
+            metadata: {}
+            data:
+              alert_message: "Sensor {{ alert_entity.replace('sensor.', '').replace('_',
+                ' ').title() }}  is\n  {{ states(alert_entity) }}"
+              alert_severity: medium
+              alert_title: Sensor Unavailable Alert
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: "{%- set check_minutes = states(check_minutes_entity)
+              | int(0) -%} {%- set last_updated = state_attr(alert_entity, 'last_updated')
+              -%} {%- if last_updated and check_minutes > 0 -%}\n  {{ (now() - last_updated).total_seconds()
+              / 60 > check_minutes }}\n{%- else -%}\n  false\n{%- endif -%}"
+          sequence:
+          - action: script.send_alert
+            metadata: {}
+            data:
+              alert_message: Sensor {{ alert_entity.replace('sensor.', '').replace('_',
+                ' ').title() }}    hasn't updated in {{ ((now() - state_attr(calibrated_value_entity,   'last_updated')).total_seconds()
+                / 60) | round(1) }} minutes
+              alert_severity: medium
+              alert_title: Stale Sensor Alert
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ states(alert_entity) not in [''unknown'', ''unavailable'']
+              }}'
+          - condition: template
+            value_template: "{%- set check_minutes = states(check_minutes_entity)
+              | int(0) -%} {%- set last_updated = state_attr(alert_entity, 'last_updated')
+              -%} {%- if last_updated and check_minutes > 0 -%}\n  {{ (now() - last_updated).total_seconds()
+              / 60 <= check_minutes }}\n{%- else -%}\n  true\n{%- endif -%}"
+          - condition: template
+            value_template: '{%- set calibrated_val = states(alert_entity) | float
+              -%} {%- set alert_threshold = states(alert_low_entity) | float -%} {{
+              calibrated_val < alert_threshold }}'
+          sequence:
+          - condition: template
+            value_template: "{%- set check_minutes = states(check_minutes_entity)
+              | int(0) -%} \n{%- set alert_threshold = states(alert_entity) | float
+              -%} \n{%- set time_ago = now() - timedelta(minutes=check_minutes) -%}
+              \n{%- set historical_states = state_attr(alert_entity, 'history') -%}
+              \n{%- if historical_states -%}\n  {%- set past_value = states.sensor[alert_entity.split('.')[1]].last_updated
+              -%}\n  {%- set past_state = states(alert_entity, time_ago) | float -%}\n
+              \ {{ past_state < alert_threshold }}\n{%- else -%}\n  {%- set past_state
+              = states(alert_entity, time_ago) | float -%}\n  {{ past_state < alert_threshold
+              }}\n{%- endif -%}"
+            enabled: true
+          - action: script.send_alert
+            metadata: {}
+            data:
+              alert_title: ' Persistent Low Value Alert'
+              alert_message: 'Alert: {{ alert_entity.replace(''sensor.'', '''').replace(''_'',
+                '' '').title() }}  is   {{ states(alert_entity) }} which has been
+                below threshold of {{   states(alert_low_entity) }}  for at least
+                {{ states(check_minutes_entity) }} minutes.'
+              alert_severity: medium
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ states(alert_entity) not in [''unknown'', ''unavailable'']
+              }}'
+          - condition: template
+            value_template: "{%- set check_minutes = states(check_minutes_entity)
+              | int(0) -%} {%- set last_updated = state_attr(alert_entity, 'last_updated')
+              -%} {%- if last_updated and check_minutes > 0 -%}\n  {{ (now() - last_updated).total_seconds()
+              / 60 <= check_minutes }}\n{%- else -%}\n  true\n{%- endif -%}"
+          - condition: template
+            value_template: '{%- set calibrated_val = states(alert_entity) | float
+              -%} {%- set alert_threshold = states(alert_high_entity) | float -%}
+              {{ calibrated_val > alert_threshold }}'
+          sequence:
+          - condition: template
+            value_template: "{%- set check_minutes = states(check_minutes_entity)
+              | int(0) -%} {%- set alert_threshold = states(alert_entity) | float
+              -%} {%- set time_ago = now() - timedelta(minutes=check_minutes) -%}
+              {%- set historical_states = state_attr(alert_entity, 'history') -%}
+              {%- if historical_states -%}\n  {%- set past_value = states.sensor[alert_entity.split('.')[1]].last_updated
+              -%}\n  {%- set past_state = states(alert_entity, time_ago) | float -%}\n
+              \ {{ past_state > alert_threshold }}\n{%- else -%}\n  {%- set past_state
+              = states(alert_entity, time_ago) | float -%}\n  {{ past_state > alert_threshold
+              }}\n{%- endif -%}"
+          - action: script.send_alert
+            metadata: {}
+            data:
+              alert_title: ' Persistent High Value Alert'
+              alert_message: 'Alert: {{ alert_entity.replace(''sensor.'', '''').replace(''_'',
+                '' '').title() }}  is   {{ states(alert_entity) }} which has been
+                above threshold of {{   states(alert_high_entity) }}  for at least
+                {{ states(check_minutes_entity) }} minutes.'
+              alert_severity: medium
+  mode: single

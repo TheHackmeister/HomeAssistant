@@ -1,199 +1,10 @@
 - id: '1610595286035'
   name: Aves SCORE
-  entities:
-    switch.ebf12734e103a03f57j9s0:
-      friendly_name: Smart Socket
-      state: 'off'
-    switch.eb06e894f64866e076kdao:
-      friendly_name: Smart Socket 2
-      state: 'on'
-    switch.eb9f3e9dade65a70a3e7vl:
-      friendly_name: Smart Socket 3
-      state: 'on'
-- id: master_bathroom_lights_off
-  name: Master Bathroom Lights Off
-  entities:
-    light.master_bath_color_light:
-      min_mireds: 142
-      max_mireds: 666
-      off_brightness:
-      friendly_name: Master Bath Color Light
-      supported_features: 59
-      state: 'off'
-    light.master_bathroom_white_light:
-      off_brightness:
-      friendly_name: Master Bathroom White Light
-      supported_features: 41
-      state: 'off'
-- id: '1612755694494'
-  name: Master Bathroom Ligths Day
-  entities:
-    light.master_bath_color_light:
-      min_mireds: 142
-      max_mireds: 666
-      brightness: 254
-      color_temp: 160
-      off_brightness:
-      friendly_name: Master Bath Color Light
-      supported_features: 59
-      state: 'on'
-    light.master_bathroom_white_light:
-      brightness: 254
-      off_brightness:
-      friendly_name: Master Bathroom White Light
-      supported_features: 41
-      state: 'on'
-- id: '1612755811173'
-  name: Main Bath Lights Night
-  entities:
-    light.half_bathroom_light:
-      min_color_temp_kelvin: 2000
-      max_color_temp_kelvin: 6666
-      min_mireds: 150
-      max_mireds: 500
-      effect_list:
-      - blink
-      - breathe
-      - okay
-      - channel_change
-      - finish_effect
-      - stop_effect
-      supported_color_modes:
-      - color_temp
-      - xy
-      friendly_name: Half-Bathroom Light
-      supported_features: 44
-      color_mode: xy
-      hs_color:
-      - 9.231
-      - 66.275
-      rgb_color:
-      - 255
-      - 112
-      - 86
-      xy_color:
-      - 0.589
-      - 0.329
-      brightness: 56
-      state: 'on'
+  entities: {}
+  icon: mdi:party-popper
   metadata: {}
-- id: '1615685988075'
-  name: Front - Delivery
-  entities:
-    light.front_yard_lights:
-      min_mireds: 142
-      max_mireds: 666
-      brightness: 254
-      hs_color:
-      - 360
-      - 100
-      rgb_color:
-      - 255
-      - 0
-      - 0
-      xy_color:
-      - 0.701
-      - 0.299
-      entity_id:
-      - light.front_porch_light
-      friendly_name: Front Yard Lights
-      icon: mdi:lightbulb-group
-      supported_features: 59
-      state: 'on'
-- id: '1615692920881'
-  name: Front - White
-  entities:
-    light.front_porch_light:
-      min_mireds: 142
-      max_mireds: 666
-      brightness: 254
-      color_temp: 381
-      off_brightness:
-      friendly_name: Front Porch Light
-      supported_features: 59
-      state: 'on'
 - id: '1660792576262'
   name: Cooking
-  entities:
-    light.kitchen_lights:
-      min_mireds: 142
-      max_mireds: 666
-      effect_list:
-      - colorloop
-      supported_color_modes:
-      - color_temp
-      - xy
-      entity_id:
-      - light.kitchen_light_door
-      - light.kitchen_light_sink
-      icon: mdi:lightbulb-group
-      friendly_name: Kitchen Lights
-      supported_features: 44
-      color_mode: color_temp
-      brightness: 254
-      hs_color:
-      - 27.423
-      - 49.825
-      rgb_color:
-      - 255
-      - 186
-      - 127
-      xy_color:
-      - 0.472
-      - 0.379
-      color_temp: 305
-      state: 'on'
-    switch.tv_room_side_table_power_relay_4:
-      icon: hass:lightbulb
-      friendly_name: TV Room Side Table Light
-      state: 'on'
-  metadata:
-    light.kitchen_lights:
-      entity_only: true
-    switch.tv_room_side_table_power_relay_4:
-      entity_only: true
-- id: '1660792938367'
-  name: 'House Mode: TV'
-  entities:
-    switch.tv_room_side_table_power_relay_4:
-      icon: hass:lightbulb
-      friendly_name: TV Room Side Table Light
-      state: 'off'
-    light.kitchen_lights:
-      min_mireds: 142
-      max_mireds: 666
-      effect_list:
-      - colorloop
-      supported_color_modes:
-      - color_temp
-      - xy
-      entity_id:
-      - light.kitchen_light_door
-      - light.kitchen_light_sink
-      icon: mdi:lightbulb-group
-      friendly_name: Kitchen Lights
-      supported_features: 44
-      color_mode: color_temp
-      brightness: 3
-      hs_color:
-      - 25.487
-      - 100
-      rgb_color:
-      - 255
-      - 108
-      - 0
-      xy_color:
-      - 0.635
-      - 0.355
-      color_temp: 666
-      state: 'on'
-  metadata:
-    switch.tv_room_side_table_power_relay_4:
-      entity_only: true
-    light.kitchen_lights:
-      entity_only: true
-- id: '1660793166100'
-  name: 'House Mode: Bright'
   entities:
     light.kitchen_lights:
       min_color_temp_kelvin: 2000
@@ -214,14 +25,50 @@
       friendly_name: Kitchen Lights
       supported_features: 44
       lights:
-      - light.kitchen_light_sink
-      - light.kitchen_light_door
+      - light.light_door_kitchen
       - light.esp32_status_led_2
+      - light.light_sink_kitchen
       controlling: true
       child_ids:
       - light.overhead_lights_kitchen
+      color_mode: xy
+      brightness: 255
+      hs_color:
+      - 26.667
+      - 42.353
+      rgb_color:
+      - 255
+      - 195
+      - 147
+      xy_color:
+      - 0.446
+      - 0.372
+      state: 'on'
+    switch.tv_room_side_table_power_relay_4:
+      icon: hass:lightbulb
+      friendly_name: TV Room Side Table Light
+      state: 'on'
+    light.dining_room_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6493
+      min_mireds: 154
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      icon: mdi:lightbulb-group
+      friendly_name: Dining Room Lights
+      supported_features: 40
+      lights:
+      - light.light_corner_dining_room
+      - light.dining_room_light
+      controlling: true
+      child_ids:
+      - light.overhead_lights_dining_room
+      - light.sleep_lights_dining_room
       color_mode: color_temp
       brightness: 255
+      color_temp_kelvin: 3558
+      color_temp: 281
       hs_color:
       - 27.117
       - 43.528
@@ -232,8 +79,302 @@
       xy_color:
       - 0.449
       - 0.373
-      color_temp_kelvin: 3558
-      color_temp: 281
+      state: 'on'
+  metadata:
+    light.kitchen_lights:
+      entity_only: true
+    switch.tv_room_side_table_power_relay_4:
+      entity_only: true
+    light.dining_room_lights:
+      entity_only: true
+  icon: mdi:chef-hat
+- id: '1660792938367'
+  name: 'House Mode: TV'
+  entities:
+    switch.tv_room_side_table_power_relay_4:
+      icon: hass:lightbulb
+      friendly_name: TV Room Side Table Light
+      state: 'off'
+    light.kitchen_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - xy
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      lights:
+      - light.light_door_kitchen
+      - light.esp32_status_led_2
+      - light.light_sink_kitchen
+      controlling: true
+      child_ids:
+      - light.overhead_lights_kitchen
+      color_mode: xy
+      brightness: 255
+      hs_color:
+      - 27.222
+      - 42.353
+      rgb_color:
+      - 255
+      - 196
+      - 147
+      xy_color:
+      - 0.445
+      - 0.372
+      state: 'on'
+  metadata:
+    switch.tv_room_side_table_power_relay_4:
+      entity_only: true
+    light.kitchen_lights:
+      entity_only: true
+  icon: mdi:television-classic
+- id: '1660793166100'
+  name: 'House Mode: Bright'
+  entities:
+    light.kitchen_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - ' ♪ 2D Swirl@!,Sensitivity=64,Blur;,Bg Swirl;!'
+      - ' ♪ 2D Waverly@Amplification,Sensitivity=64;;!'
+      - ' ♪ Gravcenter@Rate of fall,Sensitivity=128;,!;!'
+      - ' ♪ Gravcentric@Rate of fall,Sensitivity=128;!;!'
+      - ' ♪ Gravimeter@Rate of fall,Sensitivity=128;,!;!'
+      - ' ♪ Juggles@!,# of balls;,!;!'
+      - ' ♪ Matripix@!,Brightness=64;,!;!'
+      - ' ♪ Midnoise@Fade rate,Maximum length=128;,!;!'
+      - ' ♪ Noisefire@!,!;;'
+      - ' ♪ Noisemeter@Fade rate,Width=128;!,!;!'
+      - ' ♪ Pixels@Fade rate,# of pixels;,!;!'
+      - ' ♪ Pixelwave@!,Sensitivity=64;!,!;!'
+      - ' ♪ Plasmoid@Phase=128,# of pixels=128;,!;!'
+      - ' ♪ Puddlepeak@Fade rate,Puddle size,,Select bin,Volume (minimum);!,!;!'
+      - ' ♪ Puddles@Fade rate,Puddle size;!,!;!'
+      - ' ♪ Ripple Peak@Fade rate,Max # of ripples,,Select bin,Volume (minimum);!,!;!'
+      - ' ♫ 2D Akemi@Color speed,Dance ☑;Head palette,Arms & Legs,Eyes & Mouth;Face
+        palette'
+      - ' ♫ 2D CenterBars@Bar speed=250,Ripple decay=250,Center ↔ ☑=192,Center ↕ ☑=192,
+        Color ↕ ☑=192;,,Peak Color;!=11'
+      - ' ♫ 2D Funky Plank@Scroll speed,,# of bands;;'
+      - ' ♫ 2D GEQ@Bar speed,Ripple decay;,,Peak Color;!'
+      - ' ♫ Binmap@;!,!;!'
+      - ' ♫ Blurz@Fade rate,Blur amount;,Color mix;!'
+      - ' ♫ DJ Light@Speed;;'
+      - ' ♫ Freqmap@Fade rate,Starting color;,!;!'
+      - ' ♫ Freqmatrix@Time delay,Sound effect,Low bin,High bin,Sensivity;;'
+      - ' ♫ Freqpixels@Fade rate,Starting colour and # of pixels;;'
+      - ' ♫ Freqwave@Time delay,Sound effect,Low bin,High bin,Pre-amp;;'
+      - ' ♫ Gravfreq@Rate of fall,Sensivity=128;,!;!'
+      - ' ♫ Noisemove@Speed of perlin movement,Fade rate;,!;!'
+      - ' ♫ Rocktaves@;,!;!'
+      - ' ♫ Waterfall@!,Adjust color,,Select bin, Volume (minimum);!,!;!'
+      - ' ⚙️ Custom Effect@Speed,Intensity,Custom 1, Custom 2, Custom 3;!;!'
+      - 2D Black Hole@Outer X frequency,Inner X frequency,Inner Y frequency;;
+      - 2D Colored Bursts@Speed,Number of lines;;!
+      - 2D DNA Spiral@Speed,Frequency;;!
+      - 2D DNA@Scroll speed,Blur;;!
+      - 2D Drift@Rotation speed,Blur amount;;!
+      - 2D Fire2012@Speed;;
+      - 2D FireNoise@X scale,Y scale;;
+      - 2D Frizzles@X frequency,Y frequency;;!
+      - 2D Game Of Life@!,Use Palette ☑;!,!;!
+      - 2D Hiphotic@X scale,Y scale;;!
+      - 2D Julia@,Max iterations per pixel,X center,Y center,Area size;;!
+      - 2D Lissajous@X frequency,Fadetime;;!
+      - 2D Matrix@Falling speed,Spawning rate,Trail,Custom color ☑;Spawn,Trail;
+      - 2D Metaballs@;;
+      - 2D Noise@Speed,Scale;;!
+      - 2D Plasma Ball@Speed;;!
+      - 2D Polar Lights@Speed,X scale,Palette;;
+      - 2D Pulser@Speed,Blur;;!
+      - 2D Sindots@Speed,Dot distance;;!
+      - 2D Squared Swirl@,,,,Blur;,,;!
+      - 2D Sun Radiation@Variance,Brightness;;
+      - 2D Tartan@X scale,Y scale;;!
+      - 3D Ripples@Speed=128,Interval=128;!;!
+      - 3D Sphere Move@Speed=128,Interval=128;!;!
+      - Android@!,Width;!,!,;!
+      - Aurora@!=24,!;1,2,3;!=50
+      - Blends@Shift speed,Blend speed;1,2,3,!
+      - Blink Rainbow@Frequency,Blink duration;!,!,;!
+      - Blink@!,;!,!,;!
+      - Bouncing Balls@Gravity,# of balls;!,!,;!
+      - Bpm@!=64,;1,2,3;!
+      - Breathe@!,;!,!;!
+      - Candle Multi@Flicker rate=96,Flicker intensity=224;!,!,;0
+      - Candle@Flicker rate=96,Flicker intensity=224;!,!,;0
+      - Candy Cane@!,Width;;
+      - Chase 2@!,Width;!,!,;!
+      - Chase Flash Rnd@!,;,Fx,;!
+      - Chase Flash@!,;Bg,Fx,!;!
+      - Chase Rainbow@!,Width;!,!,;0
+      - Chase Random@!,Width;!,,!;!
+      - Chase@!,Width;!,!,!;!
+      - Chunchun@!,Gap size;!,!,;!
+      - Colorful@!,Saturation;1,2,3;!
+      - Colorloop@!,Saturation;1,2,3;!
+      - Colortwinkles@Fade speed,Spawn speed;1,2,3;!
+      - Colorwaves
+      - Dancing Shadows@!,# of shadows;!,,;!
+      - Dissolve Rnd@Repeat speed,Dissolve speed;,!,;!
+      - Dissolve@Repeat speed,Dissolve speed;!,!,;!
+      - Drip@Gravity,# of drips;!,!;!
+      - Dynamic Smooth
+      - Dynamic@!,!;1,2,3;!
+      - Fade@!,;!,!,;!
+      - Fairy
+      - Fairy Twinkle
+      - Fill Noise
+      - Fire 2012@Spark rate=120,Decay=64;1,2,3;!
+      - Fire Flicker@!,!;!,,;!
+      - Fireworks 1D@Gravity,Firing side;!,!,;!
+      - Fireworks Starburst
+      - Fireworks@Sharpness=96,Frequency=192;!,2,;!=11
+      - Flow
+      - Flow Stripe@Hue speed,Effect speed;;
+      - Glitter
+      - Gradient@!,Spread=16;!,!,;!
+      - Halloween
+      - Halloween Eyes
+      - Heartbeat@!,!;!,!,;!
+      - ICU
+      - Juggle@!=16,Trail=240;!,!,;!
+      - Lake@!,;1,2,3;!
+      - Lighthouse
+      - Lightning
+      - Loading@!,Fade=16;!,!,;!
+      - Meteor Smooth@!,Trail length;!,!,;!
+      - Meteor@!,Trail length;!,!,;!
+      - Multi Comet
+      - Noise 1
+      - Noise 2
+      - Noise 3
+      - Noise 4
+      - Noise Pal
+      - Oscillate
+      - Pacifica
+      - Palette@!,;1,2,3;!
+      - Percent@,% of fill;!,!,;!
+      - Perlin Move@!,# of pixels,fade rate;,!;!
+      - Phased
+      - Phased Noise
+      - Plasma@Phase,;1,2,3;!
+      - Police@!,Width;,Bg,;0
+      - Popcorn
+      - Pride 2015@!,;;
+      - Railway
+      - Rain@Fade rate=128,Frequency=128;!,2,;!
+      - Rainbow Runner@!,Size;Bg,,;!
+      - Rainbow@!,Size;1,2,3;!
+      - Random Colors@!,Fade time;1,2,3;!
+      - Reserved for Elementary
+      - Reserved for PoolNoise
+      - Reserved for Twister
+      - Reserved0
+      - Reserved1
+      - Reserved2
+      - Reserved3
+      - Reserved4
+      - Reserved5
+      - Reserved6
+      - Reserved7
+      - Reserved8
+      - Reserved9
+      - Ripple
+      - Ripple Rainbow
+      - Running Dual
+      - Running@!,Wave width;!,!,;!
+      - Saw@!,Width;!,!,;!
+      - Scan Dual@!,# of dots;!,!,;!
+      - Scan@!,# of dots;!,!,;!
+      - Scanner
+      - Scanner Dual
+      - Sine
+      - Sinelon
+      - Sinelon Dual
+      - Sinelon Rainbow
+      - Solid Glitter@,!;!,,;0
+      - Solid Pattern Tri@,Size;1,2,3;!=0
+      - Solid Pattern@Fg size,Bg size;Fg,Bg,;!=0
+      - Solid@;!;
+      - Sparkle Dark@!,!;Bg,Fx,;!
+      - Sparkle+@!,!;Bg,Fx,;!
+      - Sparkle@!,;!,!,;!
+      - Spots Fade@Spread,Width;!,!,;!
+      - Spots@Spread,Width;!,!,;!
+      - Stream
+      - Stream 2
+      - Strobe Mega@!,!;!,!,;!
+      - Strobe Rainbow@!,;,!,;!
+      - Strobe@!,;!,!,;!
+      - Sunrise@Time [min]=60,;;0
+      - Sweep Random
+      - Sweep@!,!;!,!,;!
+      - TV Simulator
+      - Tetrix@!=224,Width=0;!,!,;!=11
+      - Theater Rainbow@!,Gap size;1,2,3;!
+      - Theater@!,Gap size;!,!,;!
+      - Traffic Light@!,;,!,;!
+      - Tri Chase@!,Size;1,2,3;0
+      - Tri Fade
+      - Tri Wipe@!,Width;1,2,3;0
+      - Twinkle@!,;!,!,;!
+      - Twinklecat
+      - Twinklefox
+      - Twinkleup@!,Intensity;!,!,;!
+      - Two Dots@!,Dot size;1,2,Bg;!
+      - Washing Machine
+      - Wavesins@Speed,Brightness variation,Starting Color,Range of Colors,Color variation;;!
+      - Wipe Random@!,;1,2,3;!
+      - Wipe@!,!;!,!,;!
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - rgb
+      - xy
+      icon: mdi:lightbulb-group
+      friendly_name: Kitchen Lights
+      supported_features: 44
+      lights:
+      - light.esp32_status_led_2
+      - light.kitchen_light_strip
+      - light.light_sink_kitchen
+      - light.light_door_kitchen
+      - light.kitchen_mm_mmwave_led
+      controlling: true
+      child_ids:
+      - light.overhead_lights_kitchen
+      color_mode: xy
+      effect: Candle Multi@Flicker rate=96,Flicker intensity=224;!,!,;0
+      brightness: 255
+      hs_color:
+      - 27.222
+      - 42.353
+      rgb_color:
+      - 255
+      - 196
+      - 147
+      xy_color:
+      - 0.445
+      - 0.372
       state: 'on'
     light.grow_room_lights:
       min_color_temp_kelvin: 2000
@@ -246,7 +387,7 @@
       friendly_name: Grow Room Lights
       supported_features: 40
       lights:
-      - light.grow_room_light
+      - light.light_grow_room
       controlling: true
       child_ids:
       - light.overhead_lights_grow_room
@@ -272,49 +413,648 @@
       max_mireds: 500
       supported_color_modes:
       - color_temp
+      - rgb
       icon: mdi:lightbulb-group
       friendly_name: Dining Room Lights
-      supported_features: 40
+      supported_features: 44
+      effect_list:
+      - Android
+      - Aurora
+      - Blends
+      - Blink
+      - Blink Rainbow
+      - Bouncing Balls
+      - Bpm
+      - Breathe
+      - Candle
+      - Candle Multi
+      - Candy Cane
+      - Chase
+      - Chase 2
+      - Chase 3
+      - Chase Flash
+      - Chase Flash Rnd
+      - Chase Rainbow
+      - Chase Random
+      - Chunchun
+      - Colorful
+      - Colorloop
+      - Colortwinkles
+      - Colorwaves
+      - Dancing Shadows
+      - Dissolve
+      - Dissolve Rnd
+      - Drip
+      - Dynamic
+      - Dynamic Smooth
+      - Fade
+      - Fairy
+      - Fairytwinkle
+      - Fill Noise
+      - Fire 2012
+      - Fire Flicker
+      - Fireworks
+      - Fireworks 1D
+      - Fireworks Starburst
+      - Flow
+      - Glitter
+      - Gradient
+      - Halloween
+      - Halloween Eyes
+      - Heartbeat
+      - ICU
+      - Juggle
+      - Lake
+      - Lighthouse
+      - Lightning
+      - Loading
+      - Meteor
+      - Meteor Smooth
+      - Multi Comet
+      - Noise 1
+      - Noise 2
+      - Noise 3
+      - Noise 4
+      - Noise Pal
+      - Oscillate
+      - Pacifica
+      - Palette
+      - Percent
+      - Phased
+      - Phased Noise
+      - Plasma
+      - Police
+      - Popcorn
+      - Pride 2015
+      - Railway
+      - Rain
+      - Rainbow
+      - Rainbow Runner
+      - Random Colors
+      - Ripple
+      - Ripple Rainbow
+      - Running
+      - Running Dual
+      - Saw
+      - Scan
+      - Scan Dual
+      - Scanner
+      - Scanner Dual
+      - Sine
+      - Sinelon
+      - Sinelon Dual
+      - Sinelon Rainbow
+      - Solid
+      - Solid Glitter
+      - Solid Pattern
+      - Solid Pattern Tri
+      - Sparkle
+      - Sparkle Dark
+      - Sparkle+
+      - Spots
+      - Spots Fade
+      - Stream
+      - Stream 2
+      - Strobe
+      - Strobe Mega
+      - Strobe Rainbow
+      - Sunrise
+      - Sweep
+      - Sweep Random
+      - TV Simulator
+      - Tetrix
+      - Theater
+      - Theater Rainbow
+      - Traffic Light
+      - Tri Fade
+      - Tri Wipe
+      - Twinkle
+      - Twinklecat
+      - Twinklefox
+      - Twinkleup
+      - Two Dots
+      - Washing Machine
+      - Wipe
+      - Wipe Random
+      effect: Solid
+      color_mode: rgb
+      brightness: 255
+      hs_color:
+      - 32.383
+      - 96.275
+      rgb_color:
+      - 255
+      - 142
+      - 9
+      xy_color:
+      - 0.592
+      - 0.389
       lights:
       - light.dining_room_light
-      - light.dining_room_game_corner_light
+      - light.esp32_status_led
+      - light.fireplace_led_strip
+      - light.light_corner_dining_room
+      - light.dinning_room_mm_mmwave_led
       controlling: true
       child_ids:
       - light.overhead_lights_dining_room
       - light.sleep_lights_dining_room
+      color_temp_kelvin:
+      color_temp:
+      state: 'on'
+    light.office_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6493
+      min_mireds: 154
+      max_mireds: 500
+      supported_color_modes:
+      - color_temp
+      icon: mdi:lightbulb-group
+      friendly_name: Office Lights
+      supported_features: 40
+      lights:
+      - light.office_dimmer
+      - light.light_color_office
+      controlling: true
+      child_ids:
+      - light.overhead_lights_office
       color_mode: color_temp
       brightness: 255
-      color_temp_kelvin: 3558
-      color_temp: 281
+      color_temp_kelvin: 3875
+      color_temp: 258
       hs_color:
-      - 27.117
-      - 43.528
+      - 26.877
+      - 37.182
+      rgb_color:
+      - 255
+      - 202
+      - 160
+      xy_color:
+      - 0.428
+      - 0.367
+      state: 'on'
+    light.tv_room_lights:
+      effect_list:
+      - ' ♪ 2D Swirl@!,Sensitivity=64,Blur;,Bg Swirl;!'
+      - ' ♪ 2D Waverly@Amplification,Sensitivity=64;;!'
+      - ' ♪ Gravcenter@Rate of fall,Sensitivity=128;,!;!'
+      - ' ♪ Gravcentric@Rate of fall,Sensitivity=128;!;!'
+      - ' ♪ Gravimeter@Rate of fall,Sensitivity=128;,!;!'
+      - ' ♪ Juggles@!,# of balls;,!;!'
+      - ' ♪ Matripix@!,Brightness=64;,!;!'
+      - ' ♪ Midnoise@Fade rate,Maximum length=128;,!;!'
+      - ' ♪ Noisefire@!,!;;'
+      - ' ♪ Noisemeter@Fade rate,Width=128;!,!;!'
+      - ' ♪ Pixels@Fade rate,# of pixels;,!;!'
+      - ' ♪ Pixelwave@!,Sensitivity=64;!,!;!'
+      - ' ♪ Plasmoid@Phase=128,# of pixels=128;,!;!'
+      - ' ♪ Puddlepeak@Fade rate,Puddle size,,Select bin,Volume (minimum);!,!;!'
+      - ' ♪ Puddles@Fade rate,Puddle size;!,!;!'
+      - ' ♪ Ripple Peak@Fade rate,Max # of ripples,,Select bin,Volume (minimum);!,!;!'
+      - ' ♫ 2D Akemi@Color speed,Dance ☑;Head palette,Arms & Legs,Eyes & Mouth;Face
+        palette'
+      - ' ♫ 2D CenterBars@Bar speed=250,Ripple decay=250,Center ↔ ☑=192,Center ↕ ☑=192,
+        Color ↕ ☑=192;,,Peak Color;!=11'
+      - ' ♫ 2D Funky Plank@Scroll speed,,# of bands;;'
+      - ' ♫ 2D GEQ@Bar speed,Ripple decay;,,Peak Color;!'
+      - ' ♫ Binmap@;!,!;!'
+      - ' ♫ Blurz@Fade rate,Blur amount;,Color mix;!'
+      - ' ♫ DJ Light@Speed;;'
+      - ' ♫ Freqmap@Fade rate,Starting color;,!;!'
+      - ' ♫ Freqmatrix@Time delay,Sound effect,Low bin,High bin,Sensivity;;'
+      - ' ♫ Freqpixels@Fade rate,Starting colour and # of pixels;;'
+      - ' ♫ Freqwave@Time delay,Sound effect,Low bin,High bin,Pre-amp;;'
+      - ' ♫ Gravfreq@Rate of fall,Sensivity=128;,!;!'
+      - ' ♫ Noisemove@Speed of perlin movement,Fade rate;,!;!'
+      - ' ♫ Rocktaves@;,!;!'
+      - ' ♫ Waterfall@!,Adjust color,,Select bin, Volume (minimum);!,!;!'
+      - ' ⚙️ Custom Effect@Speed,Intensity,Custom 1, Custom 2, Custom 3;!;!'
+      - 2D Black Hole@Outer X frequency,Inner X frequency,Inner Y frequency;;
+      - 2D Colored Bursts@Speed,Number of lines;;!
+      - 2D DNA Spiral@Speed,Frequency;;!
+      - 2D DNA@Scroll speed,Blur;;!
+      - 2D Drift@Rotation speed,Blur amount;;!
+      - 2D Fire2012@Speed;;
+      - 2D FireNoise@X scale,Y scale;;
+      - 2D Frizzles@X frequency,Y frequency;;!
+      - 2D Game Of Life@!,Use Palette ☑;!,!;!
+      - 2D Hiphotic@X scale,Y scale;;!
+      - 2D Julia@,Max iterations per pixel,X center,Y center,Area size;;!
+      - 2D Lissajous@X frequency,Fadetime;;!
+      - 2D Matrix@Falling speed,Spawning rate,Trail,Custom color ☑;Spawn,Trail;
+      - 2D Metaballs@;;
+      - 2D Noise@Speed,Scale;;!
+      - 2D Plasma Ball@Speed;;!
+      - 2D Polar Lights@Speed,X scale,Palette;;
+      - 2D Pulser@Speed,Blur;;!
+      - 2D Sindots@Speed,Dot distance;;!
+      - 2D Squared Swirl@,,,,Blur;,,;!
+      - 2D Sun Radiation@Variance,Brightness;;
+      - 2D Tartan@X scale,Y scale;;!
+      - 3D Ripples@Speed=128,Interval=128;!;!
+      - 3D Sphere Move@Speed=128,Interval=128;!;!
+      - Android
+      - Android@!,Width;!,!,;!
+      - Aurora
+      - Aurora@!=24,!;1,2,3;!=50
+      - Blends
+      - Blends@Shift speed,Blend speed;1,2,3,!
+      - Blink
+      - Blink Rainbow
+      - Blink Rainbow@Frequency,Blink duration;!,!,;!
+      - Blink@!,;!,!,;!
+      - Bouncing Balls
+      - Bouncing Balls@Gravity,# of balls;!,!,;!
+      - Bpm
+      - Bpm@!=64,;1,2,3;!
+      - Breathe
+      - Breathe@!,;!,!;!
+      - Candle
+      - Candle Multi
+      - Candle Multi@Flicker rate=96,Flicker intensity=224;!,!,;0
+      - Candle@Flicker rate=96,Flicker intensity=224;!,!,;0
+      - Candy Cane
+      - Candy Cane@!,Width;;
+      - Chase
+      - Chase 2
+      - Chase 2@!,Width;!,!,;!
+      - Chase 3
+      - Chase Flash
+      - Chase Flash Rnd
+      - Chase Flash Rnd@!,;,Fx,;!
+      - Chase Flash@!,;Bg,Fx,!;!
+      - Chase Rainbow
+      - Chase Rainbow@!,Width;!,!,;0
+      - Chase Random
+      - Chase Random@!,Width;!,,!;!
+      - Chase@!,Width;!,!,!;!
+      - Chunchun
+      - Chunchun@!,Gap size;!,!,;!
+      - Colorful
+      - Colorful@!,Saturation;1,2,3;!
+      - Colorloop
+      - Colorloop@!,Saturation;1,2,3;!
+      - Colortwinkles
+      - Colortwinkles@Fade speed,Spawn speed;1,2,3;!
+      - Colorwaves
+      - Dancing Shadows
+      - Dancing Shadows@!,# of shadows;!,,;!
+      - Dissolve
+      - Dissolve Rnd
+      - Dissolve Rnd@Repeat speed,Dissolve speed;,!,;!
+      - Dissolve@Repeat speed,Dissolve speed;!,!,;!
+      - Drip
+      - Drip@Gravity,# of drips;!,!;!
+      - Dynamic
+      - Dynamic Smooth
+      - Dynamic@!,!;1,2,3;!
+      - Fade
+      - Fade@!,;!,!,;!
+      - Fairy
+      - Fairy Twinkle
+      - Fairytwinkle
+      - Fill Noise
+      - Fire 2012
+      - Fire 2012@Spark rate=120,Decay=64;1,2,3;!
+      - Fire Flicker
+      - Fire Flicker@!,!;!,,;!
+      - Fireworks
+      - Fireworks 1D
+      - Fireworks 1D@Gravity,Firing side;!,!,;!
+      - Fireworks Starburst
+      - Fireworks@Sharpness=96,Frequency=192;!,2,;!=11
+      - Flow
+      - Flow Stripe@Hue speed,Effect speed;;
+      - Glitter
+      - Gradient
+      - Gradient@!,Spread=16;!,!,;!
+      - Halloween
+      - Halloween Eyes
+      - Heartbeat
+      - Heartbeat@!,!;!,!,;!
+      - ICU
+      - Juggle
+      - Juggle@!=16,Trail=240;!,!,;!
+      - Lake
+      - Lake@!,;1,2,3;!
+      - Lighthouse
+      - Lightning
+      - Loading
+      - Loading@!,Fade=16;!,!,;!
+      - Meteor
+      - Meteor Smooth
+      - Meteor Smooth@!,Trail length;!,!,;!
+      - Meteor@!,Trail length;!,!,;!
+      - Multi Comet
+      - Noise 1
+      - Noise 2
+      - Noise 3
+      - Noise 4
+      - Noise Pal
+      - Oscillate
+      - Pacifica
+      - Palette
+      - Palette@!,;1,2,3;!
+      - Percent
+      - Percent@,% of fill;!,!,;!
+      - Perlin Move@!,# of pixels,fade rate;,!;!
+      - Phased
+      - Phased Noise
+      - Plasma
+      - Plasma@Phase,;1,2,3;!
+      - Police
+      - Police@!,Width;,Bg,;0
+      - Popcorn
+      - Pride 2015
+      - Pride 2015@!,;;
+      - Railway
+      - Rain
+      - Rain@Fade rate=128,Frequency=128;!,2,;!
+      - Rainbow
+      - Rainbow Runner
+      - Rainbow Runner@!,Size;Bg,,;!
+      - Rainbow@!,Size;1,2,3;!
+      - Random Colors
+      - Random Colors@!,Fade time;1,2,3;!
+      - Reserved for Elementary
+      - Reserved for PoolNoise
+      - Reserved for Twister
+      - Reserved0
+      - Reserved1
+      - Reserved2
+      - Reserved3
+      - Reserved4
+      - Reserved5
+      - Reserved6
+      - Reserved7
+      - Reserved8
+      - Reserved9
+      - Ripple
+      - Ripple Rainbow
+      - Running
+      - Running Dual
+      - Running@!,Wave width;!,!,;!
+      - Saw
+      - Saw@!,Width;!,!,;!
+      - Scan
+      - Scan Dual
+      - Scan Dual@!,# of dots;!,!,;!
+      - Scan@!,# of dots;!,!,;!
+      - Scanner
+      - Scanner Dual
+      - Sine
+      - Sinelon
+      - Sinelon Dual
+      - Sinelon Rainbow
+      - Solid
+      - Solid Glitter
+      - Solid Glitter@,!;!,,;0
+      - Solid Pattern
+      - Solid Pattern Tri
+      - Solid Pattern Tri@,Size;1,2,3;!=0
+      - Solid Pattern@Fg size,Bg size;Fg,Bg,;!=0
+      - Solid@;!;
+      - Sparkle
+      - Sparkle Dark
+      - Sparkle Dark@!,!;Bg,Fx,;!
+      - Sparkle+
+      - Sparkle+@!,!;Bg,Fx,;!
+      - Sparkle@!,;!,!,;!
+      - Spots
+      - Spots Fade
+      - Spots Fade@Spread,Width;!,!,;!
+      - Spots@Spread,Width;!,!,;!
+      - Stream
+      - Stream 2
+      - Strobe
+      - Strobe Mega
+      - Strobe Mega@!,!;!,!,;!
+      - Strobe Rainbow
+      - Strobe Rainbow@!,;,!,;!
+      - Strobe@!,;!,!,;!
+      - Sunrise
+      - Sunrise@Time [min]=60,;;0
+      - Sweep
+      - Sweep Random
+      - Sweep@!,!;!,!,;!
+      - TV Simulator
+      - Tetrix
+      - Tetrix@!=224,Width=0;!,!,;!=11
+      - Theater
+      - Theater Rainbow
+      - Theater Rainbow@!,Gap size;1,2,3;!
+      - Theater@!,Gap size;!,!,;!
+      - Traffic Light
+      - Traffic Light@!,;,!,;!
+      - Tri Chase@!,Size;1,2,3;0
+      - Tri Fade
+      - Tri Wipe
+      - Tri Wipe@!,Width;1,2,3;0
+      - Twinkle
+      - Twinkle@!,;!,!,;!
+      - Twinklecat
+      - Twinklefox
+      - Twinkleup
+      - Twinkleup@!,Intensity;!,!,;!
+      - Two Dots
+      - Two Dots@!,Dot size;1,2,Bg;!
+      - Washing Machine
+      - Wavesins@Speed,Brightness variation,Starting Color,Range of Colors,Color variation;;!
+      - Wipe
+      - Wipe Random
+      - Wipe Random@!,;1,2,3;!
+      - Wipe@!,!;!,!,;!
+      supported_color_modes:
+      - rgb
+      icon: mdi:lightbulb-group
+      friendly_name: TV Room Lights
+      supported_features: 44
+      effect: Solid@;!;
+      color_mode: rgb
+      brightness: 255
+      hs_color:
+      - 37.647
+      - 100
+      rgb_color:
+      - 255
+      - 160
+      - 0
+      xy_color:
+      - 0.569
+      - 0.411
+      lights:
+      - light.living_room_light
+      - light.tv_room_side_table_light
+      - light.tv_led_strip
+      - light.tv_room_led_strip
+      - light.tv_room_led_strip_main
+      - light.tv_room_mm_mmwave_led
+      - light.esp32_status_led_3
+      controlling: true
+      child_ids:
+      - light.overhead_lights_tv_room
+      - light.sleep_lights_tv_room
+      state: 'on'
+    light.hall_main_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - Android
+      - Aurora
+      - Blends
+      - Blink
+      - Blink Rainbow
+      - Bouncing Balls
+      - Bpm
+      - Breathe
+      - Candle
+      - Candle Multi
+      - Candy Cane
+      - Chase
+      - Chase 2
+      - Chase 3
+      - Chase Flash
+      - Chase Flash Rnd
+      - Chase Rainbow
+      - Chase Random
+      - Chunchun
+      - Colorful
+      - Colorloop
+      - Colortwinkles
+      - Colorwaves
+      - Dancing Shadows
+      - Dissolve
+      - Dissolve Rnd
+      - Drip
+      - Dynamic
+      - Dynamic Smooth
+      - Fade
+      - Fairy
+      - Fairytwinkle
+      - Fill Noise
+      - Fire 2012
+      - Fire Flicker
+      - Fireworks
+      - Fireworks 1D
+      - Fireworks Starburst
+      - Flow
+      - Glitter
+      - Gradient
+      - Halloween
+      - Halloween Eyes
+      - Heartbeat
+      - ICU
+      - Juggle
+      - Lake
+      - Lighthouse
+      - Lightning
+      - Loading
+      - Meteor
+      - Meteor Smooth
+      - Multi Comet
+      - Noise 1
+      - Noise 2
+      - Noise 3
+      - Noise 4
+      - Noise Pal
+      - Oscillate
+      - Pacifica
+      - Palette
+      - Percent
+      - Phased
+      - Phased Noise
+      - Plasma
+      - Police
+      - Popcorn
+      - Pride 2015
+      - Railway
+      - Rain
+      - Rainbow
+      - Rainbow Runner
+      - Random Colors
+      - Ripple
+      - Ripple Rainbow
+      - Running
+      - Running Dual
+      - Saw
+      - Scan
+      - Scan Dual
+      - Scanner
+      - Scanner Dual
+      - Sine
+      - Sinelon
+      - Sinelon Dual
+      - Sinelon Rainbow
+      - Solid
+      - Solid Glitter
+      - Solid Pattern
+      - Solid Pattern Tri
+      - Sparkle
+      - Sparkle Dark
+      - Sparkle+
+      - Spots
+      - Spots Fade
+      - Stream
+      - Stream 2
+      - Strobe
+      - Strobe Mega
+      - Strobe Rainbow
+      - Sunrise
+      - Sweep
+      - Sweep Random
+      - TV Simulator
+      - Tetrix
+      - Theater
+      - Theater Rainbow
+      - Traffic Light
+      - Tri Fade
+      - Tri Wipe
+      - Twinkle
+      - Twinklecat
+      - Twinklefox
+      - Twinkleup
+      - Two Dots
+      - Washing Machine
+      - Wipe
+      - Wipe Random
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - rgb
+      - xy
+      icon: mdi:lightbulb-group
+      friendly_name: Hall (Main) Lights
+      supported_features: 44
+      lights:
+      - light.island_led_strip
+      - light.light_status_hall
+      controlling: true
+      child_ids:
+      - light.overhead_lights_hall_main
+      effect: Solid
+      color_mode: rgb
+      brightness: 254
+      hs_color:
+      - 26.878
+      - 43.333
       rgb_color:
       - 255
       - 194
       - 144
       xy_color:
       - 0.449
-      - 0.373
+      - 0.372
+      color_temp_kelvin:
+      color_temp:
       state: 'on'
-    light.living_room_lights:
-      supported_color_modes:
-      - brightness
-      icon: mdi:lightbulb-group
-      friendly_name: Living Room Lights
-      supported_features: 40
-      lights:
-      - light.tv_room_side_table_light
-      - light.esp32_status_led_3
-      - light.living_room_light
-      controlling: true
-      child_ids:
-      - light.overhead_lights_living_room
-      - light.sleep_lights_living_room
-      color_mode: brightness
-      brightness: 255
-      state: 'on'
-    light.main_bedroom_lights:
+    light.bedroom_main_lights:
       min_color_temp_kelvin: 2000
       max_color_temp_kelvin: 6666
       min_mireds: 150
@@ -330,18 +1070,19 @@
       - color_temp
       - xy
       icon: mdi:lightbulb-group
-      friendly_name: Main Bedroom Lights
+      friendly_name: Bedroom (Main) Lights
       supported_features: 44
       lights:
-      - light.main_bedroom_right_light
+      - light.light_left_bedroom_main
+      - light.bedroom_main_mm_mmwave_led
+      - light.light_dressor_bedroom_main
       - light.esp32_status_led_5
-      - light.main_bedroom_dresser_light
-      - light.main_bedroom_left_light
-      controlling: true
+      - light.light_right_bedroom_main
+      controlling: false
       child_ids:
-      - light.overhead_lights_main_bedroom
+      - light.overhead_lights_bedroom_main
       color_mode: color_temp
-      brightness: 245
+      brightness: 255
       color_temp_kelvin: 2000
       color_temp: 500
       hs_color:
@@ -355,7 +1096,44 @@
       - 0.599
       - 0.382
       state: 'on'
-    light.main_bedroom_closet_lights:
+    light.hall_bedroom_main_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
+      supported_color_modes:
+      - color_temp
+      - xy
+      icon: mdi:lightbulb-group
+      friendly_name: Hall (Bedroom Main) Lights
+      supported_features: 44
+      lights:
+      - light.light_left_hall_bedroom_main
+      - light.light_right_hall_bedroom_main
+      controlling: true
+      child_ids:
+      - light.overhead_lights_hall_bedroom_main
+      color_mode: xy
+      brightness: 255
+      hs_color:
+      - 27.95
+      - 63.137
+      rgb_color:
+      - 255
+      - 169
+      - 94
+      xy_color:
+      - 0.519
+      - 0.387
+      state: 'on'
+    light.closet_bedroom_main_lights:
       min_color_temp_kelvin: 2000
       max_color_temp_kelvin: 6493
       min_mireds: 154
@@ -363,13 +1141,13 @@
       supported_color_modes:
       - color_temp
       icon: mdi:lightbulb-group
-      friendly_name: Main Bedroom Closet Lights
+      friendly_name: Closet (Bedroom Main) Lights
       supported_features: 40
       lights:
-      - light.main_bedroom_closet_light
+      - light.light_closet_bedroom_main
       controlling: true
       child_ids:
-      - light.overhead_lights_main_bedroom_closet
+      - light.overhead_lights_closet_bedroom_main
       color_mode: color_temp
       brightness: 255
       color_temp_kelvin: 3508
@@ -385,7 +1163,7 @@
       - 0.454
       - 0.373
       state: 'on'
-    light.main_bedroom_hall_lights:
+    light.bathroom_main_lights:
       min_color_temp_kelvin: 2000
       max_color_temp_kelvin: 6666
       min_mireds: 150
@@ -401,73 +1179,30 @@
       - color_temp
       - xy
       icon: mdi:lightbulb-group
-      friendly_name: Main Bedroom Hall Lights
+      friendly_name: Bathroom (Main) Lights
       supported_features: 44
       lights:
-      - light.main_bathroom_right_light
-      - light.main_bathroom_sink_left_light
+      - light.hall_bathroom_main_mm_mmwave_led
+      - light.esp32_status_led_4
+      - light.light_night_bathroom_main
+      - light.scene_night_bathroom_main
+      - light.light_flipper_bathroom_main
       controlling: true
       child_ids:
-      - light.overhead_lights_main_bedroom_hall
-      color_mode: color_temp
-      brightness: 255
+      - light.overhead_lights_bathroom_main
+      - light.sleep_lights_bathroom_main
+      color_mode: xy
+      brightness: 54
       hs_color:
-      - 27.117
-      - 43.528
+      - 358.566
+      - 98.431
       rgb_color:
       - 255
-      - 194
-      - 144
+      - 4
+      - 10
       xy_color:
-      - 0.449
-      - 0.373
-      color_temp_kelvin: 3558
-      color_temp: 281
-      state: 'on'
-    light.main_bathroom_lights:
-      supported_color_modes:
-      - onoff
-      icon: mdi:lightbulb-group
-      friendly_name: Main Bathroom Lights
-      supported_features: 0
-      lights:
-      - light.main_bathroom_light_flipper
-      - light.scene_main_bathroom_night
-      controlling: true
-      child_ids:
-      - light.overhead_lights_main_bathroom
-      - light.sleep_lights_main_bathroom
-      color_mode: onoff
-      state: 'on'
-    light.office_lights:
-      min_color_temp_kelvin: 2000
-      max_color_temp_kelvin: 6493
-      min_mireds: 154
-      max_mireds: 500
-      supported_color_modes:
-      - color_temp
-      icon: mdi:lightbulb-group
-      friendly_name: Office Lights
-      supported_features: 40
-      color_mode: color_temp
-      brightness: 255
-      lights:
-      - light.office_color_light
-      - light.office_dimmer
-      controlling: true
-      child_ids: []
-      color_temp_kelvin: 3875
-      color_temp: 258
-      hs_color:
-      - 26.877
-      - 37.182
-      rgb_color:
-      - 255
-      - 202
-      - 160
-      xy_color:
-      - 0.428
-      - 0.367
+      - 0.699
+      - 0.299
       state: 'on'
   metadata:
     light.kitchen_lights:
@@ -476,47 +1211,61 @@
       entity_only: true
     light.dining_room_lights:
       entity_only: true
-    light.living_room_lights:
-      entity_only: true
-    light.main_bedroom_lights:
-      entity_only: true
-    light.main_bedroom_closet_lights:
-      entity_only: true
-    light.main_bedroom_hall_lights:
-      entity_only: true
-    light.main_bathroom_lights:
-      entity_only: true
     light.office_lights:
       entity_only: true
+    light.tv_room_lights:
+      entity_only: true
+    light.hall_main_lights:
+      entity_only: true
+    light.bedroom_main_lights:
+      entity_only: true
+    light.hall_bedroom_main_lights:
+      entity_only: true
+    light.closet_bedroom_main_lights:
+      entity_only: true
+    light.bathroom_main_lights:
+      entity_only: true
+  icon: mdi:brightness-7
 - id: '1660793768339'
   name: 'House Mode: Mood'
   entities:
     light.kitchen_lights:
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
       supported_color_modes:
       - color_temp
       - xy
       icon: mdi:lightbulb-group
       friendly_name: Kitchen Lights
       supported_features: 44
-      min_mireds: 142
-      max_mireds: 666
-      effect_list:
-      - colorloop
-      entity_id:
-      - light.kitchen_light_door
-      - light.kitchen_light_sink
+      lights:
+      - light.light_door_kitchen
+      - light.esp32_status_led_2
+      - light.light_sink_kitchen
+      controlling: true
+      child_ids:
+      - light.overhead_lights_kitchen
       color_mode: xy
-      brightness: 109
+      brightness: 255
       hs_color:
-      - 30.252
-      - 93.333
+      - 27.222
+      - 42.353
       rgb_color:
       - 255
-      - 137
-      - 17
+      - 196
+      - 147
       xy_color:
-      - 0.599
-      - 0.382
+      - 0.445
+      - 0.372
       state: 'on'
     switch.tv_room_side_table_power_relay_4:
       icon: hass:lightbulb
@@ -525,6 +1274,8 @@
     light.dining_room_light:
       supported_color_modes:
       - brightness
+      color_mode:
+      brightness:
       friendly_name: Dining Room Light
       supported_features: 32
       state: 'off'
@@ -535,138 +1286,52 @@
       entity_only: true
     light.dining_room_light:
       entity_only: true
+  icon: mdi:hand-heart
 - id: '1660794155666'
   name: 'House Mode: Party!'
   entities:
     light.kitchen_lights:
-      min_mireds: 142
-      max_mireds: 666
+      min_color_temp_kelvin: 2000
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
+      max_mireds: 500
       effect_list:
-      - colorloop
+      - blink
+      - breathe
+      - channel_change
+      - finish_effect
+      - okay
+      - stop_effect
       supported_color_modes:
       - color_temp
       - xy
-      entity_id:
-      - light.kitchen_light_door
-      - light.kitchen_light_sink
       icon: mdi:lightbulb-group
       friendly_name: Kitchen Lights
       supported_features: 44
+      lights:
+      - light.light_door_kitchen
+      - light.esp32_status_led_2
+      - light.light_sink_kitchen
+      controlling: true
+      child_ids:
+      - light.overhead_lights_kitchen
       color_mode: xy
-      brightness: 123
+      brightness: 255
       hs_color:
-      - 314.824
-      - 100
+      - 26.667
+      - 42.353
       rgb_color:
       - 255
-      - 0
-      - 192
+      - 195
+      - 147
       xy_color:
-      - 0.477
-      - 0.196
+      - 0.446
+      - 0.371
       state: 'on'
   metadata:
     light.kitchen_lights:
       entity_only: true
-- id: '1661005080855'
-  name: 'Default Light Colors: On'
-  entities:
-    light.hall_light_status:
-      min_mireds: 153
-      max_mireds: 666
-      effect_list:
-      - colorloop
-      supported_color_modes:
-      - color_temp
-      - xy
-      off_with_transition: false
-      off_brightness:
-      friendly_name: Hall Light - Status
-      supported_features: 44
-      color_mode: xy
-      brightness: 254
-      hs_color:
-      - 30.119
-      - 99.216
-      rgb_color:
-      - 255
-      - 129
-      - 2
-      xy_color:
-      - 0.611994
-      - 0.373999
-      state: 'on'
-    light.master_bathroom_night_light:
-      min_mireds: 153
-      max_mireds: 500
-      supported_color_modes:
-      - color_temp
-      - xy
-      off_with_transition: false
-      off_brightness:
-      friendly_name: Master Bathroom Night Light
-      supported_features: 40
-      color_mode: xy
-      brightness: 28
-      hs_color:
-      - 0
-      - 100
-      rgb_color:
-      - 255
-      - 0
-      - 0
-      xy_color:
-      - 0.701
-      - 0.299
-      state: 'on'
-  metadata:
-    light.hall_light_status:
-      entity_only: true
-    light.master_bathroom_night_light:
-      entity_only: true
-- id: '1661005863952'
-  name: 'Default Color Lights: Off'
-  entities:
-    light.hall_light_status:
-      min_mireds: 153
-      max_mireds: 666
-      effect_list:
-      - colorloop
-      supported_color_modes:
-      - color_temp
-      - xy
-      off_with_transition: false
-      off_brightness: 254
-      friendly_name: Hall Light - Status
-      supported_features: 44
-      state: 'off'
-    light.master_bathroom_night_light:
-      min_mireds: 153
-      max_mireds: 500
-      supported_color_modes:
-      - color_temp
-      - xy
-      off_with_transition: false
-      off_brightness: 28
-      friendly_name: Master Bathroom Night Light
-      supported_features: 40
-      state: 'off'
-    light.master_closet_lights:
-      supported_color_modes:
-      - brightness
-      entity_id:
-      - light.master_closet_light_level_on_off
-      icon: mdi:lightbulb-group
-      friendly_name: Master Closet Lights
-      supported_features: 40
-      state: 'off'
-  metadata:
-    light.hall_light_status:
-      entity_only: true
-    light.master_bathroom_night_light:
-      entity_only: true
-    light.master_closet_lights:
-      entity_only: true
+  icon: mdi:account-group
 - id: '1680049531928'
   name: Game Time
   entities:
@@ -760,35 +1425,73 @@
       entity_only: true
     light.dining_room_game_corner_light_light:
       entity_only: true
-- id: '1707574943464'
-  name: Guest Bathroom Night
+- id: '1713625350156'
+  name: Night (Bathroom Main)
   entities:
-    light.master_bathroom_night_light:
+    light.light_night_bathroom_main:
       min_color_temp_kelvin: 2000
-      max_color_temp_kelvin: 6535
-      min_mireds: 153
+      max_color_temp_kelvin: 6666
+      min_mireds: 150
       max_mireds: 500
+      effect_list:
+      - blink
+      - breathe
+      - okay
+      - channel_change
+      - finish_effect
+      - stop_effect
       supported_color_modes:
       - color_temp
       - xy
+      friendly_name: Light Night (Bathroom Main)
+      supported_features: 44
       color_mode: xy
-      brightness: 51
-      color_temp_kelvin:
-      color_temp:
+      brightness: 54
       hs_color:
-      - 0.992
-      - 94.902
+      - 358.566
+      - 98.431
       rgb_color:
       - 255
-      - 17
-      - 13
+      - 4
+      - 10
       xy_color:
-      - 0.697
-      - 0.3
-      off_with_transition: false
-      off_brightness:
-      friendly_name: Master Bathroom Night Light
-      supported_features: 40
+      - 0.699
+      - 0.299
       state: 'on'
-  icon: mdi:lightbulb-night-outline
   metadata: {}
+  icon: mdi:lightbulb-night-outline
+- id: '1724020558795'
+  name: Audio Night
+  entities:
+    media_player.bathroom_main_snapcast_group:
+      source_list:
+      - Snapserver
+      - default
+      - tcp
+      - rtp
+      - roc
+      volume_level: 0.56
+      is_volume_muted: false
+      source: roc
+      friendly_name: Bathroom Main Snapcast Group
+      supported_features: 2060
+      state: idle
+    media_player.audio_bedroom_main_snapcast_client:
+      source_list:
+      - Snapserver
+      - default
+      - tcp
+      - rtp
+      - roc
+      volume_level: 0.61
+      is_volume_muted: false
+      source: roc
+      latency: 0
+      friendly_name: audio-bedroom-main Snapcast Client
+      supported_features: 2060
+      state: standby
+  metadata:
+    media_player.bathroom_main_snapcast_group:
+      entity_only: true
+    media_player.audio_bedroom_main_snapcast_client:
+      entity_only: true
