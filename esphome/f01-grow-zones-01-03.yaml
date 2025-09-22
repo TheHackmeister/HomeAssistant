@@ -1,0 +1,154 @@
+esphome:
+  name: grow-zones-01-03
+  friendly_name: grow-zones-01-03
+
+esp32:
+  board: nodemcu-32s
+  #framework:
+  #  type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "GezrreRX8FHU8r9IMo+8pcnWWwtYRB7XRgL63AbMGVM="
+
+ota:
+  - platform: esphome
+    password: "0e1df39e8a65fc773a11d8ede2af6ec4"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  #ap:
+  #  ssid: "Grow-Zones-01-03"
+  #  password: "MlXxpeSwhKvJ"
+
+#captive_portal:
+
+
+
+# SpI for digital pot
+spi:
+     clk_pin: GPIO18
+     mosi_pin: GPIO23
+     miso_pin: GPIO19
+     interface: hardware
+spi_device:
+    id: spidev
+    cs_pin: GPIO13
+
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+
+# Example configuration entry
+sensor:
+  - platform: scd30
+    co2:
+      name: "CO2 Shoot Zone 01"
+      accuracy_decimals: 1
+    temperature:
+      name: "Temperature Shoot Zone 01"
+      accuracy_decimals: 2
+    humidity:
+      name: "Humidity Shoot Zone 01"
+      accuracy_decimals: 1
+    #temperature_offset: 1.5 °C
+    address: 0x61
+    update_interval: 10s
+
+# I2c for CO2# Example on how to implement a UI section in HA for manual calibration.
+# Note: Please enter first a CO2 value before pressing the button.
+button:
+  - platform: template
+    name: "SCD30 Force manual calibration"
+    entity_category: "config"
+    on_press:
+      then:
+        - scd30.force_recalibration_with_reference:
+            value: !lambda 'return id(co2_cal).state;'
+  - platform: template
+    name: "Change Light Dimming"
+    entity_category: "config"
+    on_press:
+      then:
+        - lambda: !lambda |-
+            id(spidev).enable();
+            id(spidev).write_byte(0x11);
+            id(spidev).write_byte(100);
+            id(spidev).write_byte(0x12);
+            id(spidev).write_byte(100);
+            id(spidev).disable();
+
+number:
+  - platform: template
+    name: "CO2 calibration value Shoot Zone 01"
+    optimistic: true
+    min_value: 350
+    max_value: 4500
+    step: 1
+    id: co2_cal
+    icon: "mdi:molecule-co2"
+    entity_category: "config"
+# regular for relays
+# Something for drainage flow
+
+switch:
+  - platform: gpio
+    pin: GPIO17
+    name: "Mist Root Zone 01"
+    inverted: False
+  - platform: gpio
+    pin: GPIO16
+    name: "Drain Root Zone 01"
+    inverted: False
+  - platform: gpio
+    pin: GPIO4
+    name: "Mist Root Zone 02"
+    inverted: False
+  - platform: gpio
+    pin: GPIO0
+    name: "Drain Root Zone 02"
+    inverted: False
+  - platform: gpio
+    pin: GPIO2
+    name: "Mist Root Zone 03"
+    inverted: False
+  - platform: gpio
+    pin: GPIO15
+    name: "Drain Root Zone 03"
+    inverted: False
+
+  - platform: gpio
+    pin: GPIO27
+    name: "Drain Pump"
+    inverted: False
+  - platform: gpio
+    pin: GPIO14
+    name: "Pot Shoot Zone 01"
+    inverted: False
+
+
+
+  - platform: gpio
+    pin: GPIO32
+    name: "Mist Root Zone 04"
+    inverted: True
+  - platform: gpio
+    pin: GPIO33
+    name: "Drain Root Zone 04"
+    inverted: True
+  - platform: gpio
+    pin: GPIO25
+    name: "Mist Root Zone 05"
+    inverted: True
+  - platform: gpio
+    pin: GPIO26
+    name: "Drain Root Zone 05"
+    inverted: True

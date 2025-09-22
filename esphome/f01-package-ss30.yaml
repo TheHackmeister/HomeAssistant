@@ -1,29 +1,26 @@
 esp8266:
-  #platform: ESP32
-  #board: esp32doit-devkit-v1
   board: esp01_1m
-  
 switch:
   - platform: gpio
     name: "${system_friendly} Relay 1"
     pin: GPIO15
     id: relay1
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: ALWAYS_OFF
   - platform: gpio
     name: "${system_friendly} Relay 2"
     pin: GPIO5
     id: relay2
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: ALWAYS_OFF
   - platform: gpio
     name: "${system_friendly} Relay 3"
     pin: GPIO14
     id: relay3
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: ALWAYS_OFF
   - platform: gpio
     name: "${system_friendly} Relay 4"
     pin: GPIO12
     id: relay4
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: ALWAYS_OFF
   - platform: gpio
     name: "${system_friendly} USB Power"
     pin: GPIO4

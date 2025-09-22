@@ -1,12 +1,14 @@
 substitutions:
   name: "athom-smart-plug-02"
 packages:
-  #athom.smart-plug-v2: github://athom-tech/athom-configs/athom-smart-plug-v2.yaml
-  package-athom-smart-plug-v2.: !include package-athom-smart-plug-v2.yaml
+  athom.smart-plug-v2: github://athom-tech/athom-configs/athom-smart-plug-v2.yaml
+  #package.athom-smart-plug-v2: !include package-athom-smart-plug-v2.yaml
 esphome:
   name: ${name}
   name_add_mac_suffix: false
 
+ota:
+  - platform: esphome
 
 wifi:
   ssid: !secret wifi_ssid

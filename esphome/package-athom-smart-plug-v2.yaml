@@ -86,7 +86,6 @@ sensor:
     update_interval: 60s
 
   - platform: cse7766
-    update_interval: 10s
     current:
       name: "Current"
       filters:

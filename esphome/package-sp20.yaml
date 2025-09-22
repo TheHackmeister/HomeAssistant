@@ -1,4 +1,8 @@
-
+esp8266:
+  #platform: ESP32
+  #board: esp32doit-devkit-v1
+  board: esp01_1m
+  
 binary_sensor:
   - platform: gpio
     pin:

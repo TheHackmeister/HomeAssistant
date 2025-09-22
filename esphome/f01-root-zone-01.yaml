@@ -1,0 +1,8 @@
+substitutions:
+  system: root-zone-01
+  system_friendly: Root Zone 01
+
+packages:
+  package-ss30: !include f01-package-ss30.yaml
+  package-core-device: !include package-core-device.yaml
+

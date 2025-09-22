@@ -1,0 +1,162 @@
+substitutions:
+  device_name: Water Supply 00 Sensors
+  device_id: water-supply-00-sensors
+
+esphome:
+  name: $device_id
+  # If it builds in the /config folder like is default, then there arise
+  # conflicts between the server and my machine. /tmp/esphome-build is a volume.
+  #build_path: /tmp/esphome-builds/$device_name/
+  #arduino_version: 1.0.4
+  #build_path: ./build/${system}
+
+esp32:
+  #framework:
+  #  type: esp-idf
+  #platform: ESP32
+  board: esp32doit-devkit-v1
+  #board: esp32-s3-devkitc-1
+wifi:
+  domain: .spencerslab.com
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  #output_power: 17dB
+
+# Enable Over the Air Updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+
+# Enable Home Assistant API
+#api:
+api:
+  password: !secret hass_api_key
+  #encryption:
+  #  key: !secret encryption_key
+  reboot_timeout: 1h
+
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  #tx_pin: GPIO22
+  #rx_pin: GPIO23
+  baud_rate: 9600
+  id: distance
+  #debug:
+  #  direction: BOTH
+  #  dummy_receiver: true
+  #  after:
+  #    delimiter: "\n,\r,0"
+  #  sequence:
+  #    - lambda: UARTDebug::log_string(direction, bytes);
+
+sensor:
+  - platform: wifi_signal
+    name: "${device_name} WiFi Signal"
+    update_interval: 60s
+  - platform: uptime
+    name: "${device_name} Uptime"
+  #- platform: esp32_hall
+  #  name: "ESP32 Hall Sensor"
+  #  update_interval: 2s
+  #  id: hall
+  - platform: "a02yyuw"
+    name: "${device_name} Fill Distance"
+    uart_id: distance
+    filters:
+      - median:
+          window_size: 25
+          send_every: 12
+          send_first_at: 12
+  #- platform: adc
+  #  pin: GPIO34
+  #  name: $device_name pH
+  #  #state_topic: seedship/${system}/bus_psi
+  #  #icon: "mdi:water-pump"
+  #  update_interval: 0.2s
+  #  force_update: true
+  #  accuracy_decimals: 3
+  #  attenuation: 12db
+  #  filters:
+  #    - median:
+  #        window_size: 25
+  #        send_every: 3
+
+  - platform: adc
+    pin: GPIO32
+    name: $device_name EC
+    #state_topic: seedship/${system}/bus_psi
+    #icon: "mdi:water-pump"
+    update_interval: 0.2s
+    force_update: true
+    accuracy_decimals: 3
+    attenuation: 12db
+    filters:
+      - median:
+          window_size: 25
+          send_every: 12
+          send_first_at: 12
+
+  - platform: adc
+    pin: GPIO33
+    name: $device_name Temperature
+    #state_topic: seedship/${system}/bus_psi
+    #icon: "mdi:water-pump"
+    update_interval: 0.2s
+    force_update: true
+    accuracy_decimals: 3
+    attenuation: 12db
+    filters:
+      - median:
+          window_size: 25
+          send_every: 12
+          send_first_at: 12       
+
+  #- platform: adc
+  #  pin: GPIO35
+  #  name: $device_name Bus PSI
+  #  #state_topic: seedship/${system}/bus_psi
+  #  icon: "mdi:water-pump"
+  #  #id: bus_psi
+  #  update_interval: 0.2s
+  #  #expire_after: 60s
+  #  force_update: true
+  #  accuracy_decimals: 3
+  #  attenuation: 12db
+  #  filters:
+  #    - median:
+  #        window_size: 50
+  #        send_every: 12
+  #        send_first_at: 12
+  #    - calibrate_linear:
+  #        datapoints:
+  #            - 0.52800 -> 0
+  #            - 0.74300 -> 10.0
+  #            - 1.75800 -> 62.0
+  #            - 2.08 -> 78.0
+  #            - 2.46 -> 97.0
+  #          # 200 PSI sensor
+  #    #      - 0.5 -> 0.0
+  #    #      - 1.14 -> 25.8
+  #    #      - 1.37 -> 35.8
+  #    #      - 1.85 -> 55.5
+  #    #      - 3.09 -> 103.4
+  #    #      - 3.28 -> 109.2
+  #          ## 300 PSI sensor
+  #          #- 0.5 -> 0.0
+  #          #- 0.89 -> 25.4
+  #          #- 1.35 -> 55
+  #          #- 2.0 -> 93.3
+  #          #- 2.1 -> 103.3
+  #          #- 2.25 -> 110.4
+  #  unit_of_measurement: "PSI"
+
+binary_sensor:
+  - platform: status
+    name: "${device_name} Status"
+text_sensor:
+  - platform: version
+    name: "${device_name} ESPHome Version"
+ 

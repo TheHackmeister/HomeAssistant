@@ -1,6 +1,6 @@
 substitutions:
-  system: bedroom_main_power
-  system_friendly: Master Bedroom Power
+  system: networking-accessories-power
+  system_friendly: Networking Accessories Power
 
 packages:
   package-core-device: !include package-core-device.yaml

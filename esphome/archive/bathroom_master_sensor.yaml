@@ -1,5 +1,5 @@
 substitutions:
-  system: bathroom_master_sensor
+  system: bathroom_guest_sensor
   system_friendly: Bathroom Master
 
 packages:
