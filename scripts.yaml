@@ -1619,6 +1619,24 @@ water_supply_by_volume_plant_mix_shake:
   icon: mdi:flower
 calculated_areas_initalize_helpers:
   sequence:
+  - variables:
+      ha_topic: homeassistant
+      device_topic: area_leaders
+      area_leaders_sensor_name: area_leaders_active_count
+  - action: mqtt.publish
+    data:
+      topic: '{{ ha_topic }}/sensor/{{ area_leaders_sensor_name }}/config'
+      retain: true
+      payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\": [ \"area_leaders\"
+        ],\n      \"name\": \"Area Leaders\" ,\n      \"manufacturer\": \"Area Leader
+        System\"\n    },\n    \"name\": \"Active Count\",\n    \"uniq_id\": area_leaders_sensor_name,\n
+        \   \"object_id\": area_leaders_sensor_name,\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
+        \   \"retain\": false,\n    \"state_class\": \"measurement\",\n    \"value_template\":
+        \"{% set count = namespace(total=0) %}{% for label in labels() %}{% if label_name(label).startswith('Area
+        Leader: ') %}{% for entity_id in label_entities(label) %}{% if states(entity_id)
+        in ['on', 'open', 'home', 'active'] %}{% set count.total = count.total +
+        1 %}{% endif %}{% endfor %}{% endif %}{% endfor %}{{ count.total }}\"\n  }
+        | to_json\n}}\n"
   - repeat:
       sequence:
       - variables:
