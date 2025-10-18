@@ -1047,8 +1047,8 @@ calibrated_values_initalize_helpers_v2:
           calibrated_sensors: "{{ \n  label_entities(repeat.item)\n  | list\n}}\n"
           device_class: "{{ label_name(repeat.item)\n  | regex_replace('^[^:]*:\\s*([^:]*?)(?:\\s*:.*)?$',
             '\\\\1')\n}}\n"
-          units: "{{\n  label_name(repeat.item)\n  | regex_replace('^[^:]*:\\s*[^:]*:\\s*(.*)$|^.*$',
-            '\\\\1')\n}}\n"
+          units: "{% set raw_units = label_name(repeat.item)\n  | regex_replace('^[^:]*:\\s*[^:]*:\\s*(.*)$|^.*$',
+            '\\\\1') | trim %}\n{{ none if (raw_units == '') else raw_units }}\n"
       - repeat:
           for_each: '{{ calibrated_sensors }}'
           sequence:
@@ -1114,8 +1114,8 @@ calibrated_values_initalize_helpers_v2:
                 \   \"retain\": true,\n    \"expire_after\": 60,\n    \"state_class\":
                 \"measurement\",\n    \"suggested_display_precision\": \"2\",\n    \"value_template\":
                 \"{{ \n      (states( '\"~device_id~\"' ) | float) * ( state_attr('\"~device_id~\"_calibrated_value',
-                'poly[1]')  \n      | float) + ( state_attr('\"~device_id~\"_calibrated_value',
-                'poly[0]')  \n      | float) | float }}\",\n    \"json_attributes_topic\":
+                'poly[1]')  \n      | float(1)) + ( state_attr('\"~device_id~\"_calibrated_value',
+                'poly[0]')  \n      | float(0)) }}\",\n    \"json_attributes_topic\":
                 \"~/calibration_data\",\n    \"json_attributes_template\": \"{% set
                 cal_data = value | from_json %}\n      {% set ns = namespace(sx=0,
                 sy=0, sxy=0, sxx=0) %}\n      {% set n = cal_data.keys()|list|length
@@ -1651,7 +1651,7 @@ calculated_areas_initalize_helpers:
           payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
             [ area_id ],\n      \"name\": area ,\n      \"manufacturer\": \"Tracked
             Area\",\n      \"suggested_area\": area\n    },\n    \"name\": \"VPD\",\n
-            \   \"device_class\": \"pressure\",\n    \"unit_of_measurement\": \"kPh\",\n
+            \   \"device_class\": \"pressure\",\n    \"unit_of_measurement\": \"kPa\",\n
             \   \"uniq_id\": area_id~\"_vpd\",\n    \"object_id\": area_id~\"_vpd\",\n
             \   \"cmd_t\": \"~/calculated_value\",\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
             \   \"retain\": true,\n    \"expire_after\": 60,\n    \"state_class\":
