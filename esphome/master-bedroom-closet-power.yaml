@@ -5,3 +5,5 @@ substitutions:
 packages:
   package-core-device: !include package-core-device.yaml
   package-sp10: !include package-ss30.yaml
+wifi:
+  ssid: !secret wifi_ssid_2

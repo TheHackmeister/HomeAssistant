@@ -1,0 +1,101 @@
+substitutions:
+  name: overhead-grow-lights
+  friendly_name: Overhead Grow Lights
+packages:
+  Athom Technology.ESP32 2CH Relay Board: github://athom-tech/esp32-configs/athom-2ch-relay-board.yaml
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+
+
+api:
+  encryption:
+    key: !secret overhead-grow-lights-encryption
+
+
+wifi:
+  ssid: !secret wifi_ssid_2
+  password: !secret wifi_password
+  domain: .spencerslab.com
+  use_address: 10.0.3.226
+  fast_connect: false
+  #output_power: 8.5
+  power_save_mode: none
+spi:
+  clk_pin: GPIO32
+  mosi_pin: GPIO33
+  #miso_pin: GPIO34  # optional, MCP42100 doesn't use it
+
+spi_device:
+  id: digipot
+  cs_pin: GPIO25
+  spi_mode: MODE0
+  bit_order: msb_first
+  data_rate: 1MHz
+
+# Hide the Athom package's relay switches from HA,
+# but keep the IDs live so the onboard buttons still work.
+# ALWAYS_OFF prevents the relay glitching on at boot before
+# the light entity has a chance to take control.
+switch:
+  - id: !extend relay1
+    internal: true
+    restore_mode: ALWAYS_OFF
+  - id: !extend relay2
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+output:
+  # Wiper A — channel 0x11
+  - platform: template
+    id: brightness_output_a
+    type: float
+    write_action:
+      - lambda: |-
+          uint8_t val = (uint8_t)(state * 255);
+          uint8_t cmd[2] = { 0x11, val };
+          id(digipot).enable();
+          id(digipot).write_array(cmd, 2);
+          id(digipot).disable();
+
+  # Wiper B — channel 0x12
+  - platform: template
+    id: brightness_output_b
+    type: float
+    write_action:
+      - lambda: |-
+          uint8_t val = (uint8_t)(state * 255);
+          uint8_t cmd[2] = { 0x12, val };
+          id(digipot).enable();
+          id(digipot).write_array(cmd, 2);
+          id(digipot).disable();
+
+light:
+  - platform: monochromatic
+    id: light_a
+    name: "Light A"
+    output: brightness_output_a
+    gamma_correct: 0
+    default_transition_length: 500ms
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - switch.turn_on: relay1
+    on_turn_off:
+      then:
+        - switch.turn_off: relay1
+
+  - platform: monochromatic
+    id: light_b
+    name: "Light B"
+    output: brightness_output_b
+    gamma_correct: 0
+    default_transition_length: 500ms
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - switch.turn_on: relay2
+    on_turn_off:
+      then:
+        - switch.turn_off: relay2
