@@ -3005,6 +3005,16 @@ labeled_feature_follower:
       required: true
       selector:
         boolean: {}
+    scope:
+      name: Scope
+      description: Scope of the feature (area, floor, or all). If blank, derived from labels.
+      required: false
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - all
   sequence:
   - variables:
       feature_name: '{{ feature | lower }}'
@@ -3054,20 +3064,7 @@ labeled_feature_follower:
   - condition: template
     value_template: '{{ follower_should_act }}'
   - variables:
-      follower_enable_select_value: "{% set pfx = feature_name + ' enable select:
-        ' %} {{ follower_label_names_original\n   | select('match', '(?i)^' + pfx
-        + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
-      follower_disable_select_value: "{% set pfx = feature_name + ' disable select:
-        ' %} {{ follower_label_names_original\n   | select('match', '(?i)^' + pfx
-        + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
-      follower_select_target_value: "{% if leader_enabled and follower_enable_select_value
-        != '' %}\n  {{ follower_enable_select_value }}\n{% elif not leader_enabled
-        and follower_disable_select_value != '' %}\n  {{ follower_disable_select_value
-        }}\n{% else %}\n  {{ '' }}\n{% endif %}\n"
-      follower_value_label: "{% set pfx = feature_name + (' enable: ' if follower_enabled
-        else ' disable: ') %} {% set match = follower_label_names_original\n               |
-        select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
-        %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_target_value: "{% set pfx = feature_name + (' enable: ' if follower_enabled\n        else ' disable: ') %} {% set match = follower_label_names_original\n               |\n        select('match', '(?i)^' + pfx + '.+')\n               | first | default('')\n        %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
       follower_script: "{% set pfx = feature_name + ' script: ' %} {{ follower_label_names_original\n
         \  | select('match', '(?i)^' + pfx + 'script\\..+')\n   | first | default('')\n
         \  | regex_replace('(?i)^.+: ', '') }}\n"
@@ -3084,10 +3081,10 @@ labeled_feature_follower:
     else:
     - if:
       - condition: template
-        value_template: '{{ follower_select_target_value != '''' }}'
+        value_template: '{{ follower_target_value != '''' }}'
       then:
       - condition: template
-        value_template: '{{ states(follower_entity_id) != follower_select_target_value
+        value_template: '{{ states(follower_entity_id) != follower_target_value
           }}
 
           '
@@ -3096,49 +3093,55 @@ labeled_feature_follower:
           value_template: '{{ follower_domain == ''select'' }}'
         then:
         - action: select.select_option
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
-            option: '{{ follower_select_target_value }}'
+          data:
+            option: '{{ follower_target_value }}'
       - if:
         - condition: template
           value_template: '{{ follower_domain == ''input_select'' }}'
         then:
         - action: input_select.select_option
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
-            option: '{{ follower_select_target_value }}'
+          data:
+            option: '{{ follower_target_value }}'
       - if:
         - condition: template
           value_template: '{{ follower_domain == ''number'' }}'
         then:
         - action: number.set_value
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
-            value: '{{ follower_select_target_value }}'
+          data:
+            value: '{{ follower_target_value }}'
       - if:
         - condition: template
           value_template: '{{ follower_domain == ''input_number'' }}'
         then:
         - action: input_number.set_value
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
-            value: '{{ follower_select_target_value }}'
+          data:
+            value: '{{ follower_target_value }}'
       - if:
         - condition: template
           value_template: '{{ follower_domain == ''text'' }}'
         then:
         - action: text.set_value
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
-            value: '{{ follower_select_target_value }}'
+          data:
+            value: '{{ follower_target_value }}'
       - if:
         - condition: template
           value_template: '{{ follower_domain == ''input_text'' }}'
         then:
         - action: input_text.set_value
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
-            value: '{{ follower_select_target_value }}'
+          data:
+            value: '{{ follower_target_value }}'
       else:
       - if:
         - condition: template
@@ -3150,7 +3153,7 @@ labeled_feature_follower:
         - action: 'light.turn_{{ ''on'' if follower_enabled else ''off'' }}
 
             '
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
       - if:
         - condition: template
@@ -3165,7 +3168,7 @@ labeled_feature_follower:
             }}
 
             '
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'
       - if:
         - condition: template
@@ -3194,7 +3197,7 @@ labeled_feature_follower:
               }}
 
               '
-            data:
+            target:
               entity_id: '{{ follower_entity_id }}'
           else:
           - if:
@@ -3205,8 +3208,9 @@ labeled_feature_follower:
               value_template: "{{ state_attr(follower_entity_id, 'is_volume_muted')\n
                 \  != (not follower_enabled) }}\n"
             - action: media_player.volume_mute
-              data:
+              target:
                 entity_id: '{{ follower_entity_id }}'
+              data:
                 is_volume_muted: '{{ not follower_enabled }}'
       - if:
         - condition: template
@@ -3222,5 +3226,5 @@ labeled_feature_follower:
         - action: 'homeassistant.turn_{{ ''on'' if follower_enabled else ''off'' }}
 
             '
-          data:
+          target:
             entity_id: '{{ follower_entity_id }}'

@@ -2100,8 +2100,9 @@
   triggers:
   - trigger: state
     entity_id: sensor.feature_leader_last_changed
-    attribute: last_changed
+    attribute: leaders
   conditions: []
+  mode: queued
   actions:
   - variables:
       cutoff: '{{ trigger.from_state.attributes.last_updated_at | float(0) }}
@@ -2117,7 +2118,7 @@
           resolved_current_value: '{{ states(leader_entity_id) }}
 
             '
-          resolved_previous_value: "{{ trigger.from_state.attributes.last_changed\n
+          resolved_previous_value: "{{ trigger.from_state.attributes.leaders\n
             \  .get(leader_entity_id, {}).get('value', '') }}\n"
           is_increasing: "{% set cur = resolved_current_value | float(-99999) %} {%
             set prev = resolved_previous_value | float(-99999) %} {% if cur != -99999
@@ -2155,22 +2156,20 @@
                 }}
 
                 '
-              leader_enable_select_value: "{% set pfx = feature_name + ' enable select:
-                ' %} {% set match = all_leader_label_names_original\n               |
+              leader_enable_value: "{% set pfx = feature_name + ' enable: ' %} {% set match = all_leader_label_names_original\n               |
                 select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
                 %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
-              leader_disable_select_value: "{% set pfx = feature_name + ' disable
-                select: ' %} {% set match = all_leader_label_names_original\n               |
+              leader_disable_value: "{% set pfx = feature_name + ' disable: ' %} {% set match = all_leader_label_names_original\n               |
                 select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
                 %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
-              leader_enabled_base: "{% if leader_enable_select_value != '' or leader_disable_select_value
-                != '' %}\n  {% set enabled_by_enable = leader_enable_select_value
-                != '' and\n     resolved_current_value | lower == leader_enable_select_value
-                | lower %}\n  {% set disabled_by_disable = leader_disable_select_value
-                != '' and\n     resolved_current_value | lower == leader_disable_select_value
-                | lower %}\n  {% if leader_enable_select_value != '' and leader_disable_select_value
+              leader_enabled_base: "{% if leader_enable_value != '' or leader_disable_value
+                != '' %}\n  {% set enabled_by_enable = leader_enable_value
+                != '' and\n     resolved_current_value | lower == leader_enable_value
+                | lower %}\n  {% set disabled_by_disable = leader_disable_value
+                != '' and\n     resolved_current_value | lower == leader_disable_value
+                | lower %}\n  {% if leader_enable_value != '' and leader_disable_value
                 != '' %}\n    {{ enabled_by_enable and not disabled_by_disable }}\n
-                \ {% elif leader_enable_select_value != '' %}\n    {{ enabled_by_enable
+                \ {% elif leader_enable_value != '' %}\n    {{ enabled_by_enable
                 }}\n  {% else %}\n    {{ not disabled_by_disable }}\n  {% endif %}\n{%
                 else %}\n  {{ resolved_current_value | lower in ['on', 'true', 'home',
                 'open',\n                                        'detected', 'active',
@@ -2253,6 +2252,7 @@
                   feature: '{{ feature_name }}'
                   leader_entity_id: '{{ leader_entity_id }}'
                   leader_enabled: '{{ leader_enabled }}'
+                  scope: '{{ resolved_scope }}'
 - id: '1777371930626'
   alias: Buttons Bedroom 2
   description: ''

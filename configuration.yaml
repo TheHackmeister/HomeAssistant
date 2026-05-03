@@ -24,6 +24,9 @@ notify:
 template:
   - sensor:
     - name: "Feature Leader Last Changed"
+      unique_id: feature_leader_last_changed
+      availability: >
+        {{ label_entities('feature_leader') | count > 0 }}
       state: >
         {{ label_entities('feature_leader') | list | count }}
       attributes:
@@ -48,6 +51,64 @@ template:
           {% else %}
             {{ 0 }}
           {% endif %}
+        leaders: >
+          {% set entities = expand(label_entities('feature_leader'))
+              | sort(attribute='last_changed_timestamp') %}
+          {% set ns = namespace(result={}) %}
+          {% for e in entities %}
+            {% set ns.result = dict(ns.result, **{
+              e.entity_id: {
+                'value': e.state,
+                'last_changed_timestamp': e.last_changed_timestamp
+              }
+            }) %}
+          {% endfor %}
+          {{ ns.result }}
+        features: >
+          {% set ns = namespace(result={}) %}
+          {% for entity in expand(label_entities('feature_leader')) %}
+            {% set lbl_lower = labels(entity.entity_id)
+                | map('label_name') | reject('none') | map('lower') | list %}
+            {% set lbl_orig  = labels(entity.entity_id)
+                | map('label_name') | reject('none') | list %}
+            {% for lbl in lbl_lower %}
+              {% set feature_match = lbl
+                  | regex_replace('^(area |floor |)leader: ', '') %}
+              {% if feature_match != lbl %}
+                {% set fname = feature_match %}
+                {% set en_lbl = lbl_orig
+                    | select('match', '(?i)^' + fname + ' enable: .+')
+                    | first | default('') %}
+                {% set dis_lbl = lbl_orig
+                    | select('match', '(?i)^' + fname + ' disable: .+')
+                    | first | default('') %}
+                {% set en_val  = en_lbl  | regex_replace('(?i)^.+: ', '') %}
+                {% set dis_val = dis_lbl | regex_replace('(?i)^.+: ', '') %}
+                {% if en_val != '' or dis_val != '' %}
+                  {% set by_en  = en_val  != '' and entity.state | lower == en_val  | lower %}
+                  {% set by_dis = dis_val != '' and entity.state | lower == dis_val | lower %}
+                  {% if en_val != '' and dis_val != '' %}
+                    {% set feat_enabled = by_en and not by_dis %}
+                  {% elif en_val != '' %}
+                    {% set feat_enabled = by_en %}
+                  {% else %}
+                    {% set feat_enabled = not by_dis %}
+                  {% endif %}
+                {% else %}
+                  {% set feat_enabled = entity.state | lower in
+                      ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] %}
+                {% endif %}
+                {% set ns.result = dict(ns.result, **{
+                  fname: {
+                    'leader_entity_id': entity.entity_id,
+                    'value': entity.state,
+                    'enabled': feat_enabled
+                  }
+                }) %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {{ ns.result }}
  
     - default_entity_id: sensor.house_home_count
       name: 'House: Home Count'
