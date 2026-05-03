@@ -3096,15 +3096,26 @@ labeled_feature_follower:
       - action: '{{ follower_enable_script | trim }}'
         data: {}
       else:
-      - action: '{{ follower_enable_script | trim }}'
-        data:
-          follower_entity_id: '{{ follower_entity_id }}'
-          feature: '{{ feature }}'
-          leader_entity_id: '{{ leader_entity_id }}'
-          leader_enabled: '{{ leader_enabled }}'
-          scope: '{{ scope }}'
-        continue_on_error: '{{ follower_error_mode in [''silent'', ''log'', ''alert'']
-          }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_error_mode != ''stop'' }}'
+        then:
+        - action: '{{ follower_enable_script | trim }}'
+          data:
+            follower_entity_id: '{{ follower_entity_id }}'
+            feature: '{{ feature }}'
+            leader_entity_id: '{{ leader_entity_id }}'
+            leader_enabled: '{{ leader_enabled }}'
+            scope: '{{ scope }}'
+          continue_on_error: true
+        else:
+        - action: '{{ follower_enable_script | trim }}'
+          data:
+            follower_entity_id: '{{ follower_entity_id }}'
+            feature: '{{ feature }}'
+            leader_entity_id: '{{ leader_entity_id }}'
+            leader_enabled: '{{ leader_enabled }}'
+            scope: '{{ scope }}'
   # 2. Explicit Disable Script — runs when leader_enabled is false, regardless of value labels
   - if:
     - condition: template
@@ -3119,15 +3130,26 @@ labeled_feature_follower:
       - action: '{{ follower_disable_script | trim }}'
         data: {}
       else:
-      - action: '{{ follower_disable_script | trim }}'
-        data:
-          follower_entity_id: '{{ follower_entity_id }}'
-          feature: '{{ feature }}'
-          leader_entity_id: '{{ leader_entity_id }}'
-          leader_enabled: '{{ leader_enabled }}'
-          scope: '{{ scope }}'
-        continue_on_error: '{{ follower_error_mode in [''silent'', ''log'', ''alert'']
-          }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_error_mode != ''stop'' }}'
+        then:
+        - action: '{{ follower_disable_script | trim }}'
+          data:
+            follower_entity_id: '{{ follower_entity_id }}'
+            feature: '{{ feature }}'
+            leader_entity_id: '{{ leader_entity_id }}'
+            leader_enabled: '{{ leader_enabled }}'
+            scope: '{{ scope }}'
+          continue_on_error: true
+        else:
+        - action: '{{ follower_disable_script | trim }}'
+          data:
+            follower_entity_id: '{{ follower_entity_id }}'
+            feature: '{{ feature }}'
+            leader_entity_id: '{{ leader_entity_id }}'
+            leader_enabled: '{{ leader_enabled }}'
+            scope: '{{ scope }}'
   # 3. Direct value OR Default Script (value wins; default script only if no value found)
   - if:
     - condition: template
@@ -3195,23 +3217,34 @@ labeled_feature_follower:
       - condition: template
         value_template: '{{ follower_default_script | trim != "" }}'
       then:
-      - if:
-        - condition: template
-          value_template: '{{ follower_default_script.startswith(''automation.'')
-            or follower_default_script.startswith(''scene.'') }}'
-        then:
-        - action: '{{ follower_default_script | trim }}'
-          data: {}
-        else:
-        - action: '{{ follower_default_script | trim }}'
-          data:
-            follower_entity_id: '{{ follower_entity_id }}'
-            feature: '{{ feature }}'
-            leader_entity_id: '{{ leader_entity_id }}'
-            leader_enabled: '{{ leader_enabled }}'
-            scope: '{{ scope }}'
-          continue_on_error: '{{ follower_error_mode in [''silent'', ''log'', ''alert'']
-            }}'
+        - if:
+          - condition: template
+            value_template: '{{ follower_default_script.startswith(''automation.'')
+              or follower_default_script.startswith(''scene.'') }}'
+          then:
+          - action: '{{ follower_default_script | trim }}'
+            data: {}
+          else:
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode != ''stop'' }}'
+            then:
+            - action: '{{ follower_default_script | trim }}'
+              data:
+                follower_entity_id: '{{ follower_entity_id }}'
+                feature: '{{ feature }}'
+                leader_entity_id: '{{ leader_entity_id }}'
+                leader_enabled: '{{ leader_enabled }}'
+                scope: '{{ scope }}'
+              continue_on_error: true
+            else:
+            - action: '{{ follower_default_script | trim }}'
+              data:
+                follower_entity_id: '{{ follower_entity_id }}'
+                feature: '{{ feature }}'
+                leader_entity_id: '{{ leader_entity_id }}'
+                leader_enabled: '{{ leader_enabled }}'
+                scope: '{{ scope }}'
       else:
       # 5. Fallback: turn_on/turn_off based on follower_enabled (post-invert)
       - if:
