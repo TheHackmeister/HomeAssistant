@@ -48,6 +48,51 @@ template:
           {% else %}
             {{ 0 }}
           {% endif %}
+ 
+    - default_entity_id: sensor.house_home_count
+      name: 'House: Home Count'
+      state: '{{ dict((states.person)|groupby(''state''))[''home'']|count }}'
+
+    # TODO: Need to add labels for ignored entities and remove groups and the package_unavailable_entities.yaml.
+    - unit_of_measurement: entities
+      default_entity_id: sensor.unavailable_entities
+      icon: '{{ ''mdi:check-circle'' if is_state(''sensor.unavailable_entities'',''0'')
+        else ''mdi:alert-circle'' }}'
+      attributes:
+        entities: "{{ states|selectattr('state','in',['unavailable','unknown', 'nan'])|rejectattr('domain','eq','group')\n
+          \   |rejectattr('entity_id','in',state_attr('group.ignored_entities','entity_id'))|rejectattr('domain',
+          'in', 'button')|rejectattr('domain', 'in', 'event')|map(attribute='entity_id')|list
+          }}"
+        update_every_minute: '{{ now().minute }}'
+      name: Unavailable Entities
+      state: "{{ states|selectattr('state','in',['unavailable','unknown', 'nan'])|rejectattr('domain','eq','group')\n
+        \ |rejectattr('entity_id','in',state_attr('group.ignored_entities','entity_id'))|rejectattr('domain',
+        'in', 'event')|rejectattr('domain', 'in', 'button')|list|count }}"
+
+    - default_entity_id: sensor.away_team
+      picture: '{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_logo
+        is defined %}{{ states.sensor.nhl_sensor.attributes.away_logo }}{%- endif %}'
+      name: '{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_name
+        is defined %}{{ states.sensor.nhl_sensor.attributes.away_name }}{%- endif %}'
+      state: '{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_score
+        is defined %}{{ states.sensor.nhl_sensor.attributes.away_score }}{%- endif %}'
+    - default_entity_id: sensor.home_team
+      picture: '{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_logo
+        is defined %}{{ states.sensor.nhl_sensor.attributes.home_logo }}{%- endif %}'
+      name: '{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_name
+        is defined %}{{ states.sensor.nhl_sensor.attributes.home_name }}{%- endif %}'
+      state: '{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_score
+        is defined %}{{ states.sensor.nhl_sensor.attributes.home_score }}{%- endif %}'
+    - default_entity_id: sensor.house_home_count
+      name: 'House: Home Count'
+      state: '{{ dict((states.person)|groupby(''state''))[''home'']|count }}'
+
+
+  - light:
+      - unique_id: scene_night_bathroom_main
+        #friendly_name: "Scene Night (Bathroom Main)"
+        #value_template: |-
+        state: |-
           {% for entity_ids in state_attr('scene.night_bathroom_main', 'entity_id') %}
             {% if is_state(entity_ids, 'on') %}
               {% if loop.index == 1 %}
@@ -58,11 +103,11 @@ template:
             {% endif %}
           {% endfor %}
         turn_on:
-          service: scene.turn_on
+          action: scene.turn_on
           target:
             entity_id: scene.night_bathroom_main
         turn_off:
-          service: homeassistant.turn_off
+          action: homeassistant.turn_off
           target:
             entity_id: "{{ state_attr('scene.night_bathroom_main', 'entity_id') }}"
 
@@ -92,26 +137,40 @@ frontend:
 homeassistant:
   packages: !include_dir_named packages
 
+recorder:
+  db_url: !secret recroder_url
+  #purge_keep_days: 7
+ltss:
+  db_url: !secret ltss_url
+  chunk_time_interval: 86400000000
+  include:
+    domains:
+    - sensor
+    - binary_sensor
+    - number
+    - switch
+    - light
+    - fan
+    - update
+    - select
+    - script
+    - input_select
+    - input_boolean
+    - input_number
+    - device_tracker
+    - button
+    - automation
+
+# TODO: Remove this. Currently used by update_area_manifest.py.
+# Need to convert that first
+python_script:
+
 logger:
   logs:
     homeassistant.components.http.ban: warning
 sensor:
   - platform: nhl_api
     team_abbrev: col
-
-  - platform: template
-    sensors:
-      away_team:
-        friendly_name_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_name is defined %}{{ states.sensor.nhl_sensor.attributes.away_name }}{%- endif %}"
-        value_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_score is defined %}{{ states.sensor.nhl_sensor.attributes.away_score }}{%- endif %}"
-        entity_picture_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.away_logo is defined %}{{ states.sensor.nhl_sensor.attributes.away_logo }}{%- endif %}"
-      home_team:
-        friendly_name_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_name is defined %}{{ states.sensor.nhl_sensor.attributes.home_name }}{%- endif %}"
-        value_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_score is defined %}{{ states.sensor.nhl_sensor.attributes.home_score }}{%- endif %}"
-        entity_picture_template: "{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_logo is defined %}{{ states.sensor.nhl_sensor.attributes.home_logo }}{%- endif %}"
-      house_home_count:
-        friendly_name_template: "House: Home Count"
-        value_template: "{{ dict((states.person)|groupby('state'))['home']|count }}"
 
 rest_command:
   healthchecksio:

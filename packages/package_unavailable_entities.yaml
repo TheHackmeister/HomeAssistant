@@ -19,24 +19,24 @@
 ## https://gist.github.com/jazzyisj/0dd08334fc0a09984496bef5da9ec962
 
 ## REQUIRED this is the template sensor
-sensor:
-  - platform: template
-    sensors:
-      unavailable_entities:
-        friendly_name: Unavailable Entities
-        unit_of_measurement: entities
-        icon_template: "{{ 'mdi:check-circle' if is_state('sensor.unavailable_entities','0') else 'mdi:alert-circle' }}"
-        value_template: >
-          {{ states|selectattr('state','in',['unavailable','unknown', 'nan'])|rejectattr('domain','eq','group')
-            |rejectattr('entity_id','in',state_attr('group.ignored_entities','entity_id'))|rejectattr('domain', 'in', 'event')|rejectattr('domain', 'in', 'button')|list|count }}
-        attribute_templates:
-          entities: >
-            {{ states|selectattr('state','in',['unavailable','unknown', 'nan'])|rejectattr('domain','eq','group')
-                |rejectattr('entity_id','in',state_attr('group.ignored_entities','entity_id'))|rejectattr('domain', 'in', 'button')|rejectattr('domain', 'in', 'event')|map(attribute='entity_id')|list }}
-
-          # Make sure the sensor is updated every minute. Grafana alerts depend on this.
-          update_every_minute: >
-            {{ now().minute }}
+#sensor:
+#  - platform: template
+#    sensors:
+#      unavailable_entities:
+#        friendly_name: Unavailable Entities
+#        unit_of_measurement: entities
+#        icon_template: "{{ 'mdi:check-circle' if is_state('sensor.unavailable_entities','0') else 'mdi:alert-circle' }}"
+#        value_template: >
+#          {{ states|selectattr('state','in',['unavailable','unknown', 'nan'])|rejectattr('domain','eq','group')
+#            |rejectattr('entity_id','in',state_attr('group.ignored_entities','entity_id'))|rejectattr('domain', 'in', 'event')|rejectattr('domain', 'in', 'button')|list|count }}
+#        attribute_templates:
+#          entities: >
+#            {{ states|selectattr('state','in',['unavailable','unknown', 'nan'])|rejectattr('domain','eq','group')
+#                |rejectattr('entity_id','in',state_attr('group.ignored_entities','entity_id'))|rejectattr('domain', 'in', 'button')|rejectattr('domain', 'in', 'event')|map(attribute='entity_id')|list }}
+#
+#          # Make sure the sensor is updated every minute. Grafana alerts depend on this.
+#          update_every_minute: >
+#            {{ now().minute }}
 
 # REQUIRED add any entities you do not with to monitor in this group
 # this group MUST exist even if is empty for sensor template to render

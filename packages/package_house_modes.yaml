@@ -20,7 +20,7 @@ automation:
     - type: not_opened
       platform: device
       device_id: e2d17c9f732bd7369ae1a5eb6fb7684f
-      entity_id: 6bb6182e6aa7d691040f8f162a2d93cc
+      entity_id: 323be08b2ead4e9df1ca025462dadc5e
       domain: binary_sensor
     condition:
     - condition: time
@@ -48,7 +48,7 @@ automation:
     - type: opened
       platform: device
       device_id: e2d17c9f732bd7369ae1a5eb6fb7684f
-      entity_id: 6bb6182e6aa7d691040f8f162a2d93cc
+      entity_id: 323be08b2ead4e9df1ca025462dadc5e
       domain: binary_sensor
     condition:
     - condition: time

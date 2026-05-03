@@ -378,7 +378,9 @@
     metadata: {}
     data: {}
     target:
-      area_id: shoot_zone_01
+      area_id:
+      - shoot_zone_01
+      - shoot_zone_02
   - data: {}
     target:
       entity_id:
@@ -390,6 +392,13 @@
       - tv_room
     action: light.turn_off
     enabled: true
+  - action: number.set_value
+    metadata: {}
+    data:
+      value: '0.1'
+    target:
+      entity_id: number.spencer_laptop_brightness
+    enabled: false
   mode: single
 - id: '1724384009940'
   alias: 'House Mode: Day'
@@ -455,7 +464,7 @@
   use_blueprint:
     path: amorfinvdev/somrig.yaml
     input:
-      remote_name: Button (Spencer Sleep)
+      remote_name: Buttons (Spencer Sleep Backup)
       dots_1_press_action:
       - action: script.sleep_me_switch
         metadata: {}
@@ -481,6 +490,7 @@
         metadata: {}
         data: {}
       helper_hold_delay: 580
+      base_topic: home-zigbee2mqtt-coord
 - id: '1731802828699'
   alias: 'Sleep Me: Pause '
   description: ''
@@ -1028,49 +1038,6 @@
               target:
                 entity_id: '{{ followers | list }}'
   mode: restart
-- id: '1740624374579'
-  alias: 'TV Room: Media Player (Source)'
-  description: ''
-  triggers:
-  - domain: mqtt
-    device_id: 9edc57d84dc63ad3e90e3fa6cf59795f
-    type: action
-    subtype: 3_single
-    trigger: device
-  - trigger: numeric_state
-    entity_id:
-    - sensor.media_player_idle
-    below: 1
-    id: media-player
-  conditions:
-  - condition: or
-    conditions:
-    - condition: not
-      conditions:
-      - condition: trigger
-        id:
-        - media-player
-    - condition: and
-      conditions:
-      - condition: trigger
-        id:
-        - media-player
-      - condition: device
-        device_id: 75e1f9ce994937c60f35ce0ba1e12688
-        domain: media_player
-        entity_id: 582ee30cf5bad29fd35d395dc038973a
-        type: is_off
-  actions:
-  - data: {}
-    target:
-      area_id: tv_room
-    action: media_player.turn_on
-  - data:
-      source: HDMI-2
-    target:
-      area_id: tv_room
-    action: media_player.select_source
-  mode: single
 - id: '1740626586323'
   alias: 'Audio: (Buttons) Custom'
   description: ''
@@ -1646,7 +1613,7 @@
   use_blueprint:
     path: amorfinvdev/somrig.yaml
     input:
-      remote_name: Button (Spencer Sleep New)
+      remote_name: Buttons (Spencer Sleep)
       dots_1_press_action:
       - action: script.sleep_me_switch
         metadata: {}
@@ -1672,8 +1639,9 @@
         metadata: {}
         data: {}
       helper_hold_delay: 500
+      base_topic: home-zigbee2mqtt-coord
 - id: '1749855717033'
-  alias: 'Dose:  lights every hour'
+  alias: 'Dose: lights every hour'
   description: ''
   triggers:
   - trigger: time_pattern
@@ -1695,17 +1663,21 @@
     entity_id: input_boolean.night_mode
     state: 'off'
   actions:
-  - action: script.dose_nutrient_v2
-    metadata: {}
-    data:
-      area_id: shoot_zone_01
-      units: 1
-      nutrient: 'Nutrient: Light'
-  - delay:
-      hours: 0
-      minutes: 0
-      seconds: 25
-      milliseconds: 0
+  - variables:
+      shoot_zones: '{{ label_areas(''type_shoot_zone'') }}
+
+        '
+  - repeat:
+      for_each: '{{ shoot_zones }}'
+      sequence:
+      - action: script.turn_on
+        metadata: {}
+        data:
+          entity_id: script.dose_nutrient_v2
+          variables:
+            area_id: '{{ repeat.item }}'
+            units: 1
+            nutrient: 'Nutrient: Light'
   mode: parallel
   max: 50
 - id: '1757899089642'
@@ -1835,7 +1807,55 @@
                 {{ states(check_minutes_entity) }} minutes.'
               alert_severity: medium
   mode: single
-
+- id: '1760739835655'
+  alias: Area Leader Device Control (Dep)
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.area_leaders_active_count
+  conditions: []
+  actions:
+  - variables:
+      leader_entity: "{% set ns = namespace(entity='', time=None) %} {% for label
+        in labels() %}\n  {% if label_name(label).startswith('Area Leader: ') %}\n
+        \   {% for entity_id in label_entities(label) %}\n      {% set last_changed
+        = states[entity_id].last_changed %}\n      {% if ns.time is none or last_changed
+        > ns.time %}\n        {% set ns.entity = entity_id %}\n        {% set ns.time
+        = last_changed %}\n      {% endif %}\n    {% endfor %}\n  {% endif %}\n{%
+        endfor %} {{ ns.entity }}\n"
+      leader_state: '{{ states(leader_entity) }}'
+      leader_area: '{{ area_id(leader_entity) }}'
+      device_class: "{% set ns = namespace(class='') %} {% for label in labels() %}\n
+        \ {% if label_name(label).startswith('Area Leader: ') and leader_entity in
+        label_entities(label) %}\n    {% set ns.class = label_name(label).replace('Area
+        Leader: ', '') %}\n  {% endif %}\n{% endfor %} {{ ns.class }}\n"
+      target_entities: "{% set class = device_class %} {% set area = leader_area %}
+        {{ states[class] \n   | selectattr('entity_id', 'in', area_entities(area))\n
+        \  | map(attribute='entity_id')\n   | reject('eq', leader_entity)\n   | list
+        }}\n"
+  - condition: template
+    value_template: '{{ target_entities | length > 0 }}'
+    enabled: false
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ leader_state in [''on'', ''open'', ''home'', ''active'']
+          }}'
+      sequence:
+      - target:
+          entity_id: '{{ target_entities }}'
+        action: homeassistant.turn_on
+    - conditions:
+      - condition: template
+        value_template: '{{ leader_state in [''off'', ''closed'', ''away'', ''inactive'']
+          }}'
+      sequence:
+      - target:
+          entity_id: '{{ target_entities }}'
+        action: homeassistant.turn_off
+  mode: queued
+  max: 10
 - id: '1767644744620'
   alias: 'Sensors: Area Manifests trigger'
   description: Updates area manifest sensors when tracked entities change areas or
@@ -2233,3 +2253,47 @@
                   feature: '{{ feature_name }}'
                   leader_entity_id: '{{ leader_entity_id }}'
                   leader_enabled: '{{ leader_enabled }}'
+- id: '1777371930626'
+  alias: Buttons Bedroom 2
+  description: ''
+  use_blueprint:
+    path: amorfinvdev/somrig.yaml
+    input:
+      remote_name: Bedroom Buttons 2
+      dots_1_press_action:
+      - action: script.turn_on
+        metadata: {}
+        target:
+          entity_id: script.labeled_area_action
+        data: {}
+      dots_2_press_action:
+      - action: script.turn_on
+        metadata: {}
+        target:
+          entity_id: script.labeled_area_action
+        data: {}
+      dots_1_hold_action:
+      - action: script.turn_on
+        metadata: {}
+        target:
+          entity_id: script.labeled_area_action
+        data: {}
+      dots_2_hold_action:
+      - action: script.turn_on
+        metadata: {}
+        target:
+          entity_id: script.labeled_area_action
+        data: {}
+      dots_1_double_press_action:
+      - action: script.turn_on
+        metadata: {}
+        target:
+          entity_id: script.labeled_area_action
+        data: {}
+      dots_2_double_press_action:
+      - action: script.turn_on
+        metadata: {}
+        target:
+          entity_id: script.labeled_area_action
+        data: {}
+      helper_max_loops: 80

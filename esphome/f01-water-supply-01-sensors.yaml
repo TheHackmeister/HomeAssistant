@@ -23,6 +23,8 @@ wifi:
 # Enable Over the Air Updates
 ota:
   - platform: esphome
+    # TODO: Update this to match the others.
+    #password: !secret f01-water-supply-01-sensors-ota
     password: !secret ota_password
 
 logger:

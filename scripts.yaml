@@ -2157,6 +2157,7 @@ dose_nutrient_v2:
           - root_zone_04
           - root_zone_05
           - shoot_zone_01
+          - shoot_zone_02
       name: area_id
       default: poc_01
       required: true
@@ -2251,6 +2252,18 @@ nutrient_dosing_initalize_helpers_v2:
             \ \"object_id\": \"{{ device_name }}_dose_double\",\n  \"mode\": \"box\",\n
             \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_double\",
             \     \n  \"stat_t\": \"~/dose_double\",\n  \"retain\": true\n}\n"
+        enabled: true
+      - action: mqtt.publish
+        data:
+          topic: '{{ ha_topic }}/number/{{ device_name }}_dose_step/config'
+          retain: true
+          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
+            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
+            \"Nutrient Dosing\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
+            \ \"name\": \"Dose Step\",\n  \"uniq_id\": \"{{ device_name }}_dose_step\",\n
+            \ \"object_id\": \"{{ device_name }}_dose_step\",\n  \"mode\": \"box\",\n
+            \ \"min\": \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/dose_step\",
+            \     \n  \"stat_t\": \"~/dose_step\",\n  \"retain\": true\n}\n"
         enabled: true
   - repeat:
       for_each: '{{ dose_stop_above_entities }}'
