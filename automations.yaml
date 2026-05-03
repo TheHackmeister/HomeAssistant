@@ -2115,35 +2115,21 @@
       sequence:
       - variables:
           leader_entity_id: '{{ repeat.item }}'
-          resolved_current_value: '{{ states(leader_entity_id) }}
-
-            '
-          resolved_previous_value: "{{ trigger.to_state.attributes.leaders\n
-            \  .get(leader_entity_id, {}).get('previous_value', '') }}\n"
-          is_increasing: "{% set cur = resolved_current_value | float(-99999) %} {%
-            set prev = resolved_previous_value | float(-99999) %} {% if cur != -99999
-            and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{%
-            endif %}\n"
-          is_decreasing: "{% set cur = resolved_current_value | float(-99999) %} {%
-            set prev = resolved_previous_value | float(-99999) %} {% if cur != -99999
-            and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{%
-            endif %}\n"
+          is_increasing: "{% set cur = states(leader_entity_id) | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
+          is_decreasing: "{% set cur = states(leader_entity_id) | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
           all_leader_label_names_original: "{{ labels(leader_entity_id)\n   | map('label_name')\n
             \  | reject('none')\n   | list }}\n"
           all_leader_label_names: "{{ labels(leader_entity_id)\n   | map('label_name')\n
             \  | reject('none')\n   | map('lower')\n   | list }}\n"
-          leader_labels: "{{ all_leader_label_names\n   | select('match', '^(area
-            |floor |)leader: .+')\n   | list }}\n"
+          leader_features: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
+            {}).get('features', {}) }}\n"
       - repeat:
-          for_each: '{{ leader_labels }}'
+          for_each: '{{ leader_features | list }}'
           sequence:
           - variables:
-              leader_label: '{{ repeat.item }}'
-              feature_name: "{{ leader_label\n   | regex_replace('^(area |floor |)leader:
-                ', '') }}\n"
-              resolved_scope: "{% if leader_label.startswith('area leader') %}\n  area\n{%
-                elif leader_label.startswith('floor leader') %}\n  floor\n{% else
-                %}\n  none\n{% endif %}\n"
+              feature_name: '{{ repeat.item }}'
+              leader_enabled: '{{ leader_features[repeat.item].enabled }}'
+              resolved_scope: '{{ leader_features[repeat.item].scope }}'
               resolved_area_id: '{{ area_id(leader_entity_id) }}
 
                 '
@@ -2152,32 +2138,6 @@
                 %}\n  {% for fid in floors() %}\n    {% if aid in floor_areas(fid)
                 %}\n      {% set ns.found = fid %}\n    {% endif %}\n  {% endfor %}\n
                 \ {{ ns.found }}\n{% else %}\n  {{ '' }}\n{% endif %}\n"
-              leader_inverted: '{{ (feature_name + '' invert: true'') in all_leader_label_names
-                }}
-
-                '
-              leader_enable_value: "{% set pfx = feature_name + ' enable: ' %} {% set match = all_leader_label_names_original\n               |
-                select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
-                %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
-              leader_disable_value: "{% set pfx = feature_name + ' disable: ' %} {% set match = all_leader_label_names_original\n               |
-                select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
-                %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
-              leader_enabled_base: "{% if leader_enable_value != '' or leader_disable_value
-                != '' %}\n  {% set enabled_by_enable = leader_enable_value
-                != '' and\n     resolved_current_value | lower == leader_enable_value
-                | lower %}\n  {% set disabled_by_disable = leader_disable_value
-                != '' and\n     resolved_current_value | lower == leader_disable_value
-                | lower %}\n  {% if leader_enable_value != '' and leader_disable_value
-                != '' %}\n    {{ enabled_by_enable and not disabled_by_disable }}\n
-                \ {% elif leader_enable_value != '' %}\n    {{ enabled_by_enable
-                }}\n  {% else %}\n    {{ not disabled_by_disable }}\n  {% endif %}\n{%
-                else %}\n  {{ resolved_current_value | lower in ['on', 'true', 'home',
-                'open',\n                                        'detected', 'active',
-                'unlocked'] }}\n{% endif %}\n"
-              leader_enabled: '{{ (not leader_enabled_base) if leader_inverted else
-                leader_enabled_base }}
-
-                '
               leader_only: "{% set only_label = feature_name + ' only: ' %} {% set
                 match = all_leader_label_names\n               | select('match', '^'
                 + only_label + '(enable|disable)$')\n               | first | default('')
