@@ -2099,7 +2099,7 @@
     '
   triggers:
   - trigger: state
-    entity_id: sensor.feature_leader_last_changed
+    entity_id: sensor.labeled_features_state
     attribute: leaders
   conditions: []
   mode: queued
@@ -2118,8 +2118,8 @@
           resolved_current_value: '{{ states(leader_entity_id) }}
 
             '
-          resolved_previous_value: "{{ trigger.from_state.attributes.leaders\n
-            \  .get(leader_entity_id, {}).get('value', '') }}\n"
+          resolved_previous_value: "{{ trigger.to_state.attributes.leaders\n
+            \  .get(leader_entity_id, {}).get('previous_value', '') }}\n"
           is_increasing: "{% set cur = resolved_current_value | float(-99999) %} {%
             set prev = resolved_previous_value | float(-99999) %} {% if cur != -99999
             and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{%
@@ -2186,28 +2186,29 @@
                 %}\n  increasing\n{% elif (feature_name + ' decreasing: true') in
                 all_leader_label_names %}\n  decreasing\n{% else %}\n  none\n{% endif
                 %}\n"
-              leader_before_time: "{% set pfx = feature_name + ' before: ' %} {{ all_leader_label_names_original\n
-                \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n
-                \  | regex_replace('(?i)^.+: ', '') }}\n"
-              leader_after_time: "{% set pfx = feature_name + ' after: ' %} {{ all_leader_label_names_original\n
-                \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n
-                \  | regex_replace('(?i)^.+: ', '') }}\n"
-              leader_not_before_time: "{% set pfx = feature_name + ' not before: '
-                %} {{ all_leader_label_names_original\n   | select('match', '(?i)^'
-                + pfx + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+:
-                ', '') }}\n"
-              leader_not_after_time: "{% set pfx = feature_name + ' not after: ' %}
-                {{ all_leader_label_names_original\n   | select('match', '(?i)^' +
-                pfx + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+:
-                ', '') }}\n"
+              leader_between: "{{ all_leader_label_names_original\n   | select('match',
+                '(?i)^' + feature_name + ' between: .+')\n   | map('regex_replace',
+                '(?i)^.+: ', '')\n   | list }}\n"
+              leader_not_between: "{{ all_leader_label_names_original\n   | select('match',
+                '(?i)^' + feature_name + ' not between: .+')\n   | map('regex_replace',
+                '(?i)^.+: ', '')\n   | list }}\n"
               leader_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set
-                ok = true %} {% if leader_before_time != '' %}\n  {% set ok = ok and
-                now_time < leader_before_time %}\n{% endif %} {% if leader_after_time
-                != '' %}\n  {% set ok = ok and now_time > leader_after_time %}\n{%
-                endif %} {% if leader_not_before_time != '' %}\n  {% set ok = ok and
-                now_time >= leader_not_before_time %}\n{% endif %} {% if leader_not_after_time
-                != '' %}\n  {% set ok = ok and now_time <= leader_not_after_time %}\n{%
-                endif %} {{ ok }}\n"
+                ns = namespace(ok=true, any_b=false) %} {% for val in leader_between
+                %} {% set p = val.split(':') %} {% set s = p[0]+':'+p[1] if (p|length==4
+                or (p|length==3 and p[2]=='-')) and p[0]!='-' else '-' %} {% set
+                e = p[2]+':'+p[3] if p|length==4 else (p[1]+':'+p[2] if p|length==3
+                and p[0]=='-' else '-') %} {% set in_r = ((s=='-' or now_time>=s)
+                and (e=='-' or now_time<=e)) if (s=='-' or e=='-' or s<=e) else (now_time>=s
+                or now_time<=e) %} {% if in_r %}{% set ns.any_b = true %}{% endif
+                %} {% endfor %} {% if leader_between|length > 0 %}{% set ns.ok =
+                ns.any_b %}{% endif %} {% for val in leader_not_between %} {% set
+                p = val.split(':') %} {% set s = p[0]+':'+p[1] if (p|length==4 or
+                (p|length==3 and p[2]=='-')) and p[0]!='-' else '-' %} {% set e =
+                p[2]+':'+p[3] if p|length==4 else (p[1]+':'+p[2] if p|length==3
+                and p[0]=='-' else '-') %} {% set in_r = ((s=='-' or now_time>=s)
+                and (e=='-' or now_time<=e)) if (s=='-' or e=='-' or s<=e) else (now_time>=s
+                or now_time<=e) %} {% if in_r %}{% set ns.ok = false %}{% endif %}
+                {% endfor %} {{ ns.ok }}\n"
               leader_should_proceed: '{% if leader_only == ''enable'' and not leader_enabled
                 %} false {% elif leader_only == ''disable'' and leader_enabled %}
                 false {% elif leader_direction == ''increasing'' and not is_increasing

@@ -23,26 +23,13 @@ notify:
     media_player: media_player.home_tts
 template:
   - sensor:
-    - name: "Feature Leader Last Changed"
-      unique_id: feature_leader_last_changed
+    - name: "Labeled Features State"
+      unique_id: labeled_features_state
       availability: >
         {{ label_entities('feature_leader') | count > 0 }}
       state: >
         {{ label_entities('feature_leader') | list | count }}
       attributes:
-        last_changed: >
-          {% set entities = expand(label_entities('feature_leader'))
-              | sort(attribute='last_changed_timestamp') %}
-          {% set ns = namespace(result={}) %}
-          {% for e in entities %}
-            {% set ns.result = dict(ns.result, **{
-              e.entity_id: {
-                'value': e.state,
-                'last_changed_timestamp': e.last_changed_timestamp
-              }
-            }) %}
-          {% endfor %}
-          {{ ns.result }}
         last_updated_at: >
           {% set entities = expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp') | list %}
@@ -52,13 +39,15 @@ template:
             {{ 0 }}
           {% endif %}
         leaders: >
+          {% set prev = this.attributes.leaders | default({}) %}
           {% set entities = expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp') %}
           {% set ns = namespace(result={}) %}
           {% for e in entities %}
             {% set ns.result = dict(ns.result, **{
               e.entity_id: {
-                'value': e.state,
+                'current_value': e.state,
+                'previous_value': prev.get(e.entity_id, {}).get('current_value', ''),
                 'last_changed_timestamp': e.last_changed_timestamp
               }
             }) %}
@@ -102,7 +91,8 @@ template:
                   fname: {
                     'leader_entity_id': entity.entity_id,
                     'value': entity.state,
-                    'enabled': feat_enabled
+                    'enabled': feat_enabled,
+                    'timestamp': entity.last_changed_timestamp
                   }
                 }) %}
               {% endif %}

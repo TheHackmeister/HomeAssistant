@@ -3037,25 +3037,27 @@ labeled_feature_follower:
         = follower_label_names\n               | select('match', '^' + only_label
         + '(enable|disable)$')\n               | first | default('') %}\n{{ match
         | regex_replace('^.+: ', '') }}\n"
-      follower_before_time: "{% set pfx = feature_name + ' before: ' %} {{ follower_label_names_original\n
-        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
-        regex_replace('(?i)^.+: ', '') }}\n"
-      follower_after_time: "{% set pfx = feature_name + ' after: ' %} {{ follower_label_names_original\n
-        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
-        regex_replace('(?i)^.+: ', '') }}\n"
-      follower_not_before_time: "{% set pfx = feature_name + ' not before: ' %} {{
-        follower_label_names_original\n   | select('match', '(?i)^' + pfx + '.+')\n
-        \  | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
-      follower_not_after_time: "{% set pfx = feature_name + ' not after: ' %} {{ follower_label_names_original\n
-        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
-        regex_replace('(?i)^.+: ', '') }}\n"
-      follower_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set ok =
-        true %} {% if follower_before_time != '' %}\n  {% set ok = ok and now_time
-        < follower_before_time %}\n{% endif %} {% if follower_after_time != '' %}\n
-        \ {% set ok = ok and now_time > follower_after_time %}\n{% endif %} {% if
-        follower_not_before_time != '' %}\n  {% set ok = ok and now_time >= follower_not_before_time
-        %}\n{% endif %} {% if follower_not_after_time != '' %}\n  {% set ok = ok and
-        now_time <= follower_not_after_time %}\n{% endif %} {{ ok }}\n"
+      follower_between: "{{ follower_label_names_original\n   | select('match', '(?i)^'
+        + feature_name + ' between: .+')\n   | map('regex_replace', '(?i)^.+: ',
+        '')\n   | list }}\n"
+      follower_not_between: "{{ follower_label_names_original\n   | select('match',
+        '(?i)^' + feature_name + ' not between: .+')\n   | map('regex_replace', '(?i)^.+:
+        ', '')\n   | list }}\n"
+      follower_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set ns =
+        namespace(ok=true, any_b=false) %} {% for val in follower_between %} {% set
+        p = val.split(':') %} {% set s = p[0]+':'+p[1] if (p|length==4 or (p|length==3
+        and p[2]=='-')) and p[0]!='-' else '-' %} {% set e = p[2]+':'+p[3] if p|length==4
+        else (p[1]+':'+p[2] if p|length==3 and p[0]=='-' else '-') %} {% set in_r
+        = ((s=='-' or now_time>=s) and (e=='-' or now_time<=e)) if (s=='-' or e=='-'
+        or s<=e) else (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.any_b
+        = true %}{% endif %} {% endfor %} {% if follower_between|length > 0 %}{%
+        set ns.ok = ns.any_b %}{% endif %} {% for val in follower_not_between %} {%
+        set p = val.split(':') %} {% set s = p[0]+':'+p[1] if (p|length==4 or (p|length==3
+        and p[2]=='-')) and p[0]!='-' else '-' %} {% set e = p[2]+':'+p[3] if p|length==4
+        else (p[1]+':'+p[2] if p|length==3 and p[0]=='-' else '-') %} {% set in_r
+        = ((s=='-' or now_time>=s) and (e=='-' or now_time<=e)) if (s=='-' or e=='-'
+        or s<=e) else (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.ok =
+        false %}{% endif %} {% endfor %} {{ ns.ok }}\n"
       follower_should_act: '{% set only = follower_only | trim %} {% if only ==
         ''enable'' and not leader_enabled %} false {% elif only == ''disable'' and
         leader_enabled %} false {% elif only != '''' and only not in [''enable'',
@@ -3066,7 +3068,7 @@ labeled_feature_follower:
   - condition: template
     value_template: '{{ follower_should_act }}'
   - variables:
-      follower_target_value: "{% set pfx = feature_name + (' enable: ' if follower_enabled\n        else ' disable: ') %} {% set match = follower_label_names_original\n               |\n        select('match', '(?i)^' + pfx + '.+')\n               | first | default('')\n        %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_target_value: "{% set pfx = feature_name + (' enable: ' if follower_enabled\n        else ' disable: ') %} {% set match = follower_label_names_original\n               |\n        select('match', '(?i)^' + pfx + '.+')\n               | first | default('')\n        %} {% if match == '' %} {% set pfx2 = feature_name + ': ' %} {% set match\n        = follower_label_names_original | select('match', '(?i)^' + pfx2 + '.+')\n        | first | default('') %} {% endif %} {{ match | regex_replace('(?i)^.+: ',\n        '') | trim }}\n"
       follower_script: "{% set pfx = feature_name + ' script: ' %} {{ follower_label_names_original\n
         \  | select('match', '(?i)^' + pfx + 'script\\..+')\n   | first | default('')\n
         \  | regex_replace('(?i)^.+: ', '') }}\n"
