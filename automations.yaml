@@ -2103,6 +2103,7 @@
     attribute: leaders
   conditions: []
   mode: queued
+  max: 50
   actions:
   - variables:
       cutoff: '{{ trigger.from_state.attributes.last_updated_at | float(0) }}
@@ -2142,6 +2143,9 @@
                 %}\n  {% for fid in floors() %}\n    {% if aid in floor_areas(fid)
                 %}\n      {% set ns.found = fid %}\n    {% endif %}\n  {% endfor %}\n
                 \ {{ ns.found }}\n{% else %}\n  {{ '' }}\n{% endif %}\n"
+              resolved_scope_id: "{% if resolved_scope == 'area' %}\n  {{ resolved_area_id
+                }}\n{% elif resolved_scope == 'floor' %}\n  {{ resolved_floor_id }}\n{%
+                else %}\n  {{ '' }}\n{% endif %}\n"
               leader_only: "{% set only_label = feature_name + ' only: ' %} {% set
                 match = all_leader_label_names\n               | select('match', '^'
                 + only_label + '(enable|disable)$')\n               | first | default('')
@@ -2218,7 +2222,39 @@
                   leader_entity_id: '{{ leader_entity_id }}'
                   leader_enabled: '{{ leader_enabled }}'
                   scope: '{{ resolved_scope }}'
+                  scope_id: '{{ resolved_scope_id }}'
                 continue_on_error: true
+              - if:
+                - condition: template
+                  value_template: '{{ error is defined }}'
+                then:
+                - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == ''stop'' }}'
+                  then:
+                  - stop: 'Labeled Feature Leaders: error on follower {{ repeat.item
+                      }} (feature: {{ feature_name }}): {{ error }}'
+                    error: true
+                - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == ''log'' }}'
+                  then:
+                  - action: system_log.write
+                    data:
+                      level: error
+                      message: 'Labeled Feature Leaders: error calling follower for
+                        {{ repeat.item }} (feature: {{ feature_name }}): {{ error
+                        }}'
+                - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == ''alert'' }}'
+                  then:
+                  - action: script.send_alert
+                    data:
+                      alert_severity: high
+                      alert_title: Labeled Feature Leaders Error
+                      alert_message: 'Error calling follower for {{ repeat.item }}
+                        (feature: {{ feature_name }}): {{ error }}'
 - id: '1777371930626'
   alias: Buttons Bedroom 2
   description: ''

@@ -97,7 +97,8 @@ template:
           {{ ns.result }}
         features: >
           {% set ns = namespace(result={}) %}
-          {% for entity in expand(label_entities('feature_leader')) %}
+          {% for entity in expand(label_entities('feature_leader'))
+              | sort(attribute='last_changed_timestamp') %}
             {% set lbl_lower = labels(entity.entity_id)
                 | map('label_name') | reject('none') | map('lower') | list %}
             {% set lbl_orig  = labels(entity.entity_id)
