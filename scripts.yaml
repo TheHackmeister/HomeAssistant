@@ -3152,6 +3152,32 @@ labeled_feature_follower:
         {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
         {% endif %}{% endfor %}
         {{ ns.d }}
+  # === 3.1/3.2: Field-inspection helpers — validate Arg names + conditionally include std fields ===
+  - variables:
+      _enable_script_fields: >-
+        {% if follower_enable_script | trim != "" %}{{ state_attr(follower_enable_script | trim, 'fields') | default({}) }}{% else %}{{ {} }}{% endif %}
+      _enable_script_std_fields: >-
+        {% set sf = _enable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id}.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
+      _enable_script_invalid_args: >-
+        {% set sf = _enable_script_fields %}{% set ns = namespace(inv=[]) %}{% for k in _enable_script_args.keys() %}{% if k not in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}
+      _enable_script_valid_args: >-
+        {% set sf = _enable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _enable_script_args.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
+      _disable_script_fields: >-
+        {% if follower_disable_script | trim != "" %}{{ state_attr(follower_disable_script | trim, 'fields') | default({}) }}{% else %}{{ {} }}{% endif %}
+      _disable_script_std_fields: >-
+        {% set sf = _disable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id}.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
+      _disable_script_invalid_args: >-
+        {% set sf = _disable_script_fields %}{% set ns = namespace(inv=[]) %}{% for k in _disable_script_args.keys() %}{% if k not in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}
+      _disable_script_valid_args: >-
+        {% set sf = _disable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _disable_script_args.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
+      _default_script_fields: >-
+        {% if follower_default_script | trim != "" %}{{ state_attr(follower_default_script | trim, 'fields') | default({}) }}{% else %}{{ {} }}{% endif %}
+      _default_script_std_fields: >-
+        {% set sf = _default_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id}.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
+      _default_script_invalid_args: >-
+        {% set sf = _default_script_fields %}{% set ns = namespace(inv=[]) %}{% for k in _default_script_args.keys() %}{% if k not in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}
+      _default_script_valid_args: >-
+        {% set sf = _default_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _default_script_args.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
   # 1. Explicit Enable Script — runs when leader_enabled is true, regardless of value labels
   - if:
     - condition: template
@@ -3177,13 +3203,8 @@ labeled_feature_follower:
               value_template: '{{ follower_error_mode != ''stop'' }}'
             then:
             - action: '{{ follower_enable_script | trim }}'
-              data:
-                follower_entity_id: '{{ follower_entity_id }}'
-                feature: '{{ feature }}'
-                leader_entity_id: '{{ leader_entity_id }}'
-                leader_enabled: '{{ leader_enabled }}'
-                scope: '{{ scope }}'
-                scope_id: '{{ scope_id }}'
+              data: >
+                {{ _enable_script_std_fields }}
               continue_on_error: true
             - if:
               - condition: template
@@ -3211,23 +3232,39 @@ labeled_feature_follower:
                       }} (feature: {{ feature_name }}): {{ error }}'
             else:
             - action: '{{ follower_enable_script | trim }}'
-              data:
-                follower_entity_id: '{{ follower_entity_id }}'
-                feature: '{{ feature }}'
-                leader_entity_id: '{{ leader_entity_id }}'
-                leader_enabled: '{{ leader_enabled }}'
-                scope: '{{ scope }}'
-                scope_id: '{{ scope_id }}'
-        # Arg labels present: async call via script.turn_on with merged standard + Arg fields
+              data: >
+                {{ _enable_script_std_fields }}
+        # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
         default:
+        - if:
+          - condition: template
+            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
+          then:
+          - stop: 'Labeled Feature Follower: Arg field(s) {{ _enable_script_invalid_args }} not declared by {{ follower_enable_script }} (feature: {{ feature }})'
+            error: true
+        - if:
+          - condition: template
+            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
+          then:
+          - action: system_log.write
+            data:
+              level: warning
+              message: 'Labeled Feature Follower: Arg field(s) {{ _enable_script_invalid_args }} not declared by {{ follower_enable_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
+        - if:
+          - condition: template
+            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
+          then:
+          - action: script.send_alert
+            data:
+              alert_severity: high
+              alert_title: Labeled Feature Script Arg Error
+              alert_message: 'Arg field(s) {{ _enable_script_invalid_args }} not declared by {{ follower_enable_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
         - action: script.turn_on
           target:
             entity_id: '{{ follower_enable_script | trim }}'
           data:
             variables: >
-              {{ {'follower_entity_id': follower_entity_id, 'feature': feature,
-                  'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled,
-                  'scope': scope, 'scope_id': scope_id} | combine(_enable_script_args) }}
+              {{ _enable_script_std_fields | combine(_enable_script_valid_args) }}
   # 2. Explicit Disable Script — runs when leader_enabled is false, regardless of value labels
   - if:
     - condition: template
@@ -3253,13 +3290,8 @@ labeled_feature_follower:
               value_template: '{{ follower_error_mode != ''stop'' }}'
             then:
             - action: '{{ follower_disable_script | trim }}'
-              data:
-                follower_entity_id: '{{ follower_entity_id }}'
-                feature: '{{ feature }}'
-                leader_entity_id: '{{ leader_entity_id }}'
-                leader_enabled: '{{ leader_enabled }}'
-                scope: '{{ scope }}'
-                scope_id: '{{ scope_id }}'
+              data: >
+                {{ _disable_script_std_fields }}
               continue_on_error: true
             - if:
               - condition: template
@@ -3287,23 +3319,39 @@ labeled_feature_follower:
                       }} (feature: {{ feature_name }}): {{ error }}'
             else:
             - action: '{{ follower_disable_script | trim }}'
-              data:
-                follower_entity_id: '{{ follower_entity_id }}'
-                feature: '{{ feature }}'
-                leader_entity_id: '{{ leader_entity_id }}'
-                leader_enabled: '{{ leader_enabled }}'
-                scope: '{{ scope }}'
-                scope_id: '{{ scope_id }}'
-        # Arg labels present: async call via script.turn_on with merged standard + Arg fields
+              data: >
+                {{ _disable_script_std_fields }}
+        # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
         default:
+        - if:
+          - condition: template
+            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
+          then:
+          - stop: 'Labeled Feature Follower: Arg field(s) {{ _disable_script_invalid_args }} not declared by {{ follower_disable_script }} (feature: {{ feature }})'
+            error: true
+        - if:
+          - condition: template
+            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
+          then:
+          - action: system_log.write
+            data:
+              level: warning
+              message: 'Labeled Feature Follower: Arg field(s) {{ _disable_script_invalid_args }} not declared by {{ follower_disable_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
+        - if:
+          - condition: template
+            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
+          then:
+          - action: script.send_alert
+            data:
+              alert_severity: high
+              alert_title: Labeled Feature Script Arg Error
+              alert_message: 'Arg field(s) {{ _disable_script_invalid_args }} not declared by {{ follower_disable_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
         - action: script.turn_on
           target:
             entity_id: '{{ follower_disable_script | trim }}'
           data:
             variables: >
-              {{ {'follower_entity_id': follower_entity_id, 'feature': feature,
-                  'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled,
-                  'scope': scope, 'scope_id': scope_id} | combine(_disable_script_args) }}
+              {{ _disable_script_std_fields | combine(_disable_script_valid_args) }}
   # 3. Direct value OR Default Script (value wins; default script only if no value found)
   - if:
     - condition: template
@@ -3390,13 +3438,8 @@ labeled_feature_follower:
                   value_template: '{{ follower_error_mode != ''stop'' }}'
                 then:
                 - action: '{{ follower_default_script | trim }}'
-                  data:
-                    follower_entity_id: '{{ follower_entity_id }}'
-                    feature: '{{ feature }}'
-                    leader_entity_id: '{{ leader_entity_id }}'
-                    leader_enabled: '{{ leader_enabled }}'
-                    scope: '{{ scope }}'
-                    scope_id: '{{ scope_id }}'
+                  data: >
+                    {{ _default_script_std_fields }}
                   continue_on_error: true
                 - if:
                   - condition: template
@@ -3424,23 +3467,39 @@ labeled_feature_follower:
                           }} (feature: {{ feature_name }}): {{ error }}'
                 else:
                 - action: '{{ follower_default_script | trim }}'
-                  data:
-                    follower_entity_id: '{{ follower_entity_id }}'
-                    feature: '{{ feature }}'
-                    leader_entity_id: '{{ leader_entity_id }}'
-                    leader_enabled: '{{ leader_enabled }}'
-                    scope: '{{ scope }}'
-                    scope_id: '{{ scope_id }}'
-            # Arg labels present: async call via script.turn_on with merged standard + Arg fields
+                  data: >
+                    {{ _default_script_std_fields }}
+            # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
             default:
+            - if:
+              - condition: template
+                value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
+              then:
+              - stop: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} (feature: {{ feature }})'
+                error: true
+            - if:
+              - condition: template
+                value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
+              then:
+              - action: system_log.write
+                data:
+                  level: warning
+                  message: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
+            - if:
+              - condition: template
+                value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
+              then:
+              - action: script.send_alert
+                data:
+                  alert_severity: high
+                  alert_title: Labeled Feature Script Arg Error
+                  alert_message: 'Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
             - action: script.turn_on
               target:
                 entity_id: '{{ follower_default_script | trim }}'
               data:
                 variables: >
-                  {{ {'follower_entity_id': follower_entity_id, 'feature': feature,
-                      'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled,
-                      'scope': scope, 'scope_id': scope_id} | combine(_default_script_args) }}
+                  {{ _default_script_std_fields | combine(_default_script_valid_args) }}
       else:
       # 5. Fallback: turn_on/turn_off based on follower_enabled (post-invert)
       - if:

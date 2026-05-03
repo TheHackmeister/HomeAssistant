@@ -25,6 +25,8 @@ template:
   - sensor:
     - name: "Labeled Features State"
       unique_id: labeled_features_state
+      state_class: measurement
+      unit_of_measurement: leaders
       availability: >
         {{ label_entities('feature_leader') | count > 0 }}
       state: >

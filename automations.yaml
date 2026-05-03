@@ -2120,8 +2120,8 @@
       sequence:
       - variables:
           leader_entity_id: '{{ repeat.item }}'
-          is_increasing: "{% set cur = states(leader_entity_id) | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
-          is_decreasing: "{% set cur = states(leader_entity_id) | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
+          is_increasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
+          is_decreasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
           all_leader_label_names_original: "{{ labels(leader_entity_id)\n   | map('label_name')\n
             \  | reject('none')\n   | list }}\n"
           all_leader_label_names: "{{ labels(leader_entity_id)\n   | map('label_name')\n
@@ -2185,6 +2185,11 @@
                 %}
 
                 '
+              feature_error_mode: "{% set pfx = feature_name + ' error mode: ' %}\n
+                \  {% set match = all_leader_label_names\n     | select('match', '^'
+                + pfx + '(silent|log|alert|stop)$')\n     | first | default('') %}\n
+                \ {{ match | regex_replace('^.+: ', '') | default(automation_error_mode,
+                true) }}\n"
           - condition: template
             value_template: '{{ leader_should_proceed }}'
           - variables:
@@ -2230,14 +2235,14 @@
                 then:
                 - if:
                   - condition: template
-                    value_template: '{{ automation_error_mode == ''stop'' }}'
+                    value_template: '{{ feature_error_mode == ''stop'' }}'
                   then:
                   - stop: 'Labeled Feature Leaders: error on follower {{ repeat.item
                       }} (feature: {{ feature_name }}): {{ error }}'
                     error: true
                 - if:
                   - condition: template
-                    value_template: '{{ automation_error_mode == ''log'' }}'
+                    value_template: '{{ feature_error_mode == ''log'' }}'
                   then:
                   - action: system_log.write
                     data:
@@ -2247,7 +2252,7 @@
                         }}'
                 - if:
                   - condition: template
-                    value_template: '{{ automation_error_mode == ''alert'' }}'
+                    value_template: '{{ feature_error_mode == ''alert'' }}'
                   then:
                   - action: script.send_alert
                     data:
