@@ -1903,6 +1903,65 @@
           entity_ids: '{{ area_entities }}'
           device_ids: '{{ area_devices }}'
   mode: restart
+- id: '1770269885853'
+  alias: 'Boards: Daily Task Organization'
+  description: Runs all board organization tasks in sequence
+  triggers:
+  - trigger: time
+    at: 00:01:00
+  conditions: []
+  actions:
+  - action: script.boards_update_recurring_tasks
+    metadata: {}
+    data:
+      boardId: TrfngHQf8PWj9mnqC
+      from_swimlane_name: Today
+      from_list_name: Inbox/Reset
+  - action: script.boards_archive_past_unlabeled_tasks
+    metadata: {}
+    data:
+      boardId: TrfngHQf8PWj9mnqC
+      swimlane_name: Today
+  - action: script.boards_move_future_cards_to_default
+    metadata: {}
+    data:
+      boardId: TrfngHQf8PWj9mnqC
+      from_swimlane_name: Today
+      to_swimlane_name: Default
+  - action: script.boards_organize_by_labels
+    metadata: {}
+    data:
+      boardId: TrfngHQf8PWj9mnqC
+      swimlane_name: Default
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: 44anFDcaRYyswRToE
+      to_swimlaneId: M4ep8PQ4ooQzxrMAy
+      boardId: TrfngHQf8PWj9mnqC
+      timeDelta: 14
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: M4ep8PQ4ooQzxrMAy
+      to_swimlaneId: mi4eKny3uXdGWWmYr
+      boardId: TrfngHQf8PWj9mnqC
+      timeDelta: 7
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: mi4eKny3uXdGWWmYr
+      to_swimlaneId: 8M8Py44KDk8A7mcj4
+      boardId: TrfngHQf8PWj9mnqC
+      timeDelta: 1
+  - action: script.boards_next_week_s_tasks
+    metadata: {}
+    data:
+      from_swimlaneId: 8M8Py44KDk8A7mcj4
+      to_swimlaneId: diPoL2ZNgbaPj9xAh
+      boardId: TrfngHQf8PWj9mnqC
+      timeDelta: 0
+  mode: single
 - id: '1776536295923'
   alias: Labeled Feature Leaders
   description: 'Evaluates leader labels for each changed Feature Leader entity and

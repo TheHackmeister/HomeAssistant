@@ -370,25 +370,28 @@ audio_mood_play_in_area:
     action: script.turn_on
 boards_move_future_cards_to_default:
   sequence:
-  # Get all swimlanes to find the specified swimlanes by name
   - action: rest_command.get_board_swimlanes
     metadata: {}
     data:
       boardId: '{{ boardId }}'
     response_variable: all_swimlanes
-  
-  # Find the swimlane IDs by name
   - variables:
-      from_swimlane_match: >
-        {{ all_swimlanes.content | selectattr('title', 'eq', from_swimlane_name) | list }}
-      from_swimlaneId: >
-        {{ from_swimlane_match[0]._id if from_swimlane_match | length > 0 else '' }}
-      to_swimlane_match: >
-        {{ all_swimlanes.content | selectattr('title', 'eq', to_swimlane_name) | list }}
-      to_swimlaneId: >
-        {{ to_swimlane_match[0]._id if to_swimlane_match | length > 0 else '' }}
-  
-  # Validate we found both swimlanes
+      from_swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'',
+        from_swimlane_name) | list }}
+
+        '
+      from_swimlaneId: '{{ from_swimlane_match[0]._id if from_swimlane_match | length
+        > 0 else '''' }}
+
+        '
+      to_swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'',
+        to_swimlane_name) | list }}
+
+        '
+      to_swimlaneId: '{{ to_swimlane_match[0]._id if to_swimlane_match | length >
+        0 else '''' }}
+
+        '
   - if:
     - condition: template
       value_template: '{{ from_swimlaneId == "" or to_swimlaneId == "" }}'
@@ -397,32 +400,32 @@ boards_move_future_cards_to_default:
       metadata: {}
       data:
         level: error
-        message: 'Could not find required swimlanes. {{ from_swimlane_name }}: {{ from_swimlaneId }}, {{ to_swimlane_name }}: {{ to_swimlaneId }}'
+        message: 'Could not find required swimlanes. {{ from_swimlane_name }}: {{
+          from_swimlaneId }}, {{ to_swimlane_name }}: {{ to_swimlaneId }}'
     - stop: ''
-  
-  # Get all lists to have title lookup
   - action: rest_command.get_board_lists
     metadata: {}
     data:
       boardId: '{{ boardId }}'
     response_variable: all_lists
-  
-  # Get cards from source swimlane
+  - action: system_log.write
+    metadata: {}
+    data:
+      level: debug
+      message: 'Sample list structure: {{ all_lists.content[0] if all_lists.content
+        | length > 0 else "no lists" }}'
   - action: rest_command.get_cards_from_swimlane
     metadata: {}
     data:
       swimlaneId: '{{ from_swimlaneId }}'
       boardId: '{{ boardId }}'
     response_variable: from_cards
-  
-  # Get cards from target swimlane to discover which list IDs exist there
   - action: rest_command.get_cards_from_swimlane
     metadata: {}
     data:
       swimlaneId: '{{ to_swimlaneId }}'
       boardId: '{{ boardId }}'
     response_variable: to_cards
-  
   - if:
     - condition: template
       value_template: '{{ from_cards.content | count == 0 }}'
@@ -430,45 +433,89 @@ boards_move_future_cards_to_default:
     - action: persistent_notification.create
       metadata: {}
       data:
-        message: 'No cards found in {{ from_swimlane_name }} swimlane'
-  
+        message: No cards found in {{ from_swimlane_name }} swimlane
   - repeat:
       sequence:
-      # First check if this card is in the "Inbox/Reset" list
       - variables:
-          card_list_match: >
-            {{ all_lists.content | selectattr('_id', 'eq', repeat.item.listId) | list }}
-          card_list_title: >
-            {{ card_list_match[0].title if card_list_match | length > 0 else '' }}
-      
-      # Only process cards in "Inbox/Reset" list with future dates
+          card_list_match: '{{ all_lists.content | selectattr(''_id'', ''eq'', repeat.item.listId)
+            | list }}
+
+            '
+          card_list_title: '{{ card_list_match[0].title if card_list_match | length
+            > 0 else '''' }}
+
+            '
       - if:
         - condition: template
           value_template: '{{ card_list_title == "Inbox/Reset" }}'
         then:
+        - action: rest_command.get_card
+          metadata: {}
+          data:
+            boardId: '{{ boardId }}'
+            listId: '{{ repeat.item.listId }}'
+            cardId: '{{ repeat.item._id }}'
+          response_variable: full_card_details
         - if:
-          # Check if card has a future start date OR future due date
           - condition: template
-            value_template: >
-              {{ (repeat.item.startAt is defined and as_datetime(repeat.item.startAt) > now()) or
-                 (repeat.item.dueAt is defined and repeat.item.dueAt != None and as_datetime(repeat.item.dueAt) > now()) }}
+            value_template: "{{ (full_card_details.content.startAt is defined and
+              as_datetime(full_card_details.content.startAt) > now()) or\n   (full_card_details.content.dueAt
+              is defined and full_card_details.content.dueAt != None and as_datetime(full_card_details.content.dueAt)
+              > now()) }}\n"
           then:
           - action: system_log.write
             metadata: {}
             data:
               level: warning
-              message: 'Moving future card to {{ to_swimlane_name }}: {{ repeat.item.title }}'
+              message: 'Moving future card to {{ to_swimlane_name }}: {{ repeat.item.title
+                }}'
             enabled: true
-          
-          # Find the "Inbox/Reset" list in the target swimlane
           - variables:
-              to_list_ids_in_swimlane: >
-                {{ to_cards.content | map(attribute='listId') | unique | list }}
-              target_inbox_match: >
-                {{ all_lists.content | selectattr('_id', 'in', to_list_ids_in_swimlane) | selectattr('title', 'eq', 'Inbox/Reset') | list }}
-              target_inbox_id: >
-                {{ target_inbox_match[0]._id if target_inbox_match | length > 0 else '' }}
-          
+              to_list_ids_in_swimlane: '{{ to_cards.content | map(attribute=''listId'')
+                | unique | list }}
+
+                '
+              target_inbox_match: '{{ all_lists.content | selectattr(''_id'', ''in'',
+                to_list_ids_in_swimlane) | selectattr(''title'', ''eq'', ''Inbox/Reset'')
+                | list }}
+
+                '
+              target_inbox_id_from_cards: '{{ target_inbox_match[0]._id if target_inbox_match
+                | length > 0 else '''' }}
+
+                '
+          - if:
+            - condition: template
+              value_template: '{{ target_inbox_id_from_cards == "" }}'
+            then:
+            - action: system_log.write
+              metadata: {}
+              data:
+                level: warning
+                message: Inbox/Reset list in {{ to_swimlane_name }} appears empty.
+                  Finding it by process of elimination...
+            - variables:
+                all_inbox_lists: '{{ all_lists.content | selectattr(''title'', ''eq'',
+                  ''Inbox/Reset'') | list }}
+
+                  '
+                other_swimlane_list_ids: '{{ from_cards.content | map(attribute=''listId'')
+                  | unique | list }}
+
+                  '
+                candidate_inboxes: '{{ all_inbox_lists | rejectattr(''_id'', ''in'',
+                  other_swimlane_list_ids) | list }}
+
+                  '
+                target_inbox_id: '{{ candidate_inboxes[0]._id if candidate_inboxes
+                  | length > 0 else all_inbox_lists[0]._id }}
+
+                  '
+            else:
+            - variables:
+                target_inbox_id: '{{ target_inbox_id_from_cards }}
+
+                  '
           - if:
             - condition: template
               value_template: '{{ target_inbox_id != "" }}'
@@ -477,7 +524,7 @@ boards_move_future_cards_to_default:
               metadata: {}
               data:
                 cardId: '{{ repeat.item._id }}'
-                listId: '{{ repeat.item.listId }}'
+                listId: '{{ full_card_details.content.listId }}'
                 boardId: '{{ boardId }}'
                 swimlaneId: '{{ to_swimlaneId }}'
                 newListId: '{{ target_inbox_id }}'
@@ -487,11 +534,12 @@ boards_move_future_cards_to_default:
               metadata: {}
               data:
                 level: error
-                message: 'Cannot move card "{{ repeat.item.title }}": No Inbox/Reset list found in {{ to_swimlane_name }} swimlane'
+                message: 'Cannot move card "{{ repeat.item.title }}": No Inbox/Reset
+                  list found in {{ to_swimlane_name }} swimlane'
       for_each: '{{ from_cards.content }}'
-  
   alias: 'Boards: Move Future Cards to Default Inbox'
-  description: 'Moves cards with future dates from one swimlane Inbox to another'
+  description: Moves cards with future dates from one swimlane Inbox to another (FIXED
+    - fetches full card details)
   fields:
     boardId:
       selector:
@@ -575,12 +623,32 @@ boards_archive_past_unlabeled_tasks:
         - condition: template
           value_template: '{{ card_list_title == "Inbox/Reset" }}'
         then:
+        - action: rest_command.get_card
+          metadata: {}
+          data:
+            boardId: '{{ boardId }}'
+            listId: '{{ repeat.item.listId }}'
+            cardId: '{{ repeat.item._id }}'
+          response_variable: full_card_details
+        - action: system_log.write
+          metadata: {}
+          data:
+            level: info
+            message: 'get_card response status: {{ full_card_details.status }}, has
+              content: {{ full_card_details.content is defined }}'
+        - action: system_log.write
+          metadata: {}
+          data:
+            level: debug
+            message: 'Full card response: {{ full_card_details }}'
+        - variables:
+            card_label_ids: '{{ full_card_details.content.get(''labelIds'', []) if
+              full_card_details.content.get(''labelIds'') is not none else [] }}'
         - if:
           - condition: template
-            value_template: "{{ (repeat.item.labelIds is not defined or repeat.item.labelIds
-              == [] or repeat.item.labelIds | length == 0 or repeat.item.labelIds
-              == none) and\n (repeat.item.dueAt is defined and repeat.item.dueAt !=
-              None and as_datetime(repeat.item.dueAt) < now()) }}\n"
+            value_template: "{{ card_label_ids | length == 0 and\n   (full_card_details.content.dueAt
+              is defined and full_card_details.content.dueAt != None and as_datetime(full_card_details.content.dueAt)
+              < now()) }}\n"
           then:
           - action: system_log.write
             metadata: {}
@@ -593,16 +661,44 @@ boards_archive_past_unlabeled_tasks:
               level: info
               message: 'Attempting to archive: cardId={{ repeat.item._id }}, listId={{
                 repeat.item.listId }}, title={{ repeat.item.title }}'
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: info
+              message: Full card details - cardId={{ full_card_details.content._id
+                }}, listId={{ full_card_details.content.listId }}, swimlaneId={{ full_card_details.content.swimlaneId
+                }}
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: info
+              message: 'Archive URL will be: https://wekan.spencerslab.com/api/boards/{{
+                boardId }}/lists/{{ full_card_details.content.listId }}/cards/{{ repeat.item._id
+                }}'
           - action: rest_command.archive_card
             metadata: {}
             data:
               cardId: '{{ repeat.item._id }}'
-              listId: '{{ repeat.item.listId }}'
+              listId: '{{ full_card_details.content.listId }}'
               boardId: '{{ boardId }}'
             response_variable: archive_result
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: info
+              message: 'Archive result (with listId in payload): {{ archive_result
+                }}'
+          else:
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: debug
+              message: 'Skipping card "{{ repeat.item.title }}": has {{ card_label_ids
+                | length }} labels or not past due'
       for_each: '{{ today_cards.content }}'
   alias: 'Boards: Archive Past Unlabeled Tasks'
-  description: Archives cards with no labels and past due dates from Today Inbox
+  description: Archives cards with no labels and past due dates from Today Inbox (FIXED
+    - fetches full card details)
   fields:
     boardId:
       selector:
@@ -618,21 +714,25 @@ boards_archive_past_unlabeled_tasks:
       description: Name of the swimlane to check
       default: Today
       required: true
+boards_next_week_s_tasks:
+  sequence:
+  - action: rest_command.get_board_lists
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_lists
   - action: rest_command.get_cards_from_swimlane
     metadata: {}
     data:
       swimlaneId: '{{ from_swimlaneId }}'
       boardId: '{{ boardId }}'
     response_variable: source_cards
-  
-  # Get cards from target swimlane to discover which list IDs exist there
   - action: rest_command.get_cards_from_swimlane
     metadata: {}
     data:
       swimlaneId: '{{ to_swimlaneId }}'
       boardId: '{{ boardId }}'
     response_variable: target_cards
-  
   - if:
     - condition: template
       value_template: '{{ source_cards.content | count == 0 }}'
@@ -641,17 +741,18 @@ boards_archive_past_unlabeled_tasks:
       metadata: {}
       data:
         message: No board cards found to move. Consider refreshing the credentials
-  
   - repeat:
       sequence:
       - if:
         - condition: template
-          value_template: '{{ repeat.item.dueAt is not defined and repeat.item.startAt is not defined }}'
+          value_template: '{{ repeat.item.dueAt is not defined and repeat.item.startAt
+            is not defined }}'
         then: []
         else:
         - if:
           - condition: template
-            value_template: '{{ repeat.item.startAt is defined and as_datetime(repeat.item.startAt) < (now() + timedelta(days=timeDelta)) }}'
+            value_template: '{{ repeat.item.startAt is defined and as_datetime(repeat.item.startAt)
+              - timedelta(days=1) < (now() + timedelta(days=timeDelta)) }}'
           then:
           - action: system_log.write
             metadata: {}
@@ -659,20 +760,28 @@ boards_archive_past_unlabeled_tasks:
               level: warning
               message: 'Processing card: {{ repeat.item.title }}'
             enabled: true
-          
-          # Find the current list's title
           - variables:
-              current_list_match: >
-                {{ all_lists.content | selectattr('_id', 'eq', repeat.item.listId) | list }}
-              current_list_title: >
-                {{ current_list_match[0].title if current_list_match | length > 0 else '' }}
-              target_list_ids_in_swimlane: >
-                {{ target_cards.content | map(attribute='listId') | unique | list }}
-              target_list_match: >
-                {{ all_lists.content | selectattr('_id', 'in', target_list_ids_in_swimlane) | selectattr('title', 'eq', current_list_title) | list }}
-              target_list_id: >
-                {{ target_list_match[0]._id if target_list_match | length > 0 else '' }}
-          
+              current_list_match: '{{ all_lists.content | selectattr(''_id'', ''eq'',
+                repeat.item.listId) | list }}
+
+                '
+              current_list_title: '{{ current_list_match[0].title if current_list_match
+                | length > 0 else '''' }}
+
+                '
+              target_list_ids_in_swimlane: '{{ target_cards.content | map(attribute=''listId'')
+                | unique | list }}
+
+                '
+              target_list_match: '{{ all_lists.content | selectattr(''_id'', ''in'',
+                target_list_ids_in_swimlane) | selectattr(''title'', ''eq'', current_list_title)
+                | list }}
+
+                '
+              target_list_id: '{{ target_list_match[0]._id if target_list_match |
+                length > 0 else '''' }}
+
+                '
           - if:
             - condition: template
               value_template: '{{ target_list_id != "" }}'
@@ -691,13 +800,15 @@ boards_archive_past_unlabeled_tasks:
               metadata: {}
               data:
                 level: error
-                message: 'Cannot move card "{{ repeat.item.title }}": No list named "{{ current_list_title }}" found in target swimlane'
+                message: 'Cannot move card "{{ repeat.item.title }}": No list named
+                  "{{ current_list_title }}" found in target swimlane'
           enabled: true
-          
           else:
           - if:
             - condition: template
-              value_template: '{{ repeat.item.dueAt is defined and repeat.item.dueAt != None and as_datetime(repeat.item.dueAt) < (now() + timedelta(days=timeDelta)) }}'
+              value_template: '{{ repeat.item.dueAt is defined and repeat.item.dueAt
+                != None and as_datetime(repeat.item.dueAt) - timedelta(days=1) < (now()
+                + timedelta(days=timeDelta)) }}'
             then:
             - action: system_log.write
               metadata: {}
@@ -705,20 +816,28 @@ boards_archive_past_unlabeled_tasks:
                 level: warning
                 message: 'Processing card: {{ repeat.item.title }}'
               enabled: true
-            
-            # Find the current list's title
             - variables:
-                current_list_match: >
-                  {{ all_lists.content | selectattr('_id', 'eq', repeat.item.listId) | list }}
-                current_list_title: >
-                  {{ current_list_match[0].title if current_list_match | length > 0 else '' }}
-                target_list_ids_in_swimlane: >
-                  {{ target_cards.content | map(attribute='listId') | unique | list }}
-                target_list_match: >
-                  {{ all_lists.content | selectattr('_id', 'in', target_list_ids_in_swimlane) | selectattr('title', 'eq', current_list_title) | list }}
-                target_list_id: >
-                  {{ target_list_match[0]._id if target_list_match | length > 0 else '' }}
-            
+                current_list_match: '{{ all_lists.content | selectattr(''_id'', ''eq'',
+                  repeat.item.listId) | list }}
+
+                  '
+                current_list_title: '{{ current_list_match[0].title if current_list_match
+                  | length > 0 else '''' }}
+
+                  '
+                target_list_ids_in_swimlane: '{{ target_cards.content | map(attribute=''listId'')
+                  | unique | list }}
+
+                  '
+                target_list_match: '{{ all_lists.content | selectattr(''_id'', ''in'',
+                  target_list_ids_in_swimlane) | selectattr(''title'', ''eq'', current_list_title)
+                  | list }}
+
+                  '
+                target_list_id: '{{ target_list_match[0]._id if target_list_match
+                  | length > 0 else '''' }}
+
+                  '
             - if:
               - condition: template
                 value_template: '{{ target_list_id != "" }}'
@@ -737,10 +856,10 @@ boards_archive_past_unlabeled_tasks:
                 metadata: {}
                 data:
                   level: error
-                  message: 'Cannot move card "{{ repeat.item.title }}": No list named "{{ current_list_title }}" found in target swimlane'
+                  message: 'Cannot move card "{{ repeat.item.title }}": No list named
+                    "{{ current_list_title }}" found in target swimlane'
             enabled: true
       for_each: '{{ source_cards.content }}'
-  
   alias: 'Boards: Move Cards To Swimlane By Date'
   description: ''
   fields:
@@ -768,8 +887,139 @@ boards_archive_past_unlabeled_tasks:
           max: 100
       name: timeDelta
       required: true
-  alias: 'Boards: Move Cards To Swimlane By Date'
-  description: ''
+boards_organize_by_labels:
+  sequence:
+  - action: rest_command.get_board_swimlanes
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_swimlanes
+  - variables:
+      swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'', swimlane_name)
+        | list }}
+
+        '
+      swimlaneId: '{{ swimlane_match[0]._id if swimlane_match | length > 0 else ''''
+        }}
+
+        '
+  - if:
+    - condition: template
+      value_template: '{{ swimlaneId == "" }}'
+    then:
+    - action: system_log.write
+      metadata: {}
+      data:
+        level: error
+        message: 'Could not find swimlane: {{ swimlane_name }}'
+    - stop: ''
+      enabled: false
+  - action: rest_command.get_board_lists
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_lists
+  - action: rest_command.get_board
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: board_data
+  - variables:
+      all_labels: '{{ board_data.content.labels if board_data.content.labels is defined
+        else [] }}'
+  - action: rest_command.get_cards_from_swimlane
+    metadata: {}
+    data:
+      swimlaneId: '{{ swimlaneId }}'
+      boardId: '{{ boardId }}'
+    response_variable: swimlane_cards
+  - if:
+    - condition: template
+      value_template: '{{ swimlane_cards.content | count == 0 }}'
+    then:
+    - action: persistent_notification.create
+      metadata: {}
+      data:
+        message: No cards found in {{ swimlane_name }} swimlane
+  - variables:
+      list_ids_in_swimlane: '{{ swimlane_cards.content | map(attribute=''listId'')
+        | unique | list }}'
+      lists_in_swimlane: '{{ all_lists.content | selectattr(''_id'', ''in'', list_ids_in_swimlane)
+        | list }}'
+  - repeat:
+      sequence:
+      - action: rest_command.get_card
+        metadata: {}
+        data:
+          boardId: '{{ boardId }}'
+          listId: '{{ repeat.item.listId }}'
+          cardId: '{{ repeat.item._id }}'
+        response_variable: full_card_details
+      - variables:
+          card_label_ids: '{{ full_card_details.content.get(''labelIds'', []) if full_card_details.content.get(''labelIds'')
+            is not none else [] }}'
+      - if:
+        - condition: template
+          value_template: '{{ card_label_ids | length > 0 }}'
+        then:
+        - variables:
+            current_list_match: '{{ all_lists.content | selectattr(''_id'', ''eq'',
+              full_card_details.content.listId) | list }}
+
+              '
+            current_list_title: '{{ current_list_match[0].title if current_list_match
+              | length > 0 else '''' }}
+
+              '
+        - repeat:
+            sequence:
+            - variables:
+                label_match: '{{ all_labels | selectattr(''_id'', ''eq'', repeat.item)
+                  | list }}
+
+                  '
+                label_name: '{{ label_match[0].name if label_match | length > 0 else
+                  '''' }}
+
+                  '
+            - if:
+              - condition: template
+                value_template: '{{ label_name != "" }}'
+              then:
+              - variables:
+                  matching_list: '{{ lists_in_swimlane | selectattr(''title'', ''eq'',
+                    label_name) | list }}
+
+                    '
+                  target_list_id: '{{ matching_list[0]._id if matching_list | length
+                    > 0 else '''' }}
+
+                    '
+              - if:
+                - condition: template
+                  value_template: '{{ target_list_id != "" and target_list_id != full_card_details.content.listId
+                    }}'
+                then:
+                - action: system_log.write
+                  metadata: {}
+                  data:
+                    level: info
+                    message: Moving card "{{ full_card_details.content.title }}" from
+                      "{{ current_list_title }}" to "{{ label_name }}" based on label
+                - action: rest_command.move_card_to_swimlane
+                  metadata: {}
+                  data:
+                    cardId: '{{ full_card_details.content._id }}'
+                    listId: '{{ full_card_details.content.listId }}'
+                    boardId: '{{ boardId }}'
+                    swimlaneId: '{{ swimlaneId }}'
+                    newListId: '{{ target_list_id }}'
+                  response_variable: move_result
+            for_each: '{{ card_label_ids }}'
+      for_each: '{{ swimlane_cards.content }}'
+  alias: 'Boards: Organize Cards by Labels'
+  description: Moves cards to lists that match their label names (FIXED - fetches
+    full card details)
   fields:
     boardId:
       selector:
@@ -778,10 +1028,12 @@ boards_archive_past_unlabeled_tasks:
       description: Board ID
       default: TrfngHQf8PWj9mnqC
       required: false
-    from_swimlaneId:
+    swimlane_name:
       selector:
         text:
-      name: From Swimlane ID
+      name: Swimlane Name
+      description: Name of the swimlane to organize
+      default: Default
       required: true
 boards_update_recurring_tasks:
   sequence:
@@ -791,49 +1043,54 @@ boards_update_recurring_tasks:
       boardId: '{{ boardId }}'
     response_variable: all_swimlanes
   - variables:
-      today_swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'',
-        swimlane_name) | list }}
+      from_swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'',
+        from_swimlane_name) | list }}
 
         '
-      today_swimlaneId: '{{ today_swimlane_match[0]._id if today_swimlane_match |
-        length > 0 else '''' }}
+      from_swimlaneId: '{{ from_swimlane_match[0]._id if from_swimlane_match | length
+        > 0 else '''' }}
 
         '
   - if:
     - condition: template
-      value_template: '{{ today_swimlaneId == "" }}'
+      value_template: '{{ from_swimlaneId == "" }}'
     then:
     - action: system_log.write
       metadata: {}
       data:
         level: error
-        message: 'Could not find swimlane: {{ swimlane_name }}'
+        message: 'Could not find swimlane: {{ from_swimlane_name }}'
     - stop: ''
+      enabled: false
   - action: rest_command.get_board_lists
     metadata: {}
     data:
       boardId: '{{ boardId }}'
     response_variable: all_lists
-  - action: rest_command.get_board_labels
+  - action: rest_command.get_board
     metadata: {}
     data:
       boardId: '{{ boardId }}'
-    response_variable: all_labels
+    response_variable: board_data
+  - variables:
+      all_labels: '{{ board_data.content.labels if board_data.content.labels is defined
+        else [] }}'
   - action: rest_command.get_cards_from_swimlane
     metadata: {}
     data:
-      swimlaneId: '{{ today_swimlaneId }}'
+      swimlaneId: '{{ from_swimlaneId }}'
       boardId: '{{ boardId }}'
-    response_variable: today_cards
+    response_variable: from_cards
   - if:
     - condition: template
-      value_template: '{{ today_cards.content | count == 0 }}'
+      value_template: '{{ from_cards.content | count == 0 }}'
     then:
     - action: persistent_notification.create
       metadata: {}
       data:
-        message: No cards found in {{ swimlane_name }} swimlane
+        message: No cards found in {{ from_swimlane_name }} swimlane
     - stop: ''
+      enabled: false
   - repeat:
       sequence:
       - variables:
@@ -847,43 +1104,37 @@ boards_update_recurring_tasks:
             '
       - if:
         - condition: template
-          value_template: '{{ card_list_title == "Inbox/Reset" }}'
+          value_template: '{{ card_list_title == from_list_name }}'
         then:
+        - action: rest_command.get_card
+          metadata: {}
+          data:
+            boardId: '{{ boardId }}'
+            listId: '{{ repeat.item.listId }}'
+            cardId: '{{ repeat.item._id }}'
+          response_variable: full_card_details
+        - variables:
+            card_label_ids: '{{ full_card_details.content.get(''labelIds'', []) if
+              full_card_details.content.get(''labelIds'') is not none else [] }}'
         - if:
           - condition: template
-            value_template: '{{ repeat.item.labelIds is defined and repeat.item.labelIds
-              | length > 0 }}'
+            value_template: '{{ card_label_ids | length > 0 }}'
           then:
           - variables:
-              card_labels: "{% set label_names = [] %} {% for label_id in repeat.item.labelIds
-                %}\n  {% set label = all_labels.content | selectattr('_id', 'eq',
-                label_id) | list %}\n  {% if label | length > 0 %}\n    {% set _ =
-                label_names.append(label[0].name | lower) %}\n  {% endif %}\n{% endfor
-                %} {{ label_names }}\n"
-              has_weekly: '{{ ''weekly'' in card_labels }}
-
-                '
-              has_bi_weekly: '{{ ''bi-weekly'' in card_labels }}
-
-                '
-              has_monthly: '{{ ''monthly'' in card_labels }}
-
-                '
-              has_quarterly: '{{ ''quarterly'' in card_labels }}
-
-                '
-              has_bi_quarterly: '{{ ''bi-quarterly'' in card_labels }}
-
-                '
-              has_yearly: '{{ ''yearly'' in card_labels }}
-
-                '
-              has_bi_yearly: '{{ ''bi-yearly'' in card_labels }}
-
-                '
-              has_annually: '{{ ''annually'' in card_labels }}
-
-                '
+              card_label_names: "{% set names = namespace(items=[]) %} {% for label_id
+                in card_label_ids %}\n  {% set matching = all_labels | selectattr('_id',
+                'eq', label_id) | list %}\n  {% if matching | length > 0 %}\n    {%
+                set names.items = names.items + [matching[0].name | lower] %}\n  {%
+                endif %}\n{% endfor %} {{ names.items }}"
+              has_weekly: '{{ ''weekly'' in card_label_names }}'
+              has_bi_weekly: '{{ ''bi-weekly'' in card_label_names }}'
+              has_monthly: '{{ ''monthly'' in card_label_names }}'
+              has_bi_monthly: '{{ ''bi-monthly'' in card_label_names }}'
+              has_quarterly: '{{ ''quarterly'' in card_label_names }}'
+              has_bi_quarterly: '{{ ''bi-quarterly'' in card_label_names }}'
+              has_yearly: '{{ ''yearly'' in card_label_names }}'
+              has_bi_yearly: '{{ ''bi-yearly'' in card_label_names }}'
+              has_annually: '{{ ''annually'' in card_label_names }}'
           - variables:
               new_due_date: "{% if has_weekly %}\n  {{ (now() + timedelta(weeks=1)).isoformat()
                 }}\n{% elif has_bi_weekly %}\n  {{ (now() + timedelta(weeks=2)).isoformat()
@@ -892,12 +1143,12 @@ boards_update_recurring_tasks:
                 }}\n{% elif has_yearly %}\n  {{ (now() + timedelta(days=365)).isoformat()
                 }}\n{% elif has_bi_monthly %}\n  {{ (now() + timedelta(days=60)).isoformat()
                 }}\n{% elif has_bi_quarterly %}\n  {{ (now() + timedelta(days=180)).isoformat()
-                }}\n{% elif has_bi_yearly %}\n  {{ (now() + timedelta(days=365)).isoformat()
-                }}\n{% elif has_annually %}\n  {% if repeat.item.dueAt is defined
-                and repeat.item.dueAt != None %}\n    {{ (as_datetime(repeat.item.dueAt)
-                + timedelta(days=365)).isoformat() }}\n  {% else %}\n    {{ (now()
-                + timedelta(days=365)).isoformat() }}\n  {% endif %}\n{% else %}\n
-                \ \n{% endif %}\n"
+                }}\n{% elif has_bi_yearly %}\n  {{ (now() + timedelta(days=730)).isoformat()
+                }}\n{% elif has_annually %}\n  {% if full_card_details.content.dueAt
+                is defined and full_card_details.content.dueAt != None %}\n    {{
+                (as_datetime(full_card_details.content.dueAt) + timedelta(days=365)).isoformat()
+                }}\n  {% else %}\n    {{ (now() + timedelta(days=365)).isoformat()
+                }}\n  {% endif %}\n{% else %}\n  \n{% endif %}\n"
               recurrence_type: "{% if has_weekly %}\n  weekly\n{% elif has_monthly
                 %}\n  monthly\n{% elif has_quarterly %}\n  quarterly\n{% elif has_yearly
                 %}\n  yearly\n{% elif has_bi_weekly %}\n  bi-weekly\n{% elif has_bi_monthly
@@ -908,23 +1159,40 @@ boards_update_recurring_tasks:
             - condition: template
               value_template: '{{ recurrence_type != "none" }}'
             then:
-            - action: system_log.write
-              metadata: {}
-              data:
-                level: info
-                message: 'Updating {{ recurrence_type }} recurring task "{{ repeat.item.title
-                  }}" with new due date: {{ new_due_date }}'
-            - action: rest_command.update_card_due_date
-              metadata: {}
-              data:
-                cardId: '{{ repeat.item._id }}'
-                listId: '{{ repeat.item.listId }}'
-                boardId: '{{ boardId }}'
-                dueAt: '{{ new_due_date }}'
-              response_variable: update_result
-      for_each: '{{ today_cards.content }}'
+            - variables:
+                current_due_date: '{{ full_card_details.content.dueAt if full_card_details.content.dueAt
+                  is defined else none }}'
+                is_past_due: '{{ current_due_date is none or (current_due_date | as_datetime)
+                  < now() }}'
+            - if:
+              - condition: template
+                value_template: '{{ is_past_due }}'
+              then:
+              - action: system_log.write
+                metadata: {}
+                data:
+                  level: info
+                  message: 'Updating {{ recurrence_type }} recurring task "{{ repeat.item.title
+                    }}" with new due date: {{ new_due_date }}'
+              - action: rest_command.update_card_due_date
+                metadata: {}
+                data:
+                  cardId: '{{ full_card_details.content._id }}'
+                  listId: '{{ full_card_details.content.listId }}'
+                  boardId: '{{ boardId }}'
+                  dueAt: '{{ new_due_date }}'
+                response_variable: update_result
+              else:
+              - action: system_log.write
+                metadata: {}
+                data:
+                  level: debug
+                  message: Skipping "{{ repeat.item.title }}" - due date {{ current_due_date
+                    }} is in the future
+      for_each: '{{ from_cards.content }}'
   alias: 'Boards: Update Recurring Tasks'
-  description: Updates due dates for recurring tasks based on their labels
+  description: Updates due dates for recurring tasks based on their labels (FIXED
+    - fetches full card details)
   fields:
     boardId:
       selector:
@@ -933,12 +1201,19 @@ boards_update_recurring_tasks:
       description: Board ID
       default: TrfngHQf8PWj9mnqC
       required: false
-    swimlane_name:
+    from_swimlane_name:
       selector:
         text:
-      name: Swimlane Name
-      description: Name of the swimlane to check
+      name: From Swimlane Name
+      description: Swimlane to check for recurring tasks
       default: Today
+      required: true
+    from_list_name:
+      selector:
+        text:
+      name: From List Name
+      description: List to check for recurring tasks
+      default: Inbox/Reset
       required: true
 audio_area_based_media_actions:
   alias: 'Audio: Area Based Media Actions'

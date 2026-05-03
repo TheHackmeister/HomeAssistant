@@ -123,6 +123,36 @@ rest_command:
     headers:
       Authorization: !secret wekan_api_token
 
+  get_card:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/lists/{{ listId }}/cards/{{ cardId }}
+    method: GET
+    headers:
+      Authorization: !secret wekan_api_token
+  
+  update_card_due_date:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/lists/{{ listId }}/cards/{{ cardId }}
+    method: PUT
+    payload: >
+      {"dueAt": "{{ dueAt }}"}
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Authorization: !secret wekan_api_token
+  
+  get_board:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}
+    method: GET
+    headers:
+      Authorization: !secret wekan_api_token
+  archive_card:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/lists/{{ listId }}/cards/{{ cardId }}
+    method: PUT  
+    payload: '{"archive": "true", "listId": "{{ listId }}"}'
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Authorization: !secret wekan_api_token
+
   get_cards_from_swimlane:
     url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/swimlanes/{{ swimlaneId }}/cards
     method: GET
