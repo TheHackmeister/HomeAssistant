@@ -2218,8 +2218,7 @@
                   leader_entity_id: '{{ leader_entity_id }}'
                   leader_enabled: '{{ leader_enabled }}'
                   scope: '{{ resolved_scope }}'
-                continue_on_error: '{{ automation_error_mode in [''silent'', ''log'',
-                  ''alert''] }}'
+                continue_on_error: true
 - id: '1777371930626'
   alias: Buttons Bedroom 2
   description: ''
