@@ -2110,6 +2110,10 @@
         '
       changed_entities: "{{ expand(label_entities('feature_leader'))\n   | selectattr('last_changed_timestamp',
         '>', cutoff)\n   | map(attribute='entity_id')\n   | list }}\n"
+      automation_error_mode: "{% set em_label = labels('automation.labeled_feature_leaders')\n
+        \  | map('label_name') | reject('none')\n   | select('match', '(?i)^error
+        mode: .+')\n   | first | default('') %} {{ em_label | regex_replace('(?i)^error
+        mode: ', '') | default('log', true) }}\n"
   - repeat:
       for_each: '{{ changed_entities }}'
       sequence:
@@ -2214,6 +2218,8 @@
                   leader_entity_id: '{{ leader_entity_id }}'
                   leader_enabled: '{{ leader_enabled }}'
                   scope: '{{ resolved_scope }}'
+                continue_on_error: '{{ automation_error_mode in [''silent'', ''log'',
+                  ''alert''] }}'
 - id: '1777371930626'
   alias: Buttons Bedroom 2
   description: ''

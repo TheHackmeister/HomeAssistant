@@ -3007,7 +3007,7 @@ labeled_feature_follower:
         boolean: {}
     scope:
       name: Scope
-      description: Scope of the feature (area, floor, or all). If blank, derived from labels.
+      description: Scope of the feature (area, floor, or all).
       required: false
       selector:
         select:
@@ -3024,6 +3024,10 @@ labeled_feature_follower:
         \  | reject('none')\n   | map('lower')\n   | list }}\n"
       follower_domain: '{{ follower_entity_id.split(''.'')[0] }}'
   - variables:
+      follower_error_mode: "{% set em_pfx = feature_name + ' error mode: ' %} {%
+        set match = follower_label_names\n    | select('match', '^' + em_pfx + '(silent|log|alert|stop)$')\n
+        \   | first | default('') %} {{ match | regex_replace('^.+: ', '') | default('log',
+        true) }}\n"
       follower_inverted: '{{ (feature_name + '' invert: true'') in follower_label_names
         }}
 
@@ -3069,84 +3073,147 @@ labeled_feature_follower:
     value_template: '{{ follower_should_act }}'
   - variables:
       follower_target_value: "{% set pfx = feature_name + (' enable: ' if follower_enabled\n        else ' disable: ') %} {% set match = follower_label_names_original\n               |\n        select('match', '(?i)^' + pfx + '.+')\n               | first | default('')\n        %} {% if match == '' %} {% set pfx2 = feature_name + ': ' %} {% set match\n        = follower_label_names_original | select('match', '(?i)^' + pfx2 + '.+')\n        | first | default('') %} {% endif %} {{ match | regex_replace('(?i)^.+: ',\n        '') | trim }}\n"
-      follower_script: "{% set pfx = feature_name + ' script: ' %} {{ follower_label_names_original\n
-        \  | select('match', '(?i)^' + pfx + 'script\\..+')\n   | first | default('')\n
-        \  | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_enable_script: "{% set pfx = feature_name + ' enable script: ' %} {{
+        follower_label_names_original\n   | select('match', '(?i)^' + pfx + '.+')\n
+        \  | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_disable_script: "{% set pfx = feature_name + ' disable script: ' %}
+        {{ follower_label_names_original\n   | select('match', '(?i)^' + pfx + '.+')\n
+        \  | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_default_script: "{% set pfx = feature_name + ' script: ' %} {{ follower_label_names_original\n
+        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
+        regex_replace('(?i)^.+: ', '') }}\n"
+  # 1. Explicit Enable Script — runs when leader_enabled is true, regardless of value labels
   - if:
     - condition: template
-      value_template: '{{ follower_script != '''' }}'
+      value_template: '{{ follower_enable_script | trim != "" and leader_enabled |
+        bool }}'
     then:
-    - action: '{{ follower_script }}'
-      data:
-        follower_entity_id: '{{ follower_entity_id }}'
-        feature: '{{ feature }}'
-        leader_entity_id: '{{ leader_entity_id }}'
-        enabled: '{{ follower_enabled }}'
-    else:
     - if:
       - condition: template
-        value_template: '{{ follower_target_value != '''' }}'
+        value_template: '{{ follower_enable_script.startswith(''automation.'') or
+          follower_enable_script.startswith(''scene.'') }}'
       then:
-      - condition: template
-        value_template: '{{ states(follower_entity_id) != follower_target_value
-          }}
-
-          '
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain == ''select'' }}'
-        then:
-        - action: select.select_option
-          target:
-            entity_id: '{{ follower_entity_id }}'
-          data:
-            option: '{{ follower_target_value }}'
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain == ''input_select'' }}'
-        then:
-        - action: input_select.select_option
-          target:
-            entity_id: '{{ follower_entity_id }}'
-          data:
-            option: '{{ follower_target_value }}'
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain == ''number'' }}'
-        then:
-        - action: number.set_value
-          target:
-            entity_id: '{{ follower_entity_id }}'
-          data:
-            value: '{{ follower_target_value }}'
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain == ''input_number'' }}'
-        then:
-        - action: input_number.set_value
-          target:
-            entity_id: '{{ follower_entity_id }}'
-          data:
-            value: '{{ follower_target_value }}'
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain == ''text'' }}'
-        then:
-        - action: text.set_value
-          target:
-            entity_id: '{{ follower_entity_id }}'
-          data:
-            value: '{{ follower_target_value }}'
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain == ''input_text'' }}'
-        then:
-        - action: input_text.set_value
-          target:
-            entity_id: '{{ follower_entity_id }}'
-          data:
-            value: '{{ follower_target_value }}'
+      - action: '{{ follower_enable_script | trim }}'
+        data: {}
       else:
+      - action: '{{ follower_enable_script | trim }}'
+        data:
+          follower_entity_id: '{{ follower_entity_id }}'
+          feature: '{{ feature }}'
+          leader_entity_id: '{{ leader_entity_id }}'
+          leader_enabled: '{{ leader_enabled }}'
+          scope: '{{ scope }}'
+        continue_on_error: '{{ follower_error_mode in [''silent'', ''log'', ''alert'']
+          }}'
+  # 2. Explicit Disable Script — runs when leader_enabled is false, regardless of value labels
+  - if:
+    - condition: template
+      value_template: '{{ follower_disable_script | trim != "" and not (leader_enabled
+        | bool) }}'
+    then:
+    - if:
+      - condition: template
+        value_template: '{{ follower_disable_script.startswith(''automation.'') or
+          follower_disable_script.startswith(''scene.'') }}'
+      then:
+      - action: '{{ follower_disable_script | trim }}'
+        data: {}
+      else:
+      - action: '{{ follower_disable_script | trim }}'
+        data:
+          follower_entity_id: '{{ follower_entity_id }}'
+          feature: '{{ feature }}'
+          leader_entity_id: '{{ leader_entity_id }}'
+          leader_enabled: '{{ leader_enabled }}'
+          scope: '{{ scope }}'
+        continue_on_error: '{{ follower_error_mode in [''silent'', ''log'', ''alert'']
+          }}'
+  # 3. Direct value OR Default Script (value wins; default script only if no value found)
+  - if:
+    - condition: template
+      value_template: '{{ follower_target_value != "" }}'
+    then:
+    - condition: template
+      value_template: '{{ states(follower_entity_id) != follower_target_value }}'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == ''select'' }}'
+      then:
+      - action: select.select_option
+        target:
+          entity_id: '{{ follower_entity_id }}'
+        data:
+          option: '{{ follower_target_value }}'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == ''input_select'' }}'
+      then:
+      - action: input_select.select_option
+        target:
+          entity_id: '{{ follower_entity_id }}'
+        data:
+          option: '{{ follower_target_value }}'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == ''number'' }}'
+      then:
+      - action: number.set_value
+        target:
+          entity_id: '{{ follower_entity_id }}'
+        data:
+          value: '{{ follower_target_value }}'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == ''input_number'' }}'
+      then:
+      - action: input_number.set_value
+        target:
+          entity_id: '{{ follower_entity_id }}'
+        data:
+          value: '{{ follower_target_value }}'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == ''text'' }}'
+      then:
+      - action: text.set_value
+        target:
+          entity_id: '{{ follower_entity_id }}'
+        data:
+          value: '{{ follower_target_value }}'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == ''input_text'' }}'
+      then:
+      - action: input_text.set_value
+        target:
+          entity_id: '{{ follower_entity_id }}'
+        data:
+          value: '{{ follower_target_value }}'
+    else:
+    # 4. Default Script (only when no direct value label was found)
+    - if:
+      - condition: template
+        value_template: '{{ follower_default_script | trim != "" }}'
+      then:
+      - if:
+        - condition: template
+          value_template: '{{ follower_default_script.startswith(''automation.'')
+            or follower_default_script.startswith(''scene.'') }}'
+        then:
+        - action: '{{ follower_default_script | trim }}'
+          data: {}
+        else:
+        - action: '{{ follower_default_script | trim }}'
+          data:
+            follower_entity_id: '{{ follower_entity_id }}'
+            feature: '{{ feature }}'
+            leader_entity_id: '{{ leader_entity_id }}'
+            leader_enabled: '{{ leader_enabled }}'
+            scope: '{{ scope }}'
+          continue_on_error: '{{ follower_error_mode in [''silent'', ''log'', ''alert'']
+            }}'
+      else:
+      # 5. Fallback: turn_on/turn_off based on follower_enabled (post-invert)
       - if:
         - condition: template
           value_template: '{{ follower_domain == ''light'' }}'
