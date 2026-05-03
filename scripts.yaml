@@ -3108,6 +3108,30 @@ labeled_feature_follower:
             leader_enabled: '{{ leader_enabled }}'
             scope: '{{ scope }}'
           continue_on_error: true
+        - if:
+          - condition: template
+            value_template: '{{ error is defined }}'
+          then:
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode == ''log'' }}'
+            then:
+            - action: system_log.write
+              data:
+                level: error
+                message: 'Labeled Feature Follower: error calling enable script {{
+                  follower_enable_script }} for {{ follower_entity_id }} (feature:
+                  {{ feature_name }}): {{ error }}'
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode == ''alert'' }}'
+            then:
+            - action: script.send_alert
+              data:
+                alert_severity: high
+                alert_title: Labeled Feature Script Error
+                alert_message: 'Error calling enable script for {{ follower_entity_id
+                  }} (feature: {{ feature_name }}): {{ error }}'
         else:
         - action: '{{ follower_enable_script | trim }}'
           data:
@@ -3142,6 +3166,30 @@ labeled_feature_follower:
             leader_enabled: '{{ leader_enabled }}'
             scope: '{{ scope }}'
           continue_on_error: true
+        - if:
+          - condition: template
+            value_template: '{{ error is defined }}'
+          then:
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode == ''log'' }}'
+            then:
+            - action: system_log.write
+              data:
+                level: error
+                message: 'Labeled Feature Follower: error calling disable script {{
+                  follower_disable_script }} for {{ follower_entity_id }} (feature:
+                  {{ feature_name }}): {{ error }}'
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode == ''alert'' }}'
+            then:
+            - action: script.send_alert
+              data:
+                alert_severity: high
+                alert_title: Labeled Feature Script Error
+                alert_message: 'Error calling disable script for {{ follower_entity_id
+                  }} (feature: {{ feature_name }}): {{ error }}'
         else:
         - action: '{{ follower_disable_script | trim }}'
           data:
@@ -3237,6 +3285,30 @@ labeled_feature_follower:
                 leader_enabled: '{{ leader_enabled }}'
                 scope: '{{ scope }}'
               continue_on_error: true
+            - if:
+              - condition: template
+                value_template: '{{ error is defined }}'
+              then:
+              - if:
+                - condition: template
+                  value_template: '{{ follower_error_mode == ''log'' }}'
+                then:
+                - action: system_log.write
+                  data:
+                    level: error
+                    message: 'Labeled Feature Follower: error calling default script
+                      {{ follower_default_script }} for {{ follower_entity_id }} (feature:
+                      {{ feature_name }}): {{ error }}'
+              - if:
+                - condition: template
+                  value_template: '{{ follower_error_mode == ''alert'' }}'
+                then:
+                - action: script.send_alert
+                  data:
+                    alert_severity: high
+                    alert_title: Labeled Feature Script Error
+                    alert_message: 'Error calling default script for {{ follower_entity_id
+                      }} (feature: {{ feature_name }}): {{ error }}'
             else:
             - action: '{{ follower_default_script | trim }}'
               data:
