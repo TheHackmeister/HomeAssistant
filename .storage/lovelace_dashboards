@@ -55,6 +55,23 @@
         "mode": "storage",
         "url_path": "shoot-zone",
         "icon": "mdi:leaf"
+      },
+      {
+        "id": "lovelace",
+        "icon": "mdi:view-dashboard",
+        "title": "Overview",
+        "url_path": "lovelace",
+        "show_in_sidebar": true,
+        "require_admin": false,
+        "mode": "storage"
+      },
+      {
+        "id": "dashboard_areas",
+        "show_in_sidebar": true,
+        "title": "Areas",
+        "require_admin": false,
+        "mode": "storage",
+        "url_path": "dashboard-areas"
       }
     ]
   }

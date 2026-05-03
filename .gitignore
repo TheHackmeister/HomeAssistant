@@ -5,6 +5,11 @@
 !.gitignore
 !*.md
 !custom_components/compensation/*
+!.storage/lovelace_dashboards
+!.storage/scheduler.storage
+!.storage/lovelace_resources
+
+.ha_run.lock
 
 custom_components/*
 www/community/*
@@ -27,6 +32,7 @@ pyozw.sqlite
 traccar.xml
 zwcfg_*.xml
 zwscene.xml
+.cache/brands/integrations/
 
 # Don't need generated tts files.
 tts/*

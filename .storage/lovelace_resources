@@ -10,7 +10,7 @@
         "id": "3dad27db8da94fb59f8313d28147cf48"
       },
       {
-        "url": "/hacsfiles/scheduler-card/scheduler-card.js?hacstag=2862701573215",
+        "url": "/hacsfiles/scheduler-card/scheduler-card.js?hacstag=2862701574017",
         "type": "module",
         "id": "15836a4a20c74d5d95ecdfac45f62325"
       },
@@ -25,17 +25,17 @@
         "id": "99b5ab29ce08479e8e6faa37293fa205"
       },
       {
-        "url": "/hacsfiles/mini-media-player/mini-media-player-bundle.js?hacstag=1485208381169",
+        "url": "/hacsfiles/mini-media-player/mini-media-player-bundle.js?hacstag=14852083811611",
         "type": "module",
         "id": "c667e3b10d0b411c83756950becccde4"
       },
       {
-        "url": "/hacsfiles/button-card/button-card.js?hacstag=146194325412",
+        "url": "/hacsfiles/button-card/button-card.js?hacstag=146194325701",
         "type": "module",
         "id": "ed9c47ae7a604170bc963d1c88a2ca11"
       },
       {
-        "url": "/hacsfiles/flex-table-card/flex-table-card.js?hacstag=15629205810",
+        "url": "/hacsfiles/flex-table-card/flex-table-card.js?hacstag=15629205814",
         "type": "module",
         "id": "3a9ea86280844a688bea518f4d83cddd"
       },
@@ -55,7 +55,7 @@
         "id": "a5daad820efc473f861677026bcb5814"
       },
       {
-        "url": "/hacsfiles/battery-state-card/battery-state-card.js?hacstag=256292682321",
+        "url": "/hacsfiles/battery-state-card/battery-state-card.js?hacstag=256292682420",
         "type": "module",
         "id": "5c9e633bb14b46a997e5898bf439b063"
       },
@@ -80,7 +80,7 @@
         "id": "b8b0027eeed549b199ea4a5ec620ef91"
       },
       {
-        "url": "/hacsfiles/lovelace-grocy-chores-card/grocy-chores-card.js?hacstag=195671060202511",
+        "url": "/hacsfiles/lovelace-grocy-chores-card/grocy-chores-card.js?hacstag=195671060202612",
         "type": "module",
         "id": "6ba98f7a91a44923a4921e0e0a117785"
       },
@@ -111,12 +111,17 @@
       },
       {
         "id": "2edb355ccc15434f938ce6b4c0f82c1d",
-        "url": "/hacsfiles/light-entity-card/light-entity-card.js?hacstag=168744428613",
+        "url": "/hacsfiles/light-entity-card/light-entity-card.js?hacstag=168744428631",
         "type": "module"
       },
       {
         "id": "e63c449f90e34035ac2e915d507d24d5",
         "url": "/hacsfiles/lovelace-multiple-entity-row/multiple-entity-row.js?hacstag=178921037451",
+        "type": "module"
+      },
+      {
+        "id": "902eb35c1e514114904c5ff91912e7c9",
+        "url": "/hacsfiles/hass-alert2-ui/alert2.js?hacstag=8533699481195",
         "type": "module"
       }
     ]

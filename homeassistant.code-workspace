@@ -5,6 +5,12 @@
 		},
 		{
 			"path": "../../config"
+		},
+		{
+			"path": "../addons"
+		},
+		{
+			"path": "../../addons"
 		}
 	],
 	"settings": {

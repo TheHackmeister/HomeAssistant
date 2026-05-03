@@ -1,0 +1,1825 @@
+views:
+  - type: sections
+    max_columns: 4
+    title: Overview
+    path: overview
+    icon: ''
+    sections:
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+            filter:
+              include:
+                - domain: input_select
+                  name: '*Water*'
+              exclude: []
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Sensors
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient_.*_sensor') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient_.*_sensor') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Calibrated Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'sensor.\\1_calibrated_value') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_nutrient_v2
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.water_supply_by_volume_cancel_job
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_pressurize_electrolytes
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.water_supply_by_volume_plant_mix
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+            filter:
+              include:
+                - domain: input_select
+                  name: '*Zone*'
+              exclude: []
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 1'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: poc_01
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 1'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: poc_01
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 2'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_02
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 2'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_02
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 3'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_03
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 3'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_03
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 4'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_04
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 4'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_04
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 5'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_05
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 5'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_05
+                units: 1
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrients
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrients
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.root_zones') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.root_zones', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+    cards: []
+  - type: sections
+    max_columns: 4
+    title: Calibration
+    path: calibration
+    icon: ''
+    sections:
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Calibrated Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'sensor.\\1_calibrated_value') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: automation.calibrated_value_template_evalutation_trigger
+            tap_action:
+              action: more-info
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.calibrated_values_initalize_helpers_v2
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Raw Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Known Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'number.\\1_known_value') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Save
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'button.\\1_record') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: 'Clear '
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'button.\\1_clear') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+    layout: {}
+    cards: []
+  - type: sections
+    max_columns: 4
+    title: Alerting
+    path: alerting
+    sections:
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Calibrated Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'sensor.\\1_calibrated_value') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: automation.alerting
+            tap_action:
+              action: more-info
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: automation.water_supply_error_handling
+            tap_action:
+              action: more-info
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.send_alert
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Alert Check Minutes
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'number.\\1_alert_check_minutes') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Alert Low
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'number.\\1_alert_low') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Alert High
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'number.\\1_alert_high') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+  - type: sections
+    sections:
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+            filter:
+              include:
+                - domain: input_select
+                  name: '*Water*'
+              exclude: []
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_nutrient_v2
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_house_plants
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_pressurize_electrolytes
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.water_supply_by_volume_cancel_job
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.water_supply_by_volume_plant_mix
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.nutrient_dosing_initalize_helpers_v2
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: automation.dose_lights_every_hour
+            tap_action:
+              action: more-info
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: automation.dose_every_3_minutes
+            tap_action:
+              action: more-info
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: automation.dose_drain_and_refill_daily
+            tap_action:
+              action: more-info
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrients
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Seconds
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_seconds') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Double
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_double') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+            filter:
+              include:
+                - domain: input_select
+                  name: '*Zone*'
+              exclude: []
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 1'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: poc_01
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 1'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: poc_01
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 2'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_02
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 2'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_02
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 3'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_03
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 3'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_03
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 4'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_04
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 4'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_04
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 5'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_05
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 5'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_05
+                units: 1
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrients
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.root_zones') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.root_zones', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Seconds
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.root_zones') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.root_zones', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_seconds') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Double
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.root_zones') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.root_zones', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_double') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+    max_columns: 4
+    title: Dosing
+    cards: []
+    header: {}
+  - type: sections
+    max_columns: 4
+    title: V2
+    path: v2
+    sections:
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+            filter:
+              include:
+                - domain: input_select
+                  name: '*Water*'
+              exclude: []
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Sensors
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient_.*_sensor') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient_.*_sensor') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Stop Above
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient_.*_sensor') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient_.*_sensor') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_nutrient_v2
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_house_plants
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.dose_pressurize_electrolytes
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.water_supply_by_volume_cancel_job
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.water_supply_by_volume_plant_mix
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrients
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Seconds
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_seconds') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Double
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_double') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Calibrated Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'sensor.\\1_calibrated_value') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Raw Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Known Value
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'number.\\1_known_value') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Save
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'button.\\1_record') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: 'Clear '
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.water_supplies') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'calibrated_value(?!.*_2_point)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.water_supplies', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'calibrated_value(?!.*_2_point)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('sensor\.(.*)$', 'button.\\1_clear') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+            filter:
+              include:
+                - domain: input_select
+                  name: '*Zone*'
+              exclude: []
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 1'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: poc_01
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 1'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: poc_01
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 2'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_02
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 2'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_02
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 3'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_03
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 3'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_03
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 4'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_04
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 4'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_04
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Mist 5'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Electrolytes'
+                area_id: root_zone_05
+                units: 1
+          - show_name: true
+            show_icon: true
+            type: button
+            hold_action:
+              action: none
+            name: 'Dose: Drain 5'
+            icon: mdi:sprinkler-fire
+            tap_action:
+              action: perform-action
+              perform_action: script.dose_nutrient_v2
+              target: {}
+              data:
+                nutrient: 'Nutrient: Drain'
+                area_id: root_zone_05
+                units: 1
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrients
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.root_zones') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.root_zones', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set ns2.result = ns2.result + [{'entity': entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Seconds
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.root_zones') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.root_zones', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_seconds') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+      - type: grid
+        cards:
+          - type: custom:auto-entities
+            card:
+              type: entities
+              title: Nutrient Dose Double
+            filter:
+              template: |
+                {% set selected_zone = states('input_select.root_zones') %}
+                {% set nutrient_entities = labels() 
+                   | select('match', 'nutrient(?!.*sensor)') 
+                   | map('label_entities') 
+                   | sum(start=[]) %}
+                {% if selected_zone == 'All' %}
+                  {% set all_options = state_attr('input_select.root_zones', 'options') | reject('eq', 'All') | list %}
+                  {% set ns = namespace(all_area_entities=[]) %}
+                  {% for area in all_options %}
+                    {% set ns.all_area_entities = ns.all_area_entities + area_entities(area) %}
+                  {% endfor %}
+                  {% set filtered_entities = nutrient_entities | select('in', ns.all_area_entities) | list %}
+                {% else %}
+                  {% set filtered_entities = nutrient_entities | select('in', area_entities(selected_zone)) | list %}
+                {% endif %}
+                {% set ns2 = namespace(result=[]) %}
+                {% for entity in filtered_entities %}
+                  {% for label_id in labels() | select('match', 'nutrient(?!.*sensor)') %}
+                    {% if entity in label_entities(label_id) %}
+                      {% set dose_entity = entity | regex_replace('switch\.(.*)$', 'number.\\1_dose_double') %}
+                      {% set ns2.result = ns2.result + [{'entity': dose_entity, 'secondary_info': label_name(label_id)}] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+                {{ ns2.result }}
+              exclude: []
+            sort:
+              method: entity_id
+  - type: sections
+    max_columns: 4
+    title: Leaks
+    path: leaks
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: New section
+          - type: custom:auto-entities
+            card:
+              type: entities
+            filter:
+              include:
+                - options: {}
+                  attributes:
+                    device_class: moisture
+              exclude: []
