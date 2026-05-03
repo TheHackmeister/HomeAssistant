@@ -3057,8 +3057,8 @@ labeled_feature_follower:
         %}\n{% endif %} {% if follower_not_after_time != '' %}\n  {% set ok = ok and
         now_time <= follower_not_after_time %}\n{% endif %} {{ ok }}\n"
       follower_should_act: '{% set only = follower_only | trim %} {% if only ==
-        ''enable'' and not follower_enabled %} false {% elif only == ''disable'' and
-        follower_enabled %} false {% elif only != '''' and only not in [''enable'',
+        ''enable'' and not leader_enabled %} false {% elif only == ''disable'' and
+        leader_enabled %} false {% elif only != '''' and only not in [''enable'',
         ''disable''] %} false {% elif not follower_time_ok %} false {% else %} true
         {% endif %}
 
