@@ -21,13 +21,33 @@ notify:
     name: home_tts
     tts_service: tts.picotts_say
     media_player: media_player.home_tts
-light:
-  - platform: template
-    lights:
-      scene_night_bathroom_main:
-        friendly_name: "Scene Night (Bathroom Main)"
-        unique_id: scene_night_bathroom_main
-        value_template: |-
+template:
+  - sensor:
+    - name: "Feature Leader Last Changed"
+      state: >
+        {{ label_entities('feature_leader') | list | count }}
+      attributes:
+        last_changed: >
+          {% set entities = expand(label_entities('feature_leader'))
+              | sort(attribute='last_changed_timestamp') %}
+          {% set ns = namespace(result={}) %}
+          {% for e in entities %}
+            {% set ns.result = dict(ns.result, **{
+              e.entity_id: {
+                'value': e.state,
+                'last_changed_timestamp': e.last_changed_timestamp
+              }
+            }) %}
+          {% endfor %}
+          {{ ns.result }}
+        last_updated_at: >
+          {% set entities = expand(label_entities('feature_leader'))
+              | sort(attribute='last_changed_timestamp') | list %}
+          {% if entities | count > 0 %}
+            {{ entities | last | attr('last_changed_timestamp') }}
+          {% else %}
+            {{ 0 }}
+          {% endif %}
           {% for entity_ids in state_attr('scene.night_bathroom_main', 'entity_id') %}
             {% if is_state(entity_ids, 'on') %}
               {% if loop.index == 1 %}
@@ -97,25 +117,33 @@ rest_command:
   healthchecksio:
     url: https://hc-ping.com/89ba143b-b5bc-4074-bf95-b0897ec23102
     method: GET
+  get_board_swimlanes:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/swimlanes
+    method: GET
+    headers:
+      Authorization: !secret wekan_api_token
 
   get_cards_from_swimlane:
     url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/swimlanes/{{ swimlaneId }}/cards
     method: GET
+    headers: 
+      Authorization: !secret wekan_api_token
+
+  get_board_lists:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/lists
+    method: GET
     headers:
-      Authorization: >
-        Bearer !secret wekan_api_token
+      Authorization: !secret wekan_api_token
 
   move_card_to_swimlane:
     url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/lists/{{ listId }}/cards/{{ cardId }}
     method: PUT
     payload: >
-      {"swimlaneId": "{{ swimlaneId }}"}
+      {"swimlaneId": "{{ swimlaneId }}", "listId": "{{ newListId }}"}
     headers:
       Accept: application/json
       Content-Type: application/json
-      Authorization: >
-        Bearer !secret wekan_api_token
-
+      Authorization: !secret wekan_api_token
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'

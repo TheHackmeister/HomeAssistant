@@ -368,63 +368,111 @@ audio_mood_play_in_area:
 
         '
     action: script.turn_on
-boards_next_week_s_tasks:
+boards_move_future_cards_to_default:
   sequence:
+  # Get all swimlanes to find the specified swimlanes by name
+  - action: rest_command.get_board_swimlanes
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_swimlanes
+  
+  # Find the swimlane IDs by name
+  - variables:
+      from_swimlane_match: >
+        {{ all_swimlanes.content | selectattr('title', 'eq', from_swimlane_name) | list }}
+      from_swimlaneId: >
+        {{ from_swimlane_match[0]._id if from_swimlane_match | length > 0 else '' }}
+      to_swimlane_match: >
+        {{ all_swimlanes.content | selectattr('title', 'eq', to_swimlane_name) | list }}
+      to_swimlaneId: >
+        {{ to_swimlane_match[0]._id if to_swimlane_match | length > 0 else '' }}
+  
+  # Validate we found both swimlanes
+  - if:
+    - condition: template
+      value_template: '{{ from_swimlaneId == "" or to_swimlaneId == "" }}'
+    then:
+    - action: system_log.write
+      metadata: {}
+      data:
+        level: error
+        message: 'Could not find required swimlanes. {{ from_swimlane_name }}: {{ from_swimlaneId }}, {{ to_swimlane_name }}: {{ to_swimlaneId }}'
+    - stop: ''
+  
+  # Get all lists to have title lookup
+  - action: rest_command.get_board_lists
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_lists
+  
+  # Get cards from source swimlane
   - action: rest_command.get_cards_from_swimlane
     metadata: {}
     data:
       swimlaneId: '{{ from_swimlaneId }}'
       boardId: '{{ boardId }}'
-    response_variable: tasks
+    response_variable: from_cards
+  
+  # Get cards from target swimlane to discover which list IDs exist there
+  - action: rest_command.get_cards_from_swimlane
+    metadata: {}
+    data:
+      swimlaneId: '{{ to_swimlaneId }}'
+      boardId: '{{ boardId }}'
+    response_variable: to_cards
+  
   - if:
     - condition: template
-      value_template: '{{ tasks | count == 0 }}'
+      value_template: '{{ from_cards.content | count == 0 }}'
     then:
     - action: persistent_notification.create
       metadata: {}
       data:
-        message: No board cards found to move. Consider refreshing the credentials
+        message: 'No cards found in {{ from_swimlane_name }} swimlane'
+  
   - repeat:
       sequence:
+      # First check if this card is in the "Inbox/Reset" list
+      - variables:
+          card_list_match: >
+            {{ all_lists.content | selectattr('_id', 'eq', repeat.item.listId) | list }}
+          card_list_title: >
+            {{ card_list_match[0].title if card_list_match | length > 0 else '' }}
+      
+      # Only process cards in "Inbox/Reset" list with future dates
       - if:
         - condition: template
-          value_template: '"{{ repeat.item.dueAt is not defined and repeat.item.startAt
-            is not defined }}"'
-        then: []
-        else:
+          value_template: '{{ card_list_title == "Inbox/Reset" }}'
+        then:
         - if:
+          # Check if card has a future start date OR future due date
           - condition: template
-            value_template: '{{ repeat.item.startAt is defined and as_datetime(repeat.item.startAt)
-              < (now() +  timedelta( days=timeDelta )) }}'
+            value_template: >
+              {{ (repeat.item.startAt is defined and as_datetime(repeat.item.startAt) > now()) or
+                 (repeat.item.dueAt is defined and repeat.item.dueAt != None and as_datetime(repeat.item.dueAt) > now()) }}
           then:
           - action: system_log.write
             metadata: {}
             data:
               level: warning
-              message: '{{ repeat.item }}'
+              message: 'Moving future card to {{ to_swimlane_name }}: {{ repeat.item.title }}'
             enabled: true
-          - action: rest_command.move_card_to_swimlane
-            metadata: {}
-            data:
-              cardId: '{{ repeat.item._id }}'
-              listId: '{{ repeat.item.listId }}'
-              boardId: '{{ boardId }}'
-              swimlaneId: '{{ to_swimlaneId }}'
-            response_variable: tasks
-          enabled: true
-          else:
+          
+          # Find the "Inbox/Reset" list in the target swimlane
+          - variables:
+              to_list_ids_in_swimlane: >
+                {{ to_cards.content | map(attribute='listId') | unique | list }}
+              target_inbox_match: >
+                {{ all_lists.content | selectattr('_id', 'in', to_list_ids_in_swimlane) | selectattr('title', 'eq', 'Inbox/Reset') | list }}
+              target_inbox_id: >
+                {{ target_inbox_match[0]._id if target_inbox_match | length > 0 else '' }}
+          
           - if:
             - condition: template
-              value_template: '{{ repeat.item.dueAt is defined and repeat.item.dueAt
-                != None and as_datetime(repeat.item.dueAt) < (now() +  timedelta(
-                days=timeDelta )) }}'
+              value_template: '{{ target_inbox_id != "" }}'
             then:
-            - action: system_log.write
-              metadata: {}
-              data:
-                level: warning
-                message: '{{ repeat.item }}'
-              enabled: true
             - action: rest_command.move_card_to_swimlane
               metadata: {}
               data:
@@ -432,9 +480,267 @@ boards_next_week_s_tasks:
                 listId: '{{ repeat.item.listId }}'
                 boardId: '{{ boardId }}'
                 swimlaneId: '{{ to_swimlaneId }}'
-              response_variable: tasks
+                newListId: '{{ target_inbox_id }}'
+              response_variable: move_result
+            else:
+            - action: system_log.write
+              metadata: {}
+              data:
+                level: error
+                message: 'Cannot move card "{{ repeat.item.title }}": No Inbox/Reset list found in {{ to_swimlane_name }} swimlane'
+      for_each: '{{ from_cards.content }}'
+  
+  alias: 'Boards: Move Future Cards to Default Inbox'
+  description: 'Moves cards with future dates from one swimlane Inbox to another'
+  fields:
+    boardId:
+      selector:
+        text:
+      name: boardId
+      description: Board ID
+      default: TrfngHQf8PWj9mnqC
+      required: false
+    from_swimlane_name:
+      selector:
+        text:
+      name: From Swimlane Name
+      description: Name of the source swimlane (e.g., "Today")
+      default: Today
+      required: true
+    to_swimlane_name:
+      selector:
+        text:
+      name: To Swimlane Name
+      description: Name of the destination swimlane (e.g., "Default")
+      default: Default
+      required: true
+boards_archive_past_unlabeled_tasks:
+  sequence:
+  - action: rest_command.get_board_swimlanes
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_swimlanes
+  - variables:
+      today_swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'',
+        swimlane_name) | list }}
+
+        '
+      today_swimlaneId: '{{ today_swimlane_match[0]._id if today_swimlane_match |
+        length > 0 else '''' }}
+
+        '
+  - if:
+    - condition: template
+      value_template: '{{ today_swimlaneId == "" }}'
+    then:
+    - action: system_log.write
+      metadata: {}
+      data:
+        level: error
+        message: 'Could not find swimlane: {{ swimlane_name }}'
+    - stop: ''
+  - action: rest_command.get_board_lists
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_lists
+  - action: rest_command.get_cards_from_swimlane
+    metadata: {}
+    data:
+      swimlaneId: '{{ today_swimlaneId }}'
+      boardId: '{{ boardId }}'
+    response_variable: today_cards
+  - if:
+    - condition: template
+      value_template: '{{ today_cards.content | count == 0 }}'
+    then:
+    - action: persistent_notification.create
+      metadata: {}
+      data:
+        message: No cards found in {{ swimlane_name }} swimlane
+    - stop: ''
+  - repeat:
+      sequence:
+      - variables:
+          card_list_match: '{{ all_lists.content | selectattr(''_id'', ''eq'', repeat.item.listId)
+            | list }}
+
+            '
+          card_list_title: '{{ card_list_match[0].title if card_list_match | length
+            > 0 else '''' }}
+
+            '
+      - if:
+        - condition: template
+          value_template: '{{ card_list_title == "Inbox/Reset" }}'
+        then:
+        - if:
+          - condition: template
+            value_template: "{{ (repeat.item.labelIds is not defined or repeat.item.labelIds
+              == [] or repeat.item.labelIds | length == 0 or repeat.item.labelIds
+              == none) and\n (repeat.item.dueAt is defined and repeat.item.dueAt !=
+              None and as_datetime(repeat.item.dueAt) < now()) }}\n"
+          then:
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: info
+              message: 'Archiving past-due unlabeled card: {{ repeat.item.title }}'
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: info
+              message: 'Attempting to archive: cardId={{ repeat.item._id }}, listId={{
+                repeat.item.listId }}, title={{ repeat.item.title }}'
+          - action: rest_command.archive_card
+            metadata: {}
+            data:
+              cardId: '{{ repeat.item._id }}'
+              listId: '{{ repeat.item.listId }}'
+              boardId: '{{ boardId }}'
+            response_variable: archive_result
+      for_each: '{{ today_cards.content }}'
+  alias: 'Boards: Archive Past Unlabeled Tasks'
+  description: Archives cards with no labels and past due dates from Today Inbox
+  fields:
+    boardId:
+      selector:
+        text:
+      name: boardId
+      description: Board ID
+      default: TrfngHQf8PWj9mnqC
+      required: false
+    swimlane_name:
+      selector:
+        text:
+      name: Swimlane Name
+      description: Name of the swimlane to check
+      default: Today
+      required: true
+  - action: rest_command.get_cards_from_swimlane
+    metadata: {}
+    data:
+      swimlaneId: '{{ from_swimlaneId }}'
+      boardId: '{{ boardId }}'
+    response_variable: source_cards
+  
+  # Get cards from target swimlane to discover which list IDs exist there
+  - action: rest_command.get_cards_from_swimlane
+    metadata: {}
+    data:
+      swimlaneId: '{{ to_swimlaneId }}'
+      boardId: '{{ boardId }}'
+    response_variable: target_cards
+  
+  - if:
+    - condition: template
+      value_template: '{{ source_cards.content | count == 0 }}'
+    then:
+    - action: persistent_notification.create
+      metadata: {}
+      data:
+        message: No board cards found to move. Consider refreshing the credentials
+  
+  - repeat:
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ repeat.item.dueAt is not defined and repeat.item.startAt is not defined }}'
+        then: []
+        else:
+        - if:
+          - condition: template
+            value_template: '{{ repeat.item.startAt is defined and as_datetime(repeat.item.startAt) < (now() + timedelta(days=timeDelta)) }}'
+          then:
+          - action: system_log.write
+            metadata: {}
+            data:
+              level: warning
+              message: 'Processing card: {{ repeat.item.title }}'
             enabled: true
-      for_each: '{{ tasks.content }}'
+          
+          # Find the current list's title
+          - variables:
+              current_list_match: >
+                {{ all_lists.content | selectattr('_id', 'eq', repeat.item.listId) | list }}
+              current_list_title: >
+                {{ current_list_match[0].title if current_list_match | length > 0 else '' }}
+              target_list_ids_in_swimlane: >
+                {{ target_cards.content | map(attribute='listId') | unique | list }}
+              target_list_match: >
+                {{ all_lists.content | selectattr('_id', 'in', target_list_ids_in_swimlane) | selectattr('title', 'eq', current_list_title) | list }}
+              target_list_id: >
+                {{ target_list_match[0]._id if target_list_match | length > 0 else '' }}
+          
+          - if:
+            - condition: template
+              value_template: '{{ target_list_id != "" }}'
+            then:
+            - action: rest_command.move_card_to_swimlane
+              metadata: {}
+              data:
+                cardId: '{{ repeat.item._id }}'
+                listId: '{{ repeat.item.listId }}'
+                boardId: '{{ boardId }}'
+                swimlaneId: '{{ to_swimlaneId }}'
+                newListId: '{{ target_list_id }}'
+              response_variable: move_result
+            else:
+            - action: system_log.write
+              metadata: {}
+              data:
+                level: error
+                message: 'Cannot move card "{{ repeat.item.title }}": No list named "{{ current_list_title }}" found in target swimlane'
+          enabled: true
+          
+          else:
+          - if:
+            - condition: template
+              value_template: '{{ repeat.item.dueAt is defined and repeat.item.dueAt != None and as_datetime(repeat.item.dueAt) < (now() + timedelta(days=timeDelta)) }}'
+            then:
+            - action: system_log.write
+              metadata: {}
+              data:
+                level: warning
+                message: 'Processing card: {{ repeat.item.title }}'
+              enabled: true
+            
+            # Find the current list's title
+            - variables:
+                current_list_match: >
+                  {{ all_lists.content | selectattr('_id', 'eq', repeat.item.listId) | list }}
+                current_list_title: >
+                  {{ current_list_match[0].title if current_list_match | length > 0 else '' }}
+                target_list_ids_in_swimlane: >
+                  {{ target_cards.content | map(attribute='listId') | unique | list }}
+                target_list_match: >
+                  {{ all_lists.content | selectattr('_id', 'in', target_list_ids_in_swimlane) | selectattr('title', 'eq', current_list_title) | list }}
+                target_list_id: >
+                  {{ target_list_match[0]._id if target_list_match | length > 0 else '' }}
+            
+            - if:
+              - condition: template
+                value_template: '{{ target_list_id != "" }}'
+              then:
+              - action: rest_command.move_card_to_swimlane
+                metadata: {}
+                data:
+                  cardId: '{{ repeat.item._id }}'
+                  listId: '{{ repeat.item.listId }}'
+                  boardId: '{{ boardId }}'
+                  swimlaneId: '{{ to_swimlaneId }}'
+                  newListId: '{{ target_list_id }}'
+                response_variable: move_result
+              else:
+              - action: system_log.write
+                metadata: {}
+                data:
+                  level: error
+                  message: 'Cannot move card "{{ repeat.item.title }}": No list named "{{ current_list_title }}" found in target swimlane'
+            enabled: true
+      for_each: '{{ source_cards.content }}'
+  
   alias: 'Boards: Move Cards To Swimlane By Date'
   description: ''
   fields:
@@ -461,6 +767,178 @@ boards_next_week_s_tasks:
           min: 1
           max: 100
       name: timeDelta
+      required: true
+  alias: 'Boards: Move Cards To Swimlane By Date'
+  description: ''
+  fields:
+    boardId:
+      selector:
+        text:
+      name: boardId
+      description: Board ID
+      default: TrfngHQf8PWj9mnqC
+      required: false
+    from_swimlaneId:
+      selector:
+        text:
+      name: From Swimlane ID
+      required: true
+boards_update_recurring_tasks:
+  sequence:
+  - action: rest_command.get_board_swimlanes
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_swimlanes
+  - variables:
+      today_swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'',
+        swimlane_name) | list }}
+
+        '
+      today_swimlaneId: '{{ today_swimlane_match[0]._id if today_swimlane_match |
+        length > 0 else '''' }}
+
+        '
+  - if:
+    - condition: template
+      value_template: '{{ today_swimlaneId == "" }}'
+    then:
+    - action: system_log.write
+      metadata: {}
+      data:
+        level: error
+        message: 'Could not find swimlane: {{ swimlane_name }}'
+    - stop: ''
+  - action: rest_command.get_board_lists
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_lists
+  - action: rest_command.get_board_labels
+    metadata: {}
+    data:
+      boardId: '{{ boardId }}'
+    response_variable: all_labels
+  - action: rest_command.get_cards_from_swimlane
+    metadata: {}
+    data:
+      swimlaneId: '{{ today_swimlaneId }}'
+      boardId: '{{ boardId }}'
+    response_variable: today_cards
+  - if:
+    - condition: template
+      value_template: '{{ today_cards.content | count == 0 }}'
+    then:
+    - action: persistent_notification.create
+      metadata: {}
+      data:
+        message: No cards found in {{ swimlane_name }} swimlane
+    - stop: ''
+  - repeat:
+      sequence:
+      - variables:
+          card_list_match: '{{ all_lists.content | selectattr(''_id'', ''eq'', repeat.item.listId)
+            | list }}
+
+            '
+          card_list_title: '{{ card_list_match[0].title if card_list_match | length
+            > 0 else '''' }}
+
+            '
+      - if:
+        - condition: template
+          value_template: '{{ card_list_title == "Inbox/Reset" }}'
+        then:
+        - if:
+          - condition: template
+            value_template: '{{ repeat.item.labelIds is defined and repeat.item.labelIds
+              | length > 0 }}'
+          then:
+          - variables:
+              card_labels: "{% set label_names = [] %} {% for label_id in repeat.item.labelIds
+                %}\n  {% set label = all_labels.content | selectattr('_id', 'eq',
+                label_id) | list %}\n  {% if label | length > 0 %}\n    {% set _ =
+                label_names.append(label[0].name | lower) %}\n  {% endif %}\n{% endfor
+                %} {{ label_names }}\n"
+              has_weekly: '{{ ''weekly'' in card_labels }}
+
+                '
+              has_bi_weekly: '{{ ''bi-weekly'' in card_labels }}
+
+                '
+              has_monthly: '{{ ''monthly'' in card_labels }}
+
+                '
+              has_quarterly: '{{ ''quarterly'' in card_labels }}
+
+                '
+              has_bi_quarterly: '{{ ''bi-quarterly'' in card_labels }}
+
+                '
+              has_yearly: '{{ ''yearly'' in card_labels }}
+
+                '
+              has_bi_yearly: '{{ ''bi-yearly'' in card_labels }}
+
+                '
+              has_annually: '{{ ''annually'' in card_labels }}
+
+                '
+          - variables:
+              new_due_date: "{% if has_weekly %}\n  {{ (now() + timedelta(weeks=1)).isoformat()
+                }}\n{% elif has_bi_weekly %}\n  {{ (now() + timedelta(weeks=2)).isoformat()
+                }}\n{% elif has_monthly %}\n  {{ (now() + timedelta(days=30)).isoformat()
+                }}\n{% elif has_quarterly %}\n  {{ (now() + timedelta(days=90)).isoformat()
+                }}\n{% elif has_yearly %}\n  {{ (now() + timedelta(days=365)).isoformat()
+                }}\n{% elif has_bi_monthly %}\n  {{ (now() + timedelta(days=60)).isoformat()
+                }}\n{% elif has_bi_quarterly %}\n  {{ (now() + timedelta(days=180)).isoformat()
+                }}\n{% elif has_bi_yearly %}\n  {{ (now() + timedelta(days=365)).isoformat()
+                }}\n{% elif has_annually %}\n  {% if repeat.item.dueAt is defined
+                and repeat.item.dueAt != None %}\n    {{ (as_datetime(repeat.item.dueAt)
+                + timedelta(days=365)).isoformat() }}\n  {% else %}\n    {{ (now()
+                + timedelta(days=365)).isoformat() }}\n  {% endif %}\n{% else %}\n
+                \ \n{% endif %}\n"
+              recurrence_type: "{% if has_weekly %}\n  weekly\n{% elif has_monthly
+                %}\n  monthly\n{% elif has_quarterly %}\n  quarterly\n{% elif has_yearly
+                %}\n  yearly\n{% elif has_bi_weekly %}\n  bi-weekly\n{% elif has_bi_monthly
+                %}\n  bi-monthly\n{% elif has_bi_quarterly %}\n  bi-quarterly\n{%
+                elif has_bi_yearly %}\n  bi-yearly\n{% elif has_annually %}\n  annually\n{%
+                else %}\n  none\n{% endif %}\n"
+          - if:
+            - condition: template
+              value_template: '{{ recurrence_type != "none" }}'
+            then:
+            - action: system_log.write
+              metadata: {}
+              data:
+                level: info
+                message: 'Updating {{ recurrence_type }} recurring task "{{ repeat.item.title
+                  }}" with new due date: {{ new_due_date }}'
+            - action: rest_command.update_card_due_date
+              metadata: {}
+              data:
+                cardId: '{{ repeat.item._id }}'
+                listId: '{{ repeat.item.listId }}'
+                boardId: '{{ boardId }}'
+                dueAt: '{{ new_due_date }}'
+              response_variable: update_result
+      for_each: '{{ today_cards.content }}'
+  alias: 'Boards: Update Recurring Tasks'
+  description: Updates due dates for recurring tasks based on their labels
+  fields:
+    boardId:
+      selector:
+        text:
+      name: boardId
+      description: Board ID
+      default: TrfngHQf8PWj9mnqC
+      required: false
+    swimlane_name:
+      selector:
+        text:
+      name: Swimlane Name
+      description: Name of the swimlane to check
+      default: Today
       required: true
 audio_area_based_media_actions:
   alias: 'Audio: Area Based Media Actions'
@@ -1784,3 +2262,572 @@ send_alert:
   alias: Send Alert
   description: Sends alerts with different notification methods based on severity
     level
+init_plant_sensors:
+  alias: 'Plant Sensors: Create Plant'
+  description: Dynamically create plant monitoring sensors via MQTT discovery
+  mode: queued
+  max: 10
+  fields:
+    plants_to_create:
+      name: Number of Plants
+      description: How many plant sensors to create
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+    variety:
+      name: Plant Variety
+      description: Plant variety/type
+      default: plant
+      selector:
+        text:
+    source:
+      name: Source
+      description: Where the plant came from
+      selector:
+        text:
+    started_at:
+      name: Started Date/Time
+      description: When the plant was planted (defaults to now)
+      selector:
+        datetime:
+    starting_id:
+      name: Starting ID Override
+      description: Optional override for the starting plant ID number
+      selector:
+        number:
+          min: 0
+          max: 10000
+  sequence:
+  - variables:
+      ha_topic: homeassistant
+      counter_topic: plants/next_plant_id
+      current_id: "{% if starting_id is defined and starting_id is not none %}\n  {{
+        starting_id | int }}\n{% elif states('number.next_plant_id') not in ['unknown',
+        'unavailable', 'none'] %}\n  {{ states('number.next_plant_id') | int }}\n{%
+        else %}\n  0\n{% endif %}\n"
+      needs_counter_creation: "{{ states('number.next_plant_id') in ['unknown', 'unavailable',
+        'none'] \n    and (starting_id is not defined or starting_id is none) }}\n"
+      started_at: '{{ started_at if (started_at is defined and started_at is not none)
+        else now().isoformat() }}'
+  - if:
+    - condition: template
+      value_template: '{{ needs_counter_creation }}'
+    then:
+    - data:
+        topic: '{{ ha_topic }}/number/plant_tracking/next_plant_id/config'
+        retain: true
+        payload: "{\n  \"name\": \"Next Plant ID\",\n  \"unique_id\": \"next_plant_id_counter\",\n
+          \ \"object_id\": \"next_plant_id\",\n  \"state_topic\": \"{{ counter_topic
+          }}\",\n  \"command_topic\": \"{{ counter_topic }}\",\n  \"min\": 0,\n  \"max\":
+          100000,\n  \"step\": 1,\n  \"mode\": \"box\",\n  \"retain\": true,\n  \"device\":
+          {\n    \"identifiers\": [\"plant_tracking\"],\n    \"name\": \"Plant Tracking\",\n
+          \   \"manufacturer\": \"Curated Forest\"\n  }\n}\n"
+      action: mqtt.publish
+    - data:
+        topic: '{{ counter_topic }}'
+        retain: true
+        payload: '0'
+      action: mqtt.publish
+    - delay:
+        milliseconds: 500
+  - repeat:
+      count: '{{ plants_to_create | int }}'
+      sequence:
+      - variables:
+          plant_number: '{{ current_id | int + repeat.index - 1 }}'
+          plant_id: '{{ variety | default(''plant'') | lower | replace('' '', ''_'')
+            }}_{{ plant_number }}'
+          device_name: plant_id_{{ plant_id }}
+          plant_topic: plants/{{ plant_id }}
+      - data:
+          topic: '{{ ha_topic }}/sensor/{{ device_name }}/status/config'
+          retain: true
+          payload: "{{ {\n  \"name\": \"Growing For\",\n  \"unique_id\": device_name
+            ~ \"_grow_days\",\n  \"default_entity_id\": \"sensor.\" ~ device_name,\n
+            \ \"state_topic\": \"plants/update_every_hour\",\n  \"value_template\":
+            \"{{ ((as_timestamp(now()) - as_timestamp(state_attr('sensor.\" ~ device_name
+            ~ \"', 'started_at') | default(now(), true))) / 3600 / 24) | round(1)
+            }}\",\n  \"unit_of_measurement\": \"d\",\n  \"device_class\": \"duration\",\n
+            \ \"state_class\": \"measurement\",\n  \"json_attributes_topic\": plant_topic
+            ~ \"/attributes\",\n  \"device\": {\n    \"identifiers\": [device_name],\n
+            \   \"name\": variety | default('Plant') ~ ' #' ~ plant_number,\n    \"manufacturer\":
+            \"Curated Forest\",\n    \"model\": \"Plant Tracking\"\n  }\n} | to_json
+            }}\n"
+        action: mqtt.publish
+      - data:
+          topic: '{{ plant_topic }}/attributes'
+          retain: true
+          payload: "{{ {\n  'location_entity_id': '',\n  'record_entity_id': \"sensor.\"
+            ~ device_name ~ \"_records\",\n  'plant_id': plant_id,\n  'variety': variety
+            | default(''),\n  'source': source | default(''),\n  'started_at': started_at\n}
+            | to_json }}\n"
+        action: mqtt.publish
+      - data:
+          topic: '{{ ha_topic }}/sensor/{{ device_name }}_records/status/config'
+          retain: true
+          payload: "{{ {\n  \"name\": \"Records\",\n  \"unique_id\": device_name ~
+            \"_records\",\n  \"default_entity_id\": \"sensor.\" ~ device_name ~ \"_records\",\n
+            \ \"state_topic\": plant_topic ~ \"/records_count\",\n  \"command_topic\":
+            plant_topic ~ \"/records_count\",\n  \"state_class\": \"measurement\",\n
+            \ \"json_attributes_topic\": plant_topic ~ \"/records_attributes\",\n
+            \ \"values_template\": \"{{ value | float(0) }}\",\n  \"device\": {\n
+            \   \"identifiers\": [device_name],\n    \"name\": variety | default('Plant')
+            ~ ' #' ~ plant_number,\n    \"manufacturer\": \"Curated Forest\",\n    \"model\":
+            \"Plant Tracking Records\"\n  }\n} | to_json }}\n"
+        action: mqtt.publish
+      - delay:
+          milliseconds: 500
+      - if:
+        - condition: template
+          value_template: '{{ states(''sensor.'' ~ plant_id ~ ''_records'') in [''unknown'',
+            ''unavailable'',
+
+            ''none''] }}
+
+            '
+        then:
+        - data:
+            topic: '{{ plant_topic }}/records_attributes'
+            retain: true
+            payload: "{{ {\n  'record_id': 1,\n  'timestamp': started_at,\n  'quantity':
+              1.0,\n  'type': 'Planted',\n  'notes': variety\n} | to_json }}\n"
+          action: mqtt.publish
+        - data:
+            topic: '{{ plant_topic }}/records_count'
+            retain: true
+            payload: 1
+          action: mqtt.publish
+      - data:
+          topic: '{{ counter_topic }}'
+          retain: true
+          payload: '{{ plant_number | int + 1 }}'
+        action: mqtt.publish
+      - delay:
+          milliseconds: 200
+  - data:
+      topic: plants/update_every_hour
+      retain: true
+      payload: '{{ plants_to_create }}'
+    action: mqtt.publish
+  - data:
+      title: Plant Sensors Created
+      message: 'Created {{ plants_to_create }} plant sensor(s). Variety: {{ variety
+        | default(''N/A'') }} Starting ID: {{ current_id }} Ending ID: {{ current_id
+        | int + plants_to_create | int - 1 }}'
+    action: persistent_notification.create
+sensors_location_create_location:
+  sequence:
+  - variables:
+      ha_topic: homeassistant
+      counter_topic: locations/next_location_id
+      current_id: >
+        {% if starting_id is defined and starting_id is not none %}
+          {{ starting_id | int }}
+        {% elif states('number.next_location_id') not in ['unknown', 'unavailable',
+        'none'] %}
+          {{ states('number.next_location_id') | int }}
+        {% else %}
+          0
+        {% endif %}
+      needs_counter_creation: |
+        {{ states('number.next_location_id') in ['unknown', 'unavailable', 'none'] 
+            and (starting_id is not defined or starting_id is none) }}
+  - if:
+      - condition: template
+        value_template: "{{ needs_counter_creation }}"
+    then:
+      - data:
+          topic: "{{ ha_topic }}/number/location_tracking/next_location_id/config"
+          retain: true
+          payload: |
+            {
+              "name": "Next Location ID",
+              "unique_id": "next_location_id_counter",
+              "object_id": "next_location_id",
+              "state_topic": "{{ counter_topic }}",
+              "command_topic": "{{ counter_topic }}",
+              "min": 0,
+              "max": 100000,
+              "step": 1,
+              "mode": "box",
+              "retain": true,
+              "device": {
+                "identifiers": ["location_tracking"],
+                "name": "Location Tracking",
+                "manufacturer": "Curated Forest"
+              }
+            }
+        action: mqtt.publish
+      - data:
+          topic: "{{ counter_topic }}"
+          retain: true
+          payload: "0"
+        action: mqtt.publish
+      - delay:
+          milliseconds: 500
+  - repeat:
+      count: "{{ locations_to_create | int }}"
+      sequence:
+        - variables:
+            location_number: "{{ current_id | int + repeat.index - 1 }}"
+            location_id: >-
+              {{ location_name | default('location') | lower | replace(' ', '_') }}_{{
+              location_number }}
+            device_name: location_id_{{ location_id }}
+            location_topic: locations/{{ location_id }}
+        - data:
+            topic: "{{ ha_topic }}/switch/{{ device_name }}/usable/config"
+            retain: true
+            payload: |
+              {{ {
+                "name": "Usable",
+                "unique_id": device_name ~ "_usable",
+                "object_id": device_name,
+                "state_topic": location_topic ~ "/usable",
+                "command_topic": location_topic ~ "/usable/set",
+                "payload_on": "true",
+                "payload_off": "false",
+                "state_on": "true",
+                "state_off": "false",
+                "retain": true,
+                "json_attributes_topic": location_topic ~ "/attributes",
+                "device": {
+                  "identifiers": [device_name],
+                  "name": location_name | default('Location') ~ ' #' ~ location_number,
+                  "manufacturer": "Curated Forest",
+                  "model": "Location Tracking"
+                }
+              } | to_json }}
+          action: mqtt.publish
+        - data:
+            topic: "{{ location_topic }}/usable"
+            retain: true
+            payload: "true"
+          action: mqtt.publish
+        - data:
+            topic: "{{ location_topic }}/attributes"
+            retain: true
+            payload: |
+              {{ {
+                'location_id': location_id,
+                'location_name': location_name | default(''),
+                'root_zone': root_zone | default(''),
+                'shoot_zone': shoot_zone | default(''),
+                'water_supply': water_supply | default('')
+              } | to_json }}
+          action: mqtt.publish
+        - delay:
+            milliseconds: 200
+  - data:
+      title: Location Sensors Created
+      message: >-
+        Created {{ locations_to_create }} location sensor(s). Starting ID: {{ current_id }} Ending ID: {{ current_id
+        | int + locations_to_create | int - 1 }}
+    action: persistent_notification.create
+  alias: 'Sensors (Location): Create Location'
+  description: Dynamically create location monitoring sensors via MQTT discovery
+feature_leader:
+  alias: Feature Leader
+  mode: parallel
+  max: 25
+  fields:
+    leader_entity_id:
+      name: Leader Entity ID
+      description: The labeled leader entity that changed state
+      required: true
+      selector:
+        entity: {}
+    current_value:
+      name: Current Value
+      description: The current state value of the leader entity. Defaults to states(leader_entity_id)
+        if not passed.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    previous_value:
+      name: Previous Value
+      description: The previous state value of the leader entity before the change.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    scope:
+      name: Scope
+      description: 'Override scope detection: area, floor, or none'
+      required: false
+      default: ''
+      selector:
+        select:
+          options:
+          - ''
+          - area
+          - floor
+          - none
+    area_id_override:
+      name: Area ID Override
+      description: Explicit area ID, skips label-based area resolution
+      required: false
+      default: ''
+      selector:
+        area: {}
+    floor_id_override:
+      name: Floor ID Override
+      description: Explicit floor ID, skips label-based floor resolution
+      required: false
+      default: ''
+      selector:
+        floor: {}
+  sequence:
+  - variables:
+labeled_feature_follower:
+  alias: Labeled Feature Follower
+  mode: parallel
+  max: 50
+  fields:
+    follower_entity_id:
+      name: Follower Entity ID
+      description: The follower entity to act on
+      required: true
+      selector:
+        entity: {}
+    feature:
+      name: Feature
+      description: The feature name (e.g. 'night', 'screen')
+      required: true
+      selector:
+        text: {}
+    leader_entity_id:
+      name: Leader Entity ID
+      description: The leader that triggered this (optional, for reference)
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_enabled:
+      name: Leader Enabled
+      description: Post-evaluated leader enabled boolean, passed from the automation
+      required: true
+      selector:
+        boolean: {}
+  sequence:
+  - variables:
+      feature_name: '{{ feature | lower }}'
+      follower_label_names_original: "{{ labels(follower_entity_id)\n   | map('label_name')\n
+        \  | reject('none')\n   | list }}\n"
+      follower_label_names: "{{ labels(follower_entity_id)\n   | map('label_name')\n
+        \  | reject('none')\n   | map('lower')\n   | list }}\n"
+      follower_domain: '{{ follower_entity_id.split(''.'')[0] }}'
+  - variables:
+      follower_inverted: '{{ (feature_name + '' invert: true'') in follower_label_names
+        }}
+
+        '
+      follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled
+        }}
+
+        '
+  - variables:
+      follower_only: "{% set only_label = feature_name + ' only: ' %} {% set match
+        = follower_label_names\n               | select('match', '^' + only_label
+        + '(enable|disable)$')\n               | first | default('') %}\n{{ match
+        | regex_replace('^.+: ', '') }}\n"
+      follower_before_time: "{% set pfx = feature_name + ' before: ' %} {{ follower_label_names_original\n
+        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
+        regex_replace('(?i)^.+: ', '') }}\n"
+      follower_after_time: "{% set pfx = feature_name + ' after: ' %} {{ follower_label_names_original\n
+        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
+        regex_replace('(?i)^.+: ', '') }}\n"
+      follower_not_before_time: "{% set pfx = feature_name + ' not before: ' %} {{
+        follower_label_names_original\n   | select('match', '(?i)^' + pfx + '.+')\n
+        \  | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_not_after_time: "{% set pfx = feature_name + ' not after: ' %} {{ follower_label_names_original\n
+        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
+        regex_replace('(?i)^.+: ', '') }}\n"
+      follower_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set ok =
+        true %} {% if follower_before_time != '' %}\n  {% set ok = ok and now_time
+        < follower_before_time %}\n{% endif %} {% if follower_after_time != '' %}\n
+        \ {% set ok = ok and now_time > follower_after_time %}\n{% endif %} {% if
+        follower_not_before_time != '' %}\n  {% set ok = ok and now_time >= follower_not_before_time
+        %}\n{% endif %} {% if follower_not_after_time != '' %}\n  {% set ok = ok and
+        now_time <= follower_not_after_time %}\n{% endif %} {{ ok }}\n"
+      follower_should_act: '{% if follower_only == ''enable'' and not leader_enabled
+        %} false {% elif follower_only == ''disable'' and leader_enabled %} false
+        {% elif not follower_time_ok %} false {% else %} true {% endif %}
+
+        '
+  - condition: template
+    value_template: '{{ follower_should_act }}'
+  - variables:
+      follower_enable_select_value: "{% set pfx = feature_name + ' enable select:
+        ' %} {{ follower_label_names_original\n   | select('match', '(?i)^' + pfx
+        + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_disable_select_value: "{% set pfx = feature_name + ' disable select:
+        ' %} {{ follower_label_names_original\n   | select('match', '(?i)^' + pfx
+        + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_select_target_value: "{% if leader_enabled and follower_enable_select_value
+        != '' %}\n  {{ follower_enable_select_value }}\n{% elif not leader_enabled
+        and follower_disable_select_value != '' %}\n  {{ follower_disable_select_value
+        }}\n{% else %}\n  {{ '' }}\n{% endif %}\n"
+      follower_value_label: "{% set pfx = feature_name + (' enable: ' if follower_enabled
+        else ' disable: ') %} {% set match = follower_label_names_original\n               |
+        select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
+        %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
+      follower_script: "{% set pfx = feature_name + ' script: ' %} {{ follower_label_names_original\n
+        \  | select('match', '(?i)^' + pfx + 'script\\..+')\n   | first | default('')\n
+        \  | regex_replace('(?i)^.+: ', '') }}\n"
+  - if:
+    - condition: template
+      value_template: '{{ follower_script != '''' }}'
+    then:
+    - action: '{{ follower_script }}'
+      data:
+        follower_entity_id: '{{ follower_entity_id }}'
+        feature: '{{ feature }}'
+        leader_entity_id: '{{ leader_entity_id }}'
+        enabled: '{{ follower_enabled }}'
+    else:
+    - if:
+      - condition: template
+        value_template: '{{ follower_select_target_value != '''' }}'
+      then:
+      - condition: template
+        value_template: '{{ states(follower_entity_id) != follower_select_target_value
+          }}
+
+          '
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''select'' }}'
+        then:
+        - action: select.select_option
+          data:
+            entity_id: '{{ follower_entity_id }}'
+            option: '{{ follower_select_target_value }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''input_select'' }}'
+        then:
+        - action: input_select.select_option
+          data:
+            entity_id: '{{ follower_entity_id }}'
+            option: '{{ follower_select_target_value }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''number'' }}'
+        then:
+        - action: number.set_value
+          data:
+            entity_id: '{{ follower_entity_id }}'
+            value: '{{ follower_select_target_value }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''input_number'' }}'
+        then:
+        - action: input_number.set_value
+          data:
+            entity_id: '{{ follower_entity_id }}'
+            value: '{{ follower_select_target_value }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''text'' }}'
+        then:
+        - action: text.set_value
+          data:
+            entity_id: '{{ follower_entity_id }}'
+            value: '{{ follower_select_target_value }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''input_text'' }}'
+        then:
+        - action: input_text.set_value
+          data:
+            entity_id: '{{ follower_entity_id }}'
+            value: '{{ follower_select_target_value }}'
+      else:
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''light'' }}'
+        then:
+        - condition: template
+          value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
+            if follower_enabled else ['off']) }}\n"
+        - action: 'light.turn_{{ ''on'' if follower_enabled else ''off'' }}
+
+            '
+          data:
+            entity_id: '{{ follower_entity_id }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain in [''switch'', ''input_boolean''] }}
+
+            '
+        then:
+        - condition: template
+          value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
+            if follower_enabled else ['off']) }}\n"
+        - action: '{{ follower_domain }}.turn_{{ ''on'' if follower_enabled else ''off''
+            }}
+
+            '
+          data:
+            entity_id: '{{ follower_entity_id }}'
+      - if:
+        - condition: template
+          value_template: '{{ follower_domain == ''media_player'' }}'
+        then:
+        - variables:
+            mp_supported: '{{ state_attr(follower_entity_id, ''supported_features'')
+              | int(0) }}
+
+              '
+            mp_supports_on_off: '{{ mp_supported | bitwise_and(128) > 0 }}
+
+              '
+            mp_supports_mute: '{{ mp_supported | bitwise_and(4) > 0 }}
+
+              '
+        - if:
+          - condition: template
+            value_template: '{{ mp_supports_on_off }}'
+          then:
+          - condition: template
+            value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
+              'playing', 'idle', 'paused', 'buffering']\n    if follower_enabled else
+              ['off', 'unavailable', 'standby']) }}\n"
+          - action: 'media_player.turn_{{ ''on'' if follower_enabled else ''off''
+              }}
+
+              '
+            data:
+              entity_id: '{{ follower_entity_id }}'
+          else:
+          - if:
+            - condition: template
+              value_template: '{{ mp_supports_mute }}'
+            then:
+            - condition: template
+              value_template: "{{ state_attr(follower_entity_id, 'is_volume_muted')\n
+                \  != (not follower_enabled) }}\n"
+            - action: media_player.volume_mute
+              data:
+                entity_id: '{{ follower_entity_id }}'
+                is_volume_muted: '{{ not follower_enabled }}'
+      - if:
+        - condition: template
+          value_template: "{{ follower_domain not in ['light', 'switch', 'input_boolean',\n
+            \  'media_player', 'number', 'input_number', 'text',\n   'input_text',
+            'select', 'input_select'] }}\n"
+        then:
+        - condition: template
+          value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
+            'true', 'home', 'open', 'detected', 'active', 'unlocked']\n    if follower_enabled
+            else\n    ['off', 'false', 'away', 'closed', 'clear', 'inactive', 'locked'])
+            }}\n"
+        - action: 'homeassistant.turn_{{ ''on'' if follower_enabled else ''off'' }}
+
+            '
+          data:
+            entity_id: '{{ follower_entity_id }}'

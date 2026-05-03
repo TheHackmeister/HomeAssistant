@@ -1835,3 +1835,234 @@
                 {{ states(check_minutes_entity) }} minutes.'
               alert_severity: medium
   mode: single
+
+- id: '1767644744620'
+  alias: Area Manifest Updater
+  description: Updates area manifest sensors when tracked entities change areas or
+    on startup
+  triggers:
+  - trigger: homeassistant
+    event: start
+    id: startup
+  - trigger: event
+    event_type: entity_registry_updated
+    event_data:
+      action: update
+    id: registry_update
+  conditions:
+  - condition: or
+    conditions:
+    - condition: trigger
+      id: startup
+    - condition: and
+      conditions:
+      - condition: trigger
+        id: registry_update
+      - condition: template
+        value_template: '{{ ''area_id'' in trigger.event.data.changes }}'
+      - condition: template
+        value_template: "{% set old_area_id = trigger.event.data.changes.area_id %}
+          {% set new_area_id = area_id(trigger.event.data.entity_id) %} {% set tracked_areas
+          = label_entities('track_area_ids') \n   | map('area_id') \n   | reject('none')
+          \n   | unique \n   | list %}\n{{ old_area_id in tracked_areas or new_area_id
+          in tracked_areas }}\n"
+  actions:
+  - if:
+    - condition: trigger
+      id: startup
+    then:
+    - delay:
+        seconds: 45
+  - variables:
+      tracked_entities: '{{ label_entities(''track_area_ids'') }}'
+      areas: "{% set ns = namespace(areas=[]) %} {% for entity_id in tracked_entities
+        %}\n  {% set a_id = area_id(entity_id) or 'unassigned' %}\n  {% if a_id not
+        in ns.areas %}\n    {% set ns.areas = ns.areas + [a_id] %}\n  {% endif %}\n{%
+        endfor %} {{ ns.areas }}\n"
+  - repeat:
+      for_each: '{{ areas }}'
+      sequence:
+      - variables:
+          current_area: '{{ repeat.item }}'
+          area_entities: "{% set result = [] %} {% for entity_id in tracked_entities
+            %}\n  {% if (area_id(entity_id) or 'unassigned') == current_area %}\n
+            \   {% set result = result + [entity_id] %}\n  {% endif %}\n{% endfor
+            %} {{ result }}\n"
+          area_devices: "{% set ns = namespace(devices=[]) %} {% for entity_id in
+            tracked_entities %}\n  {% if (area_id(entity_id) or 'unassigned') == current_area
+            %}\n    {% set d_id = device_id(entity_id) %}\n    {% if d_id and d_id
+            not in ns.devices %}\n      {% set ns.devices = ns.devices + [d_id] %}\n
+            \   {% endif %}\n  {% endif %}\n{% endfor %} {{ ns.devices }}\n"
+          area_name: "{% if current_area == 'unassigned' %}\n  Unassigned\n{% else
+            %}\n  {{ area_name(area_entities[0]) if area_entities|length > 0 else
+            current_area }}\n{% endif %}\n"
+      - action: python_script.update_area_manifest
+        data:
+          area_id: '{{ current_area }}'
+          area_name: '{{ area_name }}'
+          entity_ids: '{{ area_entities }}'
+          device_ids: '{{ area_devices }}'
+  mode: restart
+- id: '1776536295923'
+  alias: Labeled Feature Leaders
+  description: 'Evaluates leader labels for each changed Feature Leader entity and
+    calls the labeled_feature_follower script once per follower with the post-evaluated
+    leader_enabled boolean.
+
+    '
+  triggers:
+  - trigger: state
+    entity_id: sensor.feature_leader_last_changed
+    attribute: last_changed
+  conditions: []
+  actions:
+  - variables:
+      cutoff: '{{ trigger.from_state.attributes.last_updated_at | float(0) }}
+
+        '
+      changed_entities: "{{ expand(label_entities('feature_leader'))\n   | selectattr('last_changed_timestamp',
+        '>', cutoff)\n   | map(attribute='entity_id')\n   | list }}\n"
+  - repeat:
+      for_each: '{{ changed_entities }}'
+      sequence:
+      - variables:
+          leader_entity_id: '{{ repeat.item }}'
+          resolved_current_value: '{{ states(leader_entity_id) }}
+
+            '
+          resolved_previous_value: "{{ trigger.from_state.attributes.last_changed\n
+            \  .get(leader_entity_id, {}).get('value', '') }}\n"
+          is_increasing: "{% set cur = resolved_current_value | float(-99999) %} {%
+            set prev = resolved_previous_value | float(-99999) %} {% if cur != -99999
+            and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{%
+            endif %}\n"
+          is_decreasing: "{% set cur = resolved_current_value | float(-99999) %} {%
+            set prev = resolved_previous_value | float(-99999) %} {% if cur != -99999
+            and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{%
+            endif %}\n"
+          all_leader_label_names_original: "{{ labels(leader_entity_id)\n   | map('label_name')\n
+            \  | reject('none')\n   | list }}\n"
+          all_leader_label_names: "{{ labels(leader_entity_id)\n   | map('label_name')\n
+            \  | reject('none')\n   | map('lower')\n   | list }}\n"
+          leader_labels: "{{ all_leader_label_names\n   | select('match', '^(area
+            |floor |)leader: .+')\n   | list }}\n"
+      - repeat:
+          for_each: '{{ leader_labels }}'
+          sequence:
+          - variables:
+              leader_label: '{{ repeat.item }}'
+              feature_name: "{{ leader_label\n   | regex_replace('^(area |floor |)leader:
+                ', '') }}\n"
+              resolved_scope: "{% if leader_label.startswith('area leader') %}\n  area\n{%
+                elif leader_label.startswith('floor leader') %}\n  floor\n{% else
+                %}\n  none\n{% endif %}\n"
+              resolved_area_id: '{{ area_id(leader_entity_id) }}
+
+                '
+              resolved_floor_id: "{% if resolved_scope == 'floor' %}\n  {% set aid
+                = area_id(leader_entity_id) %}\n  {% set ns = namespace(found='')
+                %}\n  {% for fid in floors() %}\n    {% if aid in floor_areas(fid)
+                %}\n      {% set ns.found = fid %}\n    {% endif %}\n  {% endfor %}\n
+                \ {{ ns.found }}\n{% else %}\n  {{ '' }}\n{% endif %}\n"
+              leader_inverted: '{{ (feature_name + '' invert: true'') in all_leader_label_names
+                }}
+
+                '
+              leader_enable_select_value: "{% set pfx = feature_name + ' enable select:
+                ' %} {% set match = all_leader_label_names_original\n               |
+                select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
+                %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
+              leader_disable_select_value: "{% set pfx = feature_name + ' disable
+                select: ' %} {% set match = all_leader_label_names_original\n               |
+                select('match', '(?i)^' + pfx + '.+')\n               | first | default('')
+                %}\n{{ match | regex_replace('(?i)^.+: ', '') }}\n"
+              leader_enabled_base: "{% if leader_enable_select_value != '' or leader_disable_select_value
+                != '' %}\n  {% set enabled_by_enable = leader_enable_select_value
+                != '' and\n     resolved_current_value | lower == leader_enable_select_value
+                | lower %}\n  {% set disabled_by_disable = leader_disable_select_value
+                != '' and\n     resolved_current_value | lower == leader_disable_select_value
+                | lower %}\n  {% if leader_enable_select_value != '' and leader_disable_select_value
+                != '' %}\n    {{ enabled_by_enable and not disabled_by_disable }}\n
+                \ {% elif leader_enable_select_value != '' %}\n    {{ enabled_by_enable
+                }}\n  {% else %}\n    {{ not disabled_by_disable }}\n  {% endif %}\n{%
+                else %}\n  {{ resolved_current_value | lower in ['on', 'true', 'home',
+                'open',\n                                        'detected', 'active',
+                'unlocked'] }}\n{% endif %}\n"
+              leader_enabled: '{{ (not leader_enabled_base) if leader_inverted else
+                leader_enabled_base }}
+
+                '
+              leader_only: "{% set only_label = feature_name + ' only: ' %} {% set
+                match = all_leader_label_names\n               | select('match', '^'
+                + only_label + '(enable|disable)$')\n               | first | default('')
+                %}\n{{ match | regex_replace('^.+: ', '') }}\n"
+              leader_direction: "{% if (feature_name + ' increasing: true') in all_leader_label_names
+                %}\n  increasing\n{% elif (feature_name + ' decreasing: true') in
+                all_leader_label_names %}\n  decreasing\n{% else %}\n  none\n{% endif
+                %}\n"
+              leader_before_time: "{% set pfx = feature_name + ' before: ' %} {{ all_leader_label_names_original\n
+                \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n
+                \  | regex_replace('(?i)^.+: ', '') }}\n"
+              leader_after_time: "{% set pfx = feature_name + ' after: ' %} {{ all_leader_label_names_original\n
+                \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n
+                \  | regex_replace('(?i)^.+: ', '') }}\n"
+              leader_not_before_time: "{% set pfx = feature_name + ' not before: '
+                %} {{ all_leader_label_names_original\n   | select('match', '(?i)^'
+                + pfx + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+:
+                ', '') }}\n"
+              leader_not_after_time: "{% set pfx = feature_name + ' not after: ' %}
+                {{ all_leader_label_names_original\n   | select('match', '(?i)^' +
+                pfx + '.+')\n   | first | default('')\n   | regex_replace('(?i)^.+:
+                ', '') }}\n"
+              leader_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set
+                ok = true %} {% if leader_before_time != '' %}\n  {% set ok = ok and
+                now_time < leader_before_time %}\n{% endif %} {% if leader_after_time
+                != '' %}\n  {% set ok = ok and now_time > leader_after_time %}\n{%
+                endif %} {% if leader_not_before_time != '' %}\n  {% set ok = ok and
+                now_time >= leader_not_before_time %}\n{% endif %} {% if leader_not_after_time
+                != '' %}\n  {% set ok = ok and now_time <= leader_not_after_time %}\n{%
+                endif %} {{ ok }}\n"
+              leader_should_proceed: '{% if leader_only == ''enable'' and not leader_enabled
+                %} false {% elif leader_only == ''disable'' and leader_enabled %}
+                false {% elif leader_direction == ''increasing'' and not is_increasing
+                %} false {% elif leader_direction == ''decreasing'' and not is_decreasing
+                %} false {% elif not leader_time_ok %} false {% else %} true {% endif
+                %}
+
+                '
+          - condition: template
+            value_template: '{{ leader_should_proceed }}'
+          - variables:
+              follower_label_name: '{% if resolved_scope == ''area'' %} area follower:
+                {{ feature_name }} {% elif resolved_scope == ''floor'' %} floor follower:
+                {{ feature_name }} {% else %} follower: {{ feature_name }} {% endif
+                %}
+
+                '
+              all_followers: '{{ label_entities(follower_label_name) }}
+
+                '
+              followers: "{% if resolved_scope == 'area' %}\n  {% set area_ents =
+                area_entities(resolved_area_id) | list %}\n  {% set area_devs = area_devices(resolved_area_id)
+                %}\n  {% set ns = namespace(dev_ents=[]) %}\n  {% for d in area_devs
+                %}\n    {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list
+                %}\n  {% endfor %}\n  {% set all_area_ents = (area_ents + ns.dev_ents)
+                | unique | list %}\n  {{ all_followers | select('in', all_area_ents)
+                | list }}\n{% elif resolved_scope == 'floor' %}\n  {% set floor_area_list
+                = floor_areas(resolved_floor_id) %}\n  {% set ns = namespace(floor_entities=[])
+                %}\n  {% for a in floor_area_list %}\n    {% set area_ents = area_entities(a)
+                | list %}\n    {% set area_devs = area_devices(a) %}\n    {% for d
+                in area_devs %}\n      {% set ns.floor_entities = ns.floor_entities
+                + device_entities(d) | list %}\n    {% endfor %}\n    {% set ns.floor_entities
+                = ns.floor_entities + area_ents %}\n  {% endfor %}\n  {{ all_followers
+                | select('in', ns.floor_entities | unique | list) | list }}\n{% else
+                %}\n  {{ all_followers }}\n{% endif %}\n"
+          - repeat:
+              for_each: '{{ followers }}'
+              sequence:
+              - action: script.labeled_feature_follower
+                data:
+                  follower_entity_id: '{{ repeat.item }}'
+                  feature: '{{ feature_name }}'
+                  leader_entity_id: '{{ leader_entity_id }}'
+                  leader_enabled: '{{ leader_enabled }}'
