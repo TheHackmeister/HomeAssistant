@@ -1837,7 +1837,7 @@
   mode: single
 
 - id: '1767644744620'
-  alias: Area Manifest Updater
+  alias: 'Sensors: Area Manifests trigger'
   description: Updates area manifest sensors when tracked entities change areas or
     on startup
   triggers:
@@ -1859,13 +1859,13 @@
       - condition: trigger
         id: registry_update
       - condition: template
-        value_template: '{{ ''area_id'' in trigger.event.data.changes }}'
-      - condition: template
         value_template: "{% set old_area_id = trigger.event.data.changes.area_id %}
-          {% set new_area_id = area_id(trigger.event.data.entity_id) %} {% set tracked_areas
-          = label_entities('track_area_ids') \n   | map('area_id') \n   | reject('none')
-          \n   | unique \n   | list %}\n{{ old_area_id in tracked_areas or new_area_id
-          in tracked_areas }}\n"
+          {% set new_area_id = area_id(trigger.event.data.entity_id) %} {% set type_labels
+          = labels() | select('match', '^type_') | list %} {% set all_labels = type_labels
+          + ['track_area_ids'] %} {% set tracked_areas = all_labels \n   | map('label_entities')
+          \n   | sum(start=[]) \n   | map('area_id') \n   | reject('none') \n   |
+          unique \n   | list %}\n{{ old_area_id in tracked_areas or new_area_id in
+          tracked_areas }}\n"
   actions:
   - if:
     - condition: trigger
@@ -1874,35 +1874,143 @@
     - delay:
         seconds: 45
   - variables:
-      tracked_entities: '{{ label_entities(''track_area_ids'') }}'
-      areas: "{% set ns = namespace(areas=[]) %} {% for entity_id in tracked_entities
-        %}\n  {% set a_id = area_id(entity_id) or 'unassigned' %}\n  {% if a_id not
-        in ns.areas %}\n    {% set ns.areas = ns.areas + [a_id] %}\n  {% endif %}\n{%
-        endfor %} {{ ns.areas }}\n"
+      tracked_labels: '{{ (labels() | select(''match'', ''^type_'') | list + [''track_area_ids''])
+        | unique | list }}'
+      areas: "{% set ns = namespace(areas=[]) %} {% for label in tracked_labels %}\n
+        \ {% for area in label_areas(label) %}\n    {% if area not in ns.areas %}\n
+        \     {% set ns.areas = ns.areas + [area] %}\n    {% endif %}\n  {% endfor
+        %}\n{% endfor %} {{ ns.areas }}"
   - repeat:
       for_each: '{{ areas }}'
       sequence:
       - variables:
           current_area: '{{ repeat.item }}'
-          area_entities: "{% set result = [] %} {% for entity_id in tracked_entities
-            %}\n  {% if (area_id(entity_id) or 'unassigned') == current_area %}\n
-            \   {% set result = result + [entity_id] %}\n  {% endif %}\n{% endfor
-            %} {{ result }}\n"
-          area_devices: "{% set ns = namespace(devices=[]) %} {% for entity_id in
-            tracked_entities %}\n  {% if (area_id(entity_id) or 'unassigned') == current_area
-            %}\n    {% set d_id = device_id(entity_id) %}\n    {% if d_id and d_id
-            not in ns.devices %}\n      {% set ns.devices = ns.devices + [d_id] %}\n
-            \   {% endif %}\n  {% endif %}\n{% endfor %} {{ ns.devices }}\n"
-          area_name: "{% if current_area == 'unassigned' %}\n  Unassigned\n{% else
-            %}\n  {{ area_name(area_entities[0]) if area_entities|length > 0 else
-            current_area }}\n{% endif %}\n"
-      - action: python_script.update_area_manifest
+          entities_in_area: '{{ area_entities(current_area) | list }}'
+          devices_in_area: "{% set ns = namespace(devices=[]) %} {% for entity_id
+            in area_entities(current_area) %}\n  {% set d_id = device_id(entity_id)
+            %}\n  {% if d_id and d_id not in ns.devices %}\n    {% set ns.devices
+            = ns.devices + [d_id] %}\n  {% endif %}\n{% endfor %} {{ ns.devices }}\n"
+          current_area_name: '{{ area_name(current_area) }}'
+      - action: script.sensors_area_manifests
         data:
           area_id: '{{ current_area }}'
-          area_name: '{{ area_name }}'
-          entity_ids: '{{ area_entities }}'
-          device_ids: '{{ area_devices }}'
+          area_name: '{{ current_area_name }}'
+          entity_ids: '{{ entities_in_area }}'
+          device_ids: '{{ devices_in_area }}'
   mode: restart
+- id: '1767665604733'
+  alias: Alert2 Actionable - pH
+  description: ''
+  triggers:
+  - event_type: alert2_alert_on
+    trigger: event
+  actions:
+  - variables:
+      action_snooze: '{{ ''SNOOZE_'' ~ context.id }}'
+      action_increase: '{{ ''INCREASE_'' ~ context.id }}'
+      action_decrease: '{{ ''DECREASE_'' ~ context.id }}'
+      c: '{{ context }}'
+  - data:
+      title: "\U0001F6A8 {{ trigger.event.data.domain }} alert"
+      message: '{{ trigger.event.data.domain }} is {{ states(trigger.event.data.name)
+        }} on {{ trigger.event.data.name }}'
+      data:
+        tag: garage-alert
+        actions:
+        - action: '{{ action_snooze }}'
+          title: Snooze 30min
+        - action: '{{ action_increase }}'
+          title: Increase
+        - action: '{{ action_decrease }}'
+          title: Decrease
+    action: notify.mobile_app_pixel_6
+  - wait_for_trigger:
+    - event_type: mobile_app_notification_action
+      event_data:
+        action: '{{ action_snooze }}'
+      trigger: event
+    - event_type: mobile_app_notification_action
+      event_data:
+        action: '{{ action_increase }}'
+      trigger: event
+    - event_type: mobile_app_notification_action
+      event_data:
+        action: '{{ action_decrease }}'
+      trigger: event
+    timeout: 01:00:00
+    continue_on_timeout: true
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ wait.trigger.event.data.action == action_snooze }}'
+      sequence:
+      - data:
+          snooze_until: '{{ now() + timedelta(minutes=30) }}'
+          target:
+            '[object Object]':
+        action: alert2.notification_control
+    - conditions:
+      - condition: template
+        value_template: '{{ wait.trigger.event.data.action == action_increase }}'
+      sequence:
+      - variables:
+          control_entities: '{% set sensor_area = area_id(trigger.event.data.name)
+            %} {% set sensor_label_name = labels(trigger.event.data.name) | select(''match'',
+            ''sensor_'') | first | label_name | replace(''Sensor:'', ''Control:'')
+            %} {% set control_label_id = label_id(sensor_label_name) %} {{ label_entities(control_label_id)
+            | select(''in'', area_entities(sensor_area)) | list }}
+
+            '
+      - repeat:
+          for_each: '{{ control_entities }}'
+          sequence:
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: '{{ states(repeat.item) | float  + states(repeat.item | regex_replace(''_dose_.*'',
+                ''_dose_step'')) | float }}'
+            target:
+              entity_id: '{{ repeat.item }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ wait.trigger.event.data.action == action_decrease }}'
+      sequence:
+      - variables:
+          control_entities: '{% set sensor_area = area_id(trigger.event.data.name)
+            %} {% set sensor_label_name = labels(trigger.event.data.name) | select(''match'',
+            ''sensor_'') | first | label_name | replace(''Sensor:'', ''Control:'')
+            %} {% set control_label_id = label_id(sensor_label_name) %} {{ label_entities(control_label_id)
+            | select(''in'', area_entities(sensor_area)) | list }}
+
+            '
+      - repeat:
+          for_each: '{{ control_entities }}'
+          sequence:
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: '{{ states(repeat.item) | float  - states(repeat.item | regex_replace(''_dose_.*'',
+                ''_dose_step'')) | float }}'
+            target:
+              entity_id: '{{ repeat.item }}'
+  - action: notify.mobile_app_pixel_6
+    data: {}
+    enabled: false
+  mode: parallel
+  max: 10
+- id: '1769024159031'
+  alias: 'Plant Sensors: template evalutation trigger (Hour)'
+  description: ''
+  triggers:
+  - hours: '*'
+    minutes: 0
+    trigger: time_pattern
+  actions:
+  - data:
+      topic: plants/update_every_hour
+      payload: '{{ now().isoformat() }}'
+    action: mqtt.publish
+  mode: single
 - id: '1770269885853'
   alias: 'Boards: Daily Task Organization'
   description: Runs all board organization tasks in sequence

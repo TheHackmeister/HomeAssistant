@@ -1887,6 +1887,51 @@ calibrated_values_initalize_helpers_v2:
             enabled: true
           - action: mqtt.publish
             data:
+              topic: '{{ ha_topic }}/sensor/{{ device_name }}_calibrated_value/config'
+              retain: true
+              payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
+                [ device_name ],\n      \"name\": friendly_name ,\n      \"manufacturer\":
+                \"Calibrated Value\",\n      \"suggested_area\": \"{{ area_id }}\"\n
+                \   },\n    \"name\": \"Calibrated Value\",\n    \"device_class\":
+                device_class,\n    \"unit_of_measurement\": units,\n    \"uniq_id\":
+                device_name~\"_calibrated_value\",\n    \"object_id\": device_name~\"_calibrated_value\",\n
+                \   \"cmd_t\": \"~/calibrated_value\",\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
+                \   \"retain\": true,\n    \"expire_after\": 60,\n    \"state_class\":
+                \"measurement\",\n    \"suggested_display_precision\": \"2\",\n    \"value_template\":
+                \"{{ \n      (states( '\"~device_id~\"' ) | float) * ( state_attr('\"~device_id~\"_calibrated_value',
+                'poly[1]')  \n      | float(1)) + ( state_attr('\"~device_id~\"_calibrated_value',
+                'poly[0]')  \n      | float(0)) }}\",\n    \"json_attributes_topic\":
+                \"~/calibration_data\",\n    \"json_attributes_template\": \"{% set
+                cal_data = value | from_json %}\n      {% set ns = namespace(sx=0,
+                sy=0, sxy=0, sxx=0) %}\n      {% set n = cal_data.keys()|list|length
+                %}\n      {% for y, x in cal_data.items() %}\n        {% set x = x|float
+                %}\n        {% set y = y|float %}\n        {% set ns.sx = ns.sx +
+                x %}\n        {% set ns.sy = ns.sy + y %}\n        {% set ns.sxy =
+                ns.sxy + (x * y) %}\n        {% set ns.sxx = ns.sxx + (x * x) %}\n
+                \     {% endfor %}\n      \n      {% set den = n * ns.sxx - ns.sx
+                * ns.sx %}\n      {% if den != 0 %}\n        {% set a = (n * ns.sxy
+                - ns.sx * ns.sy) / den %}\n        {% set b = (ns.sy - a * ns.sx)
+                / n %}\n      {% elif n != 0 %}\n        {% set a = 0 %}{% set b =
+                ns.sy / n %}\n      {% else %}\n        {% set a = 1 %}{% set b =
+                0 %}\n      {% endif %}\n      {{ {'raw': value, 'poly[0]': (b)|string,
+                'poly[1]': (a)|string, 'poly[2]': '0', 'poly[3]': '0', 'poly[4]':
+                '0'} | to_json }}\n    \"\n  } | to_json\n}}\n"
+            enabled: true
+          - action: mqtt.publish
+            data:
+              topic: '{{ ha_topic }}/number/{{ device_name }}_calibration_step/config'
+              retain: true
+              payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
+                [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n
+                \   \"manufacturer\": \"Calibration Step\",\n    \"suggested_area\":
+                \"{{ area_id }}\"\n  },\n  \"name\": \"Calibration Step\",\n  \"uniq_id\":
+                \"{{ device_name }}_calibration_step\",\n  \"object_id\": \"{{ device_name
+                }}_calibration_step\",\n  \"mode\": \"box\",\n  \"min\": \"0\",\n
+                \ \"max\": \"10000000\",      \n  \"cmd_t\": \"~/calibration_step\",
+                \     \n  \"stat_t\": \"~/calibration_step\",\n  \"retain\": true\n}\n"
+            enabled: false
+          - action: mqtt.publish
+            data:
               topic: '{{ ha_topic }}/number/{{ device_name }}_alert_high/config'
               retain: true
               payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
@@ -1913,16 +1958,16 @@ calibrated_values_initalize_helpers_v2:
             enabled: true
           - action: mqtt.publish
             data:
-              topic: '{{ ha_topic }}/number/{{ device_name }}_alert_check_minutes/config'
+              topic: '{{ ha_topic }}/number/{{ device_name }}_alert_on_for_seconds/config'
               retain: true
               payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\":
                 [\"{{ device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n
-                \   \"manufacturer\": \"Low Alert\",\n    \"suggested_area\": \"{{
-                area_id }}\"\n  },\n  \"name\": \"Alert Check Minutes\",\n  \"uniq_id\":
-                \"{{ device_name }}_alert_check_minutes\",\n  \"object_id\": \"{{
-                device_name }}_alert_check_minutes\",\n  \"mode\": \"box\",\n  \"min\":
-                \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/alert_check_minutes\",
-                \     \n  \"stat_t\": \"~/alert_check_minutes\",\n  \"retain\": true\n}\n"
+                \   \"manufacturer\": \"Alert On For Seconds\",\n    \"suggested_area\":
+                \"{{ area_id }}\"\n  },\n  \"name\": \"Alert On For Seconds\",\n  \"uniq_id\":
+                \"{{ device_name }}_alert_on_for_seconds\",\n  \"object_id\": \"{{
+                device_name }}_alert_on_for_seconds\",\n  \"mode\": \"box\",\n  \"min\":
+                \"0\",\n  \"max\": \"10000000\",      \n  \"cmd_t\": \"~/alert_on_for_seconds\",
+                \     \n  \"stat_t\": \"~/alert_on_for_seconds\",\n  \"retain\": true\n}\n"
             enabled: true
       for_each: '{{ calibrated_labels }}'
   alias: 'Calibrated Values: Initalize Helpers (v2)'
@@ -2387,9 +2432,9 @@ calculated_areas_initalize_helpers:
         \   \"retain\": false,\n    \"state_class\": \"measurement\",\n    \"value_template\":
         \"{% set count = namespace(total=0) %}{% for label in labels() %}{% if label_name(label).startswith('Area
         Leader: ') %}{% for entity_id in label_entities(label) %}{% if states(entity_id)
-        in ['on', 'open', 'home', 'active'] %}{% set count.total = count.total +
-        1 %}{% endif %}{% endfor %}{% endif %}{% endfor %}{{ count.total }}\"\n  }
-        | to_json\n}}\n"
+        in ['on', 'open', 'home', 'active'] %}{% set count.total = count.total + 1
+        %}{% endif %}{% endfor %}{% endif %}{% endfor %}{{ count.total }}\"\n  } |
+        to_json\n}}\n"
   - repeat:
       sequence:
       - variables:
@@ -2537,8 +2582,8 @@ send_alert:
   alias: Send Alert
   description: Sends alerts with different notification methods based on severity
     level
-init_plant_sensors:
-  alias: 'Plant Sensors: Create Plant'
+sensors_create_plants:
+  alias: 'Sensors: Create Plants'
   description: Dynamically create plant monitoring sensors via MQTT discovery
   mode: queued
   max: 10
@@ -2567,6 +2612,13 @@ init_plant_sensors:
       description: When the plant was planted (defaults to now)
       selector:
         datetime:
+    plant_area:
+      name: Plant Area
+      description: Area to put plant in
+      selector:
+        area:
+          entity:
+            device_class: pressure
     starting_id:
       name: Starting ID Override
       description: Optional override for the starting plant ID number
@@ -2574,6 +2626,14 @@ init_plant_sensors:
         number:
           min: 0
           max: 10000
+    location_id:
+      selector:
+        number:
+          min: 1
+          max: 1000
+          step: 1
+      name: Location ID
+      description: Starting Location ID to use
   sequence:
   - variables:
       ha_topic: homeassistant
@@ -2627,30 +2687,33 @@ init_plant_sensors:
             }}\",\n  \"unit_of_measurement\": \"d\",\n  \"device_class\": \"duration\",\n
             \ \"state_class\": \"measurement\",\n  \"json_attributes_topic\": plant_topic
             ~ \"/attributes\",\n  \"device\": {\n    \"identifiers\": [device_name],\n
-            \   \"name\": variety | default('Plant') ~ ' #' ~ plant_number,\n    \"manufacturer\":
-            \"Curated Forest\",\n    \"model\": \"Plant Tracking\"\n  }\n} | to_json
+            \   \"name\": (variety | default('Plant') | replace('_', ' ') | title)
+            ~ ' #' ~ plant_number,\n    \"manufacturer\": \"Curated Forest\",\n    \"suggested_area\":
+            area_name(plant_area),\n    \"model\": \"Plant Tracking\"\n  }\n} | to_json
             }}\n"
         action: mqtt.publish
       - data:
           topic: '{{ plant_topic }}/attributes'
           retain: true
-          payload: "{{ {\n  'location_entity_id': '',\n  'record_entity_id': \"sensor.\"
-            ~ device_name ~ \"_records\",\n  'plant_id': plant_id,\n  'variety': variety
-            | default(''),\n  'source': source | default(''),\n  'started_at': started_at\n}
-            | to_json }}\n"
+          payload: "{{ {\n  'location_entity_id': (\"switch.location_id_\" ~ ((location_id
+            + repeat.index -1) | string)) if (location_id is defined and location_id)
+            else '',\n  'plant_id': plant_id,\n  'variety': variety | default(''),\n
+            \ 'source': source | default(''),\n  'started_at': started_at\n} | to_json
+            }}\n"
         action: mqtt.publish
       - data:
           topic: '{{ ha_topic }}/sensor/{{ device_name }}_records/status/config'
           retain: true
-          payload: "{{ {\n  \"name\": \"Records\",\n  \"unique_id\": device_name ~
-            \"_records\",\n  \"default_entity_id\": \"sensor.\" ~ device_name ~ \"_records\",\n
+          payload: "{{ {\n  \"name\": \"Records\",\n  \"unique_id\": \"plant_records_\"
+            ~ plant_id,\n  \"default_entity_id\": \"sensor.plant_records_\" ~ plant_id,\n
             \ \"state_topic\": plant_topic ~ \"/records_count\",\n  \"command_topic\":
             plant_topic ~ \"/records_count\",\n  \"state_class\": \"measurement\",\n
             \ \"json_attributes_topic\": plant_topic ~ \"/records_attributes\",\n
             \ \"values_template\": \"{{ value | float(0) }}\",\n  \"device\": {\n
             \   \"identifiers\": [device_name],\n    \"name\": variety | default('Plant')
             ~ ' #' ~ plant_number,\n    \"manufacturer\": \"Curated Forest\",\n    \"model\":
-            \"Plant Tracking Records\"\n  }\n} | to_json }}\n"
+            \"Plant Tracking Records\",\n    \"suggested_area\": area_name(plant_area),\n
+            \ }\n} | to_json }}\n"
         action: mqtt.publish
       - delay:
           milliseconds: 500
@@ -2692,171 +2755,213 @@ init_plant_sensors:
         | default(''N/A'') }} Starting ID: {{ current_id }} Ending ID: {{ current_id
         | int + plants_to_create | int - 1 }}'
     action: persistent_notification.create
-sensors_location_create_location:
+sensors_create_locations:
   sequence:
   - variables:
       ha_topic: homeassistant
       counter_topic: locations/next_location_id
-      current_id: >
-        {% if starting_id is defined and starting_id is not none %}
-          {{ starting_id | int }}
-        {% elif states('number.next_location_id') not in ['unknown', 'unavailable',
-        'none'] %}
-          {{ states('number.next_location_id') | int }}
-        {% else %}
-          0
-        {% endif %}
-      needs_counter_creation: |
-        {{ states('number.next_location_id') in ['unknown', 'unavailable', 'none'] 
-            and (starting_id is not defined or starting_id is none) }}
+      current_id: "{% if starting_id is defined and starting_id is not none %}\n  {{
+        starting_id | int }}\n{% elif states('number.next_location_id') not in ['unknown',
+        'unavailable', 'none'] %}\n  {{ states('number.next_location_id') | int }}\n{%
+        else %}\n  0\n{% endif %}\n"
+      needs_counter_creation: "{{ states('number.next_location_id') in ['unknown',
+        'unavailable', 'none'] \n    and (starting_id is not defined or starting_id
+        is none) }}\n"
   - if:
-      - condition: template
-        value_template: "{{ needs_counter_creation }}"
+    - condition: template
+      value_template: '{{ needs_counter_creation }}'
     then:
+    - data:
+        topic: '{{ ha_topic }}/number/location_tracking/next_location_id/config'
+        retain: true
+        payload: "{\n  \"name\": \"Next Location ID\",\n  \"unique_id\": \"next_location_id_counter\",\n
+          \ \"default_entity_id\": \"sensor.next_location_id\",\n  \"state_topic\":
+          \"{{ counter_topic }}\",\n  \"command_topic\": \"{{ counter_topic }}\",\n
+          \ \"min\": 0,\n  \"max\": 100000,\n  \"step\": 1,\n  \"mode\": \"box\",\n
+          \ \"retain\": true,\n  \"device\": {\n    \"identifiers\": [\"location_tracking\"],\n
+          \   \"name\": \"Location Tracking\",\n    \"manufacturer\": \"Curated Forest\"\n
+          \ }\n}\n"
+      action: mqtt.publish
+    - data:
+        topic: '{{ counter_topic }}'
+        retain: true
+        payload: '0'
+      action: mqtt.publish
+    - delay:
+        milliseconds: 500
+  - repeat:
+      count: '{{ locations_to_create | int }}'
+      sequence:
+      - variables:
+          location_id: '{{ current_id | int + repeat.index - 1 }}'
+          location_name: location_{{ location_id }}
+          device_name: location_id_{{ location_id }}
+          location_topic: locations/{{ location_name }}
       - data:
-          topic: "{{ ha_topic }}/number/location_tracking/next_location_id/config"
+          topic: '{{ ha_topic }}/switch/{{ device_name }}/active/config'
           retain: true
-          payload: |
-            {
-              "name": "Next Location ID",
-              "unique_id": "next_location_id_counter",
-              "object_id": "next_location_id",
-              "state_topic": "{{ counter_topic }}",
-              "command_topic": "{{ counter_topic }}",
-              "min": 0,
-              "max": 100000,
-              "step": 1,
-              "mode": "box",
-              "retain": true,
-              "device": {
-                "identifiers": ["location_tracking"],
-                "name": "Location Tracking",
-                "manufacturer": "Curated Forest"
-              }
-            }
+          payload: "{{ {\n  \"name\": \"Active\",\n  \"unique_id\": device_name ~
+            \"_active\",\n  \"default_entity_id\": 'sensor.' ~ device_name,\n  \"state_topic\":
+            location_topic ~ \"/active\",\n  \"command_topic\": location_topic ~ \"/active/set\",\n
+            \ \"payload_on\": \"true\",\n  \"payload_off\": \"false\",\n  \"state_on\":
+            \"true\",\n  \"state_off\": \"false\",\n  \"retain\": true,\n  \"json_attributes_topic\":
+            location_topic ~ \"/attributes\",\n  \"device\": {\n    \"identifiers\":
+            [device_name],\n    \"name\": 'Location' ~ ' #' ~ location_id,\n    \"manufacturer\":
+            \"Curated Forest\",\n    \"suggested_area\": area_name(location_area |
+            default(root_zone)),\n    \"model\": \"Location Tracking\"\n  }\n} | to_json
+            }}\n"
         action: mqtt.publish
       - data:
-          topic: "{{ counter_topic }}"
+          topic: '{{ location_topic }}/active'
           retain: true
-          payload: "0"
+          payload: 'true'
+        action: mqtt.publish
+      - data:
+          topic: '{{ location_topic }}/attributes'
+          retain: true
+          payload: "{{ {\n  'location_id': location_id,\n  'root_zone': root_zone
+            | default(''),\n  'shoot_zone': shoot_zone | default(''),\n  'water_supply':
+            water_supply | default('')\n} | to_json }}\n"
+        action: mqtt.publish
+      - data:
+          topic: '{{ counter_topic }}'
+          retain: true
+          payload: '{{ location_id | int + 1 }}'
         action: mqtt.publish
       - delay:
-          milliseconds: 500
-  - repeat:
-      count: "{{ locations_to_create | int }}"
-      sequence:
-        - variables:
-            location_number: "{{ current_id | int + repeat.index - 1 }}"
-            location_id: >-
-              {{ location_name | default('location') | lower | replace(' ', '_') }}_{{
-              location_number }}
-            device_name: location_id_{{ location_id }}
-            location_topic: locations/{{ location_id }}
-        - data:
-            topic: "{{ ha_topic }}/switch/{{ device_name }}/usable/config"
-            retain: true
-            payload: |
-              {{ {
-                "name": "Usable",
-                "unique_id": device_name ~ "_usable",
-                "object_id": device_name,
-                "state_topic": location_topic ~ "/usable",
-                "command_topic": location_topic ~ "/usable/set",
-                "payload_on": "true",
-                "payload_off": "false",
-                "state_on": "true",
-                "state_off": "false",
-                "retain": true,
-                "json_attributes_topic": location_topic ~ "/attributes",
-                "device": {
-                  "identifiers": [device_name],
-                  "name": location_name | default('Location') ~ ' #' ~ location_number,
-                  "manufacturer": "Curated Forest",
-                  "model": "Location Tracking"
-                }
-              } | to_json }}
-          action: mqtt.publish
-        - data:
-            topic: "{{ location_topic }}/usable"
-            retain: true
-            payload: "true"
-          action: mqtt.publish
-        - data:
-            topic: "{{ location_topic }}/attributes"
-            retain: true
-            payload: |
-              {{ {
-                'location_id': location_id,
-                'location_name': location_name | default(''),
-                'root_zone': root_zone | default(''),
-                'shoot_zone': shoot_zone | default(''),
-                'water_supply': water_supply | default('')
-              } | to_json }}
-          action: mqtt.publish
-        - delay:
-            milliseconds: 200
+          milliseconds: 200
   - data:
       title: Location Sensors Created
-      message: >-
-        Created {{ locations_to_create }} location sensor(s). Starting ID: {{ current_id }} Ending ID: {{ current_id
-        | int + locations_to_create | int - 1 }}
+      message: 'Created {{ locations_to_create }} location sensor(s). Starting ID:
+        {{ current_id }} Ending ID: {{ current_id | int + locations_to_create | int
+        - 1 }}'
     action: persistent_notification.create
-  alias: 'Sensors (Location): Create Location'
+  alias: 'Sensors: Create Locations'
   description: Dynamically create location monitoring sensors via MQTT discovery
-feature_leader:
-  alias: Feature Leader
-  mode: parallel
-  max: 25
+  mode: queued
+  max: 10
   fields:
-    leader_entity_id:
-      name: Leader Entity ID
-      description: The labeled leader entity that changed state
+    locations_to_create:
+      name: Number of Locations
+      description: How many location sensors to create
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+      required: true
+    root_zone:
+      name: Root Zone
+      description: Root zone identifier
+      default:
+      selector:
+        area:
+          entity:
+            device_class: pressure
+      required: true
+    shoot_zone:
+      name: Shoot Zone
+      description: Shoot zone identifier
+      default:
+      selector:
+        area:
+          entity:
+            device_class: pressure
+      required: true
+    water_supply:
+      name: Water Supply
+      description: Water supply identifier
+      default: water_supply_01
+      selector:
+        area:
+          entity:
+            device_class: pressure
+      required: true
+    location_area:
+      name: Location Area
+      description: Area to put the location in if not the root_zone
+      selector:
+        area:
+    starting_id:
+      name: Starting ID Override
+      description: Optional override for the starting location ID number
+      selector:
+        number:
+          min: 0
+          max: 10000
+sensors_area_manifests:
+  alias: 'Sensors: Area Manifests'
+  description: Updates a single area manifest sensor via MQTT discovery
+  mode: queued
+  max: 10
+  fields:
+    area_id:
+      name: Area ID
+      description: The area ID to update
       required: true
       selector:
-        entity: {}
-    current_value:
-      name: Current Value
-      description: The current state value of the leader entity. Defaults to states(leader_entity_id)
-        if not passed.
-      required: false
-      default: ''
+        text:
+    area_name:
+      name: Area Name
+      description: The area name
+      required: true
       selector:
-        text: {}
-    previous_value:
-      name: Previous Value
-      description: The previous state value of the leader entity before the change.
+        text:
+    entity_ids:
+      name: Entity IDs
+      description: List of entity IDs in the area
       required: false
-      default: ''
-      selector:
-        text: {}
-    scope:
-      name: Scope
-      description: 'Override scope detection: area, floor, or none'
+    device_ids:
+      name: Device IDs
+      description: List of device IDs in the area
       required: false
-      default: ''
-      selector:
-        select:
-          options:
-          - ''
-          - area
-          - floor
-          - none
-    area_id_override:
-      name: Area ID Override
-      description: Explicit area ID, skips label-based area resolution
-      required: false
-      default: ''
-      selector:
-        area: {}
-    floor_id_override:
-      name: Floor ID Override
-      description: Explicit floor ID, skips label-based floor resolution
-      required: false
-      default: ''
-      selector:
-        floor: {}
   sequence:
   - variables:
+      ha_topic: homeassistant
+      safe_area_id: '{{ area_id | replace('' '', ''_'') | replace(''-'', ''_'') |
+        lower }}'
+      sensor_entity_id: sensor.area_manifest_{{ safe_area_id }}
+      sensor_topic: area_manifests/{{ safe_area_id }}
+      entity_count: '{{ entity_ids | length }}'
+      device_count: '{{ device_ids | length }}'
+      area_type: '{% set type_labels = labels(area_id) | select(''match'', ''^type_'')
+        | list %} {{ type_labels[0].replace(''type_'', '''') if type_labels | length
+        > 0 else '''' }}
+
+        '
+      label_map: "{% set ns = namespace(data={}) %} {% for lbl_id in labels() %}\n
+        \ {% set matching_entities = label_entities(lbl_id) | select('in', entity_ids)
+        | list %}\n  {% if matching_entities | length > 0 %}\n    {% set ns.data =
+        dict(ns.data, **{lbl_id: matching_entities}) %}\n  {% endif %}\n{% endfor
+        %} {{ ns.data }}\n"
+  - data:
+      topic: '{{ ha_topic }}/sensor/area_manifest_{{ safe_area_id }}/config'
+      retain: true
+      payload: "{{ {\n  \"name\": area_name ~ \" Area Manifest\",\n  \"object_id\":
+        \"area_manifest_\" ~ safe_area_id,\n  \"unique_id\": \"area_manifest_\" ~
+        safe_area_id,\n  \"state_topic\": sensor_topic ~ \"/state\",\n  \"json_attributes_topic\":
+        sensor_topic ~ \"/attributes\",\n  \"icon\": \"mdi:format-list-bulleted-square\",\n
+        \ \"device\": {\n    \"identifiers\": [\"area_manifest_\" ~ safe_area_id],\n
+        \   \"name\": area_name ~ \" Area\",\n    \"manufacturer\": \"Home Assistant\",\n
+        \   \"model\": \"Area Manifest\"\n  }\n} | to_json }}\n"
+    action: mqtt.publish
+  - data:
+      topic: '{{ sensor_topic }}/state'
+      retain: true
+      payload: '{{ entity_count }}'
+    action: mqtt.publish
+  - data:
+      topic: '{{ sensor_topic }}/attributes'
+      retain: true
+      payload: "{% set ns = namespace(label_data={}) %}\n{% for lbl_id in labels()
+        %}\n  {% set matching_entities = label_entities(lbl_id) | select('in', entity_ids)
+        | list %}\n  {% if matching_entities | length > 0 %}\n    {% set ns.label_data
+        = dict(ns.label_data, **{lbl_id: matching_entities}) %}\n  {% endif %}\n{%
+        endfor %}\n{{ {\n  'area_id': area_id,\n  'area_name': area_name,\n  'area_type':
+        area_type,\n  'entity_ids': entity_ids,\n  'device_ids': device_ids,\n  'entity_count':
+        entity_count,\n  'device_count': device_count,\n  'labels': ns.label_data\n}
+        | to_json }}\n"
+    action: mqtt.publish
 labeled_feature_follower:
   alias: Labeled Feature Follower
   mode: parallel
