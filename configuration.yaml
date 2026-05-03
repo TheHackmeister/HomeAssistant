@@ -199,7 +199,7 @@ homeassistant:
   packages: !include_dir_named packages
 
 recorder:
-  db_url: !secret recroder_url
+  db_url: !secret recorder_url
   #purge_keep_days: 7
 ltss:
   db_url: !secret ltss_url
