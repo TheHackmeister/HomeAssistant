@@ -3069,13 +3069,14 @@ labeled_feature_follower:
         = ((s=='-' or now_time>=s) and (e=='-' or now_time<=e)) if (s=='-' or e=='-'
         or s<=e) else (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.ok =
         false %}{% endif %} {% endfor %} {{ ns.ok }}\n"
-      follower_should_act: '{% set only = follower_only | trim %} {% if only ==
-        ''enable'' and not leader_enabled %} false {% elif only == ''disable'' and
-        leader_enabled %} false {% elif only != '''' and only not in [''enable'',
-        ''disable''] %} false {% elif not follower_time_ok %} false {% else %} true
-        {% endif %}
-
-        '
+      follower_should_act: >-
+        {%- set only = follower_only | trim -%}
+        {%- if only == 'enable' and not leader_enabled -%}false
+        {%- elif only == 'disable' and leader_enabled -%}false
+        {%- elif only != '' and only not in ['enable', 'disable'] -%}false
+        {%- elif not follower_time_ok -%}false
+        {%- else -%}true
+        {%- endif -%}
   - condition: template
     value_template: '{{ follower_should_act }}'
   - variables:
@@ -3413,6 +3414,19 @@ labeled_feature_follower:
           entity_id: '{{ follower_entity_id }}'
         data:
           value: '{{ follower_target_value }}'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == ''light'' }}'
+      then:
+      - if:
+        - condition: template
+          value_template: '{{ follower_target_value | int(-1) >= 0 }}'
+        then:
+        - action: light.turn_on
+          target:
+            entity_id: '{{ follower_entity_id }}'
+          data:
+            brightness_pct: '{{ [follower_target_value | int(0), 100] | min }}'
     else:
     # 4. Default Script (only when no direct value label was found)
     - if:
@@ -3612,6 +3626,11 @@ labeled_feature_sleep_timeout:
     Create separate label/blueprint configurations for each user who needs
     independent sleep-timeout behaviour.
   mode: restart
+  variables:
+    # Declared at script top-level so original_volumes is a persistent entity
+    # attribute while the script runs.  The Cancel Restore automation reads it
+    # from trigger.from_state.attributes.original_volumes on script turn-off.
+    original_volumes: {}
   fields:
     area_media_players:
       name: Area Media Players
@@ -3706,6 +3725,7 @@ labeled_feature_sleep_timeout:
               entity_id: '{{ repeat.item }}'
             data:
               volume_level: '{{ original_volumes.get(repeat.item, 0.5) }}'
+
 
 labeled_feature_button:
   alias: Labeled Feature Button
@@ -4175,7 +4195,7 @@ labeled_feature_button:
         # Button 1 — hold (long_release is the canonical hold action;
         #            long_press handled identically for immediate feedback)
         # Playing:     volume up + (night: Sleep Timeout restart)
-        # Not playing: (no-op — fan is a manual override)
+        # Not playing: Ad-Toggle (toggles input_boolean.ad_toggle)
         # ────────────────────────────────────────────────────────────────────
         - conditions:
             - condition: template
@@ -4203,6 +4223,11 @@ labeled_feature_button:
                           data:
                             variables:
                               area_media_players: '{{ area_media_players }}'
+              else:
+                # Not playing: Ad-Toggle
+                - action: input_boolean.toggle
+                  target:
+                    entity_id: input_boolean.ads_playing_spencer_2
 
         # ────────────────────────────────────────────────────────────────────
         # Button 2 — hold

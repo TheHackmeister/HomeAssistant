@@ -2135,17 +2135,17 @@
               feature_name: '{{ repeat.item }}'
               leader_enabled: '{{ leader_features[repeat.item].enabled }}'
               resolved_scope: '{{ leader_features[repeat.item].scope }}'
-              resolved_area_id: '{{ area_id(leader_entity_id) }}
-
-                '
-              resolved_floor_id: "{% if resolved_scope == 'floor' %}\n  {% set aid
-                = area_id(leader_entity_id) %}\n  {% set ns = namespace(found='')
-                %}\n  {% for fid in floors() %}\n    {% if aid in floor_areas(fid)
-                %}\n      {% set ns.found = fid %}\n    {% endif %}\n  {% endfor %}\n
-                \ {{ ns.found }}\n{% else %}\n  {{ '' }}\n{% endif %}\n"
-              resolved_scope_id: "{% if resolved_scope == 'area' %}\n  {{ resolved_area_id
-                }}\n{% elif resolved_scope == 'floor' %}\n  {{ resolved_floor_id }}\n{%
-                else %}\n  {{ '' }}\n{% endif %}\n"
+              resolved_area_id: '{{ area_id(leader_entity_id) | trim }}'
+              resolved_floor_id: >-
+                {%- if resolved_scope == 'floor' -%}
+                {%- set aid = area_id(leader_entity_id) -%}
+                {%- set ns = namespace(found='') -%}
+                {%- for fid in floors() -%}
+                {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+                {%- endfor -%}{{- ns.found -}}
+                {%- endif -%}
+              resolved_scope_id: >-
+                {%- if resolved_scope == 'area' -%}{{- resolved_area_id | trim -}}{%- elif resolved_scope == 'floor' -%}{{- resolved_floor_id | trim -}}{%- endif -%}
               leader_only: "{% set only_label = feature_name + ' only: ' %} {% set
                 match = all_leader_label_names\n               | select('match', '^'
                 + only_label + '(enable|disable)$')\n               | first | default('')
@@ -2192,16 +2192,258 @@
                 true) }}\n"
           - condition: template
             value_template: '{{ leader_should_proceed }}'
+          # === Leader-level script calls (Enable | Disable | Default) ===
           - variables:
-              follower_label_name: '{% if resolved_scope == ''area'' %} area follower:
-                {{ feature_name }} {% elif resolved_scope == ''floor'' %} floor follower:
-                {{ feature_name }} {% else %} follower: {{ feature_name }} {% endif
-                %}
-
-                '
-              all_followers: '{{ label_entities(follower_label_name) }}
-
-                '
+              _leader_enable_script: >-
+                {%- set pfx = feature_name + ' enable script: ' -%}
+                {{- all_leader_label_names_original | select('match', '(?i)^' + pfx + '.+')
+                    | first | default('') | regex_replace('(?i)^.+: ', '') | trim -}}
+              _leader_disable_script: >-
+                {%- set pfx = feature_name + ' disable script: ' -%}
+                {{- all_leader_label_names_original | select('match', '(?i)^' + pfx + '.+')
+                    | first | default('') | regex_replace('(?i)^.+: ', '') | trim -}}
+              _leader_default_script: >-
+                {%- set pfx = feature_name + ' script: ' -%}
+                {{- all_leader_label_names_original | select('match', '(?i)^' + pfx + '.+')
+                    | first | default('') | regex_replace('(?i)^.+: ', '') | trim -}}
+          - variables:
+              _leader_enable_args: >-
+                {% set ns = namespace(d={}) %}
+                {% set lf_l = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
+                {% set lf_f = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
+                {% for lbl in all_leader_label_names_original %}
+                {% if lbl | lower | regex_search('^' + feature_name + ' enable arg [^:]+:') %}
+                {% set field = lbl | regex_replace('(?i)^.+ enable arg ([^:]+): .*$', '\\1') | trim %}
+                {% set raw = lbl | regex_replace('^[^:]+: ', '') | trim %}
+                {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
+                {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
+                {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
+                {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
+                {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_f.get(key, {}).get(fld, raw) | string}) %}
+                {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_l.get(key, {}).get(fld, raw) | string}) %}
+                {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
+                {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
+                {% endif %}{% endfor %}{{ ns.d }}
+              _leader_disable_args: >-
+                {% set ns = namespace(d={}) %}
+                {% set lf_l = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
+                {% set lf_f = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
+                {% for lbl in all_leader_label_names_original %}
+                {% if lbl | lower | regex_search('^' + feature_name + ' disable arg [^:]+:') %}
+                {% set field = lbl | regex_replace('(?i)^.+ disable arg ([^:]+): .*$', '\\1') | trim %}
+                {% set raw = lbl | regex_replace('^[^:]+: ', '') | trim %}
+                {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
+                {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
+                {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
+                {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
+                {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_f.get(key, {}).get(fld, raw) | string}) %}
+                {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_l.get(key, {}).get(fld, raw) | string}) %}
+                {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
+                {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
+                {% endif %}{% endfor %}{{ ns.d }}
+              _leader_default_args: >-
+                {% set ns = namespace(d={}) %}
+                {% set lf_l = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
+                {% set lf_f = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
+                {% for lbl in all_leader_label_names_original %}
+                {% set ll = lbl | lower %}
+                {% if ll | regex_search('^' + feature_name + ' arg [^:]+:')
+                    and not ll | regex_search('^' + feature_name + ' (enable|disable) arg ') %}
+                {% set field = lbl | regex_replace('(?i)^.+ arg ([^:]+): .*$', '\\1') | trim %}
+                {% set raw = lbl | regex_replace('^[^:]+: ', '') | trim %}
+                {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
+                {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
+                {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
+                {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
+                {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_f.get(key, {}).get(fld, raw) | string}) %}
+                {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_l.get(key, {}).get(fld, raw) | string}) %}
+                {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
+                {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
+                {% endif %}{% endfor %}{{ ns.d }}
+          # 1. Leader Enable Script
+          - if:
+            - condition: template
+              value_template: '{{ _leader_enable_script != "" and leader_enabled | bool }}'
+            then:
+            - if:
+              - condition: template
+                value_template: >-
+                  {{ _leader_enable_script.startswith('automation.')
+                     or _leader_enable_script.startswith('scene.') }}
+              then:
+              - action: '{{ _leader_enable_script }}'
+                data: {}
+              else:
+              - choose:
+                - conditions:
+                  - condition: template
+                    value_template: '{{ _leader_enable_args | length == 0 }}'
+                  sequence:
+                  - if:
+                    - condition: template
+                      value_template: '{{ feature_error_mode != "stop" }}'
+                    then:
+                    - action: '{{ _leader_enable_script }}'
+                      data: >
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                      continue_on_error: true
+                    - if:
+                      - condition: template
+                        value_template: '{{ error is defined }}'
+                      then:
+                      - if:
+                        - condition: template
+                          value_template: '{{ feature_error_mode == "log" }}'
+                        then:
+                        - action: system_log.write
+                          data:
+                            level: error
+                            message: 'LF Leaders: leader enable script error {{ _leader_enable_script }} ({{ leader_entity_id }}, feature: {{ feature_name }}): {{ error }}'
+                      - if:
+                        - condition: template
+                          value_template: '{{ feature_error_mode == "alert" }}'
+                        then:
+                        - action: script.send_alert
+                          data:
+                            alert_severity: high
+                            alert_title: Labeled Feature Leader Script Error
+                            alert_message: 'Leader enable script error for {{ leader_entity_id }} (feature: {{ feature_name }}): {{ error }}'
+                    else:
+                    - action: '{{ _leader_enable_script }}'
+                      data: >
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                default:
+                - action: script.turn_on
+                  target:
+                    entity_id: '{{ _leader_enable_script }}'
+                  data:
+                    variables: >
+                      {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} | combine(_leader_enable_args) }}
+          # 2. Leader Disable Script
+          - if:
+            - condition: template
+              value_template: '{{ _leader_disable_script != "" and not (leader_enabled | bool) }}'
+            then:
+            - if:
+              - condition: template
+                value_template: >-
+                  {{ _leader_disable_script.startswith('automation.')
+                     or _leader_disable_script.startswith('scene.') }}
+              then:
+              - action: '{{ _leader_disable_script }}'
+                data: {}
+              else:
+              - choose:
+                - conditions:
+                  - condition: template
+                    value_template: '{{ _leader_disable_args | length == 0 }}'
+                  sequence:
+                  - if:
+                    - condition: template
+                      value_template: '{{ feature_error_mode != "stop" }}'
+                    then:
+                    - action: '{{ _leader_disable_script }}'
+                      data: >
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                      continue_on_error: true
+                    - if:
+                      - condition: template
+                        value_template: '{{ error is defined }}'
+                      then:
+                      - if:
+                        - condition: template
+                          value_template: '{{ feature_error_mode == "log" }}'
+                        then:
+                        - action: system_log.write
+                          data:
+                            level: error
+                            message: 'LF Leaders: leader disable script error {{ _leader_disable_script }} ({{ leader_entity_id }}, feature: {{ feature_name }}): {{ error }}'
+                      - if:
+                        - condition: template
+                          value_template: '{{ feature_error_mode == "alert" }}'
+                        then:
+                        - action: script.send_alert
+                          data:
+                            alert_severity: high
+                            alert_title: Labeled Feature Leader Script Error
+                            alert_message: 'Leader disable script error for {{ leader_entity_id }} (feature: {{ feature_name }}): {{ error }}'
+                    else:
+                    - action: '{{ _leader_disable_script }}'
+                      data: >
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                default:
+                - action: script.turn_on
+                  target:
+                    entity_id: '{{ _leader_disable_script }}'
+                  data:
+                    variables: >
+                      {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} | combine(_leader_disable_args) }}
+          # 3. Leader Default Script
+          - if:
+            - condition: template
+              value_template: >-
+                {{ _leader_default_script != "" and
+                   ((leader_enabled | bool and _leader_enable_script == "") or
+                    (not (leader_enabled | bool) and _leader_disable_script == "")) }}
+            then:
+            - if:
+              - condition: template
+                value_template: >-
+                  {{ _leader_default_script.startswith('automation.')
+                     or _leader_default_script.startswith('scene.') }}
+              then:
+              - action: '{{ _leader_default_script }}'
+                data: {}
+              else:
+              - choose:
+                - conditions:
+                  - condition: template
+                    value_template: '{{ _leader_default_args | length == 0 }}'
+                  sequence:
+                  - if:
+                    - condition: template
+                      value_template: '{{ feature_error_mode != "stop" }}'
+                    then:
+                    - action: '{{ _leader_default_script }}'
+                      data: >
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                      continue_on_error: true
+                    - if:
+                      - condition: template
+                        value_template: '{{ error is defined }}'
+                      then:
+                      - if:
+                        - condition: template
+                          value_template: '{{ feature_error_mode == "log" }}'
+                        then:
+                        - action: system_log.write
+                          data:
+                            level: error
+                            message: 'LF Leaders: leader default script error {{ _leader_default_script }} ({{ leader_entity_id }}, feature: {{ feature_name }}): {{ error }}'
+                      - if:
+                        - condition: template
+                          value_template: '{{ feature_error_mode == "alert" }}'
+                        then:
+                        - action: script.send_alert
+                          data:
+                            alert_severity: high
+                            alert_title: Labeled Feature Leader Script Error
+                            alert_message: 'Leader default script error for {{ leader_entity_id }} (feature: {{ feature_name }}): {{ error }}'
+                    else:
+                    - action: '{{ _leader_default_script }}'
+                      data: >
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                default:
+                - action: script.turn_on
+                  target:
+                    entity_id: '{{ _leader_default_script }}'
+                  data:
+                    variables: >
+                      {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} | combine(_leader_default_args) }}
+          - variables:
+              follower_label_name: >-
+                {%- if resolved_scope == 'area' -%}area follower: {{ feature_name }}{%- elif resolved_scope == 'floor' -%}floor follower: {{ feature_name }}{%- else -%}follower: {{ feature_name }}{%- endif -%}
+              all_followers: '{{ label_entities(follower_label_name) }}'
               followers: "{% if resolved_scope == 'area' %}\n  {% set area_ents =
                 area_entities(resolved_area_id) | list %}\n  {% set area_devs = area_devices(resolved_area_id)
                 %}\n  {% set ns = namespace(dev_ents=[]) %}\n  {% for d in area_devs
@@ -2260,6 +2502,44 @@
                       alert_title: Labeled Feature Leaders Error
                       alert_message: 'Error calling follower for {{ repeat.item }}
                         (feature: {{ feature_name }}): {{ error }}'
+- id: 'sleep_timeout_cancel_restore'
+  alias: Sleep Timeout Cancel Restore
+  description: >
+    Restores media player volumes when labeled_feature_sleep_timeout is cancelled
+    externally before completing. Triggered when the script goes from on to off
+    while script.labeled_feature_sleep_timeout still had a non-empty original_volumes
+    attribute (read from trigger.from_state.attributes.original_volumes). Unmutes
+    players first since cancellation may
+    have occurred after the mute step.
+  triggers:
+    - trigger: state
+      entity_id: script.labeled_feature_sleep_timeout
+      from: 'on'
+      to: 'off'
+  conditions:
+    - condition: template
+      value_template: >-
+        {{ trigger.from_state.attributes.original_volumes | default({}) | length > 0 }}
+  actions:
+    - variables:
+        stored_volumes: >-
+          {{ trigger.from_state.attributes.original_volumes | default({}) }}
+    - action: media_player.volume_mute
+      target:
+        entity_id: '{{ stored_volumes.keys() | list }}'
+      data:
+        is_volume_muted: false
+      continue_on_error: true
+    - repeat:
+        for_each: '{{ stored_volumes.keys() | list }}'
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              volume_level: '{{ stored_volumes[repeat.item] }}'
+            continue_on_error: true
+  mode: single
 - id: '1777371930626'
   alias: Buttons Bedroom 2
   description: ''
