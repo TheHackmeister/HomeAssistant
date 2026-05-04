@@ -3587,3 +3587,656 @@ labeled_feature_follower:
             '
           target:
             entity_id: '{{ follower_entity_id }}'
+
+labeled_feature_sleep_timeout:
+  alias: Labeled Feature Sleep Timeout
+  description: >
+    Single-run sleep-timeout script for the Labeled Feature Button system.
+    Uses mode: restart so that calling it again (e.g. after any media interaction
+    in night mode) resets the full countdown from the beginning.
+
+    Sequence (per the Label Based Features documentation):
+      1. Wait sleep_timeout_minutes (default 15 min)
+      2. Halve the volume on each area media player
+      3. Wait 1 minute
+      4. Mute volume
+      5. Seek back 30 s every 30 s × 20 iterations (≈ 10 min) — keeps the
+         playback position from advancing so the content is still "live" on unmute
+      6. Unmute volume
+      7. Restore each player to its original volume level
+
+    Call script.turn_on (or homeassistant.turn_on) to start/restart the timer.
+    Call homeassistant.turn_off targeting this script to cancel and restore.
+
+    Note: Because mode is restart only one countdown runs at a time per HA instance.
+    Create separate label/blueprint configurations for each user who needs
+    independent sleep-timeout behaviour.
+  mode: restart
+  fields:
+    area_media_players:
+      name: Area Media Players
+      description: >
+        List of media player entity IDs in the resolved area to fade and mute.
+        Passed automatically by labeled_feature_button.
+      required: true
+      selector:
+        object: {}
+    sleep_timeout_minutes:
+      name: Sleep Timeout Minutes
+      description: How long to wait before beginning the fade-out sequence (default 15).
+      required: false
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 120
+  sequence:
+    # ── Step 1: Capture original volumes ────────────────────────────────────
+    - variables:
+        original_volumes: >-
+          {% set ns = namespace(d={}) %}
+          {% for mp in area_media_players %}
+            {% set vol = state_attr(mp, 'volume_level') | float(0.5) %}
+            {% set ns.d = dict(ns.d, **{mp: vol}) %}
+          {% endfor %}
+          {{ ns.d }}
+
+    # ── Step 2: Wait the configured timeout ─────────────────────────────────
+    - delay:
+        minutes: '{{ sleep_timeout_minutes | default(15) | int }}'
+
+    # ── Step 3: Halve volume on every area media player ─────────────────────
+    - repeat:
+        for_each: '{{ area_media_players }}'
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              volume_level: >-
+                {{ (original_volumes.get(repeat.item, 0.5) / 2) | round(2) }}
+
+    # ── Step 4: Wait 1 minute ────────────────────────────────────────────────
+    - delay:
+        minutes: 1
+
+    # ── Step 5: Mute ─────────────────────────────────────────────────────────
+    - action: media_player.volume_mute
+      target:
+        entity_id: '{{ area_media_players }}'
+      data:
+        is_volume_muted: true
+
+    - delay:
+        minutes: 1
+
+    # ── Step 6: Seek back 30 s every 30 s × 20 iterations (≈ 10 minutes) ───
+    # Keeps the playback position from advancing while muted so the content
+    # is still near where it was when the user unmutes / restores.
+    - repeat:
+        count: 20
+        sequence:
+          - delay:
+              seconds: 30
+          - if:
+              - condition: template
+                value_template: '{{ area_media_players | length > 0 }}'
+            then:
+              - action: media_player.media_seek
+                target:
+                  entity_id: '{{ area_media_players | first }}'
+                data:
+                  seek_position: >-
+                    {{ [state_attr(area_media_players | first,
+                        'media_position') | float(0) - 30, 0] | max }}
+
+    # ── Step 7: Unmute ────────────────────────────────────────────────────────
+    - action: media_player.volume_mute
+      target:
+        entity_id: '{{ area_media_players }}'
+      data:
+        is_volume_muted: false
+
+    # ── Step 8: Restore original volumes ─────────────────────────────────────
+    - repeat:
+        for_each: '{{ area_media_players }}'
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              volume_level: '{{ original_volumes.get(repeat.item, 0.5) }}'
+
+labeled_feature_button:
+  alias: Labeled Feature Button
+  description: >
+    Handles button-based features for the Labeled Feature system. Called via the
+    Default Script pattern by labeled_feature_follower. The 'feature' field receives
+    the button action string (e.g. '1_short_release', 'toggle') from the
+    [leaders].[entity_id].[current_value] substitution on the follower entity.
+    Checks media playing state and night mode in the resolved area to determine
+    the correct action. dots_N_* events are mapped to their N_* equivalents so
+    2-button and media-player (IKEA E2123) devices share the same logic.
+    Night-mode interactions call labeled_feature_sleep_timeout (mode: restart)
+    to start/reset the sleep countdown, and homeassistant.turn_off on that same
+    script to cancel it.
+  mode: parallel
+  max: 50
+  fields:
+    feature:
+      name: Feature (Button Action)
+      description: >
+        The button event to handle. 2-button: 1_initial_press, 1_long_press,
+        1_short_release, 1_long_release, 1_double_press (and 2_* variants).
+        Media player: toggle, track_previous, track_next, volume_up, volume_down,
+        volume_up_hold, volume_down_hold, dots_1_* / dots_2_* (mapped internally).
+      required: true
+      selector:
+        select:
+          custom_value: true
+          options:
+            - 1_initial_press
+            - 1_long_press
+            - 1_short_release
+            - 1_long_release
+            - 1_double_press
+            - 2_initial_press
+            - 2_long_press
+            - 2_short_release
+            - 2_long_release
+            - 2_double_press
+            - toggle
+            - track_previous
+            - track_next
+            - volume_up
+            - volume_down
+            - volume_up_hold
+            - volume_down_hold
+            - dots_1_initial_press
+            - dots_1_long_press
+            - dots_1_short_release
+            - dots_1_long_release
+            - dots_1_double_press
+            - dots_2_initial_press
+            - dots_2_long_press
+            - dots_2_short_release
+            - dots_2_long_release
+            - dots_2_double_press
+    follower_entity_id:
+      name: Follower Entity ID
+      description: >
+        Used for area lookup. Passed automatically by labeled_feature_follower.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_entity_id:
+      name: Leader Entity ID (the button)
+      description: >
+        The button entity that triggered this script. Used as fallback for area
+        lookup when follower_entity_id is not provided.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_enabled:
+      name: Leader Enabled
+      description: >
+        Passed by labeled_feature_follower. Not used directly by button logic
+        (the feature string drives action selection instead).
+      required: false
+      default: true
+      selector:
+        boolean: {}
+    scope:
+      name: Scope
+      description: Scope of the feature (area, floor, or none).
+      required: false
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - none
+    scope_id:
+      name: Scope ID
+      description: The resolved area_id or floor_id passed by the automation.
+      required: false
+      default: ''
+      selector:
+        text: {}
+  sequence:
+    # ── Step 1: Resolve the operating area ──────────────────────────────────
+    - variables:
+        resolved_area_id: >-
+          {%- if scope is defined and scope == 'area'
+              and scope_id is defined and scope_id != '' -%}
+            {{ scope_id }}
+          {%- elif follower_entity_id is defined and follower_entity_id != '' -%}
+            {{ area_id(follower_entity_id) | default('') }}
+          {%- elif leader_entity_id is defined and leader_entity_id != '' -%}
+            {{ area_id(leader_entity_id) | default('') }}
+          {%- else -%}
+            {{ '' }}
+          {%- endif -%}
+
+    # ── Step 2: Gather area context ─────────────────────────────────────────
+    # All variables here are independent of each other; they only reference
+    # resolved_area_id which was set in Step 1.
+    - variables:
+        area_media_players: >-
+          {% if resolved_area_id != '' %}
+            {{ states.media_player
+               | selectattr('entity_id', 'in', area_entities(resolved_area_id))
+               | map(attribute='entity_id') | list }}
+          {% else %}
+            {{ [] }}
+          {% endif %}
+        media_playing: >-
+          {% if resolved_area_id != '' %}
+            {{ states.media_player
+               | selectattr('entity_id', 'in', area_entities(resolved_area_id))
+               | selectattr('state', 'in', ['playing', 'buffering'])
+               | list | count > 0 }}
+          {% else %}
+            false
+          {% endif %}
+        night_mode: '{{ is_state(''input_boolean.night_mode'', ''on'') }}'
+        feature_action: '{{ feature | lower | trim }}'
+
+    # ── Step 3: Map dots_N_* events → N_* for unified handling ──────────────
+    # IKEA E2123 dots buttons produce dots_1_* / dots_2_* events.
+    # IKEA Somrig / generic 2-button devices produce 1_* / 2_* events.
+    # Both device types share identical logic after this mapping.
+    - variables:
+        mapped_action: >-
+          {% set m = {
+            'dots_1_initial_press': '1_initial_press',
+            'dots_1_long_press':    '1_long_press',
+            'dots_1_short_release': '1_short_release',
+            'dots_1_long_release':  '1_long_release',
+            'dots_1_double_press':  '1_double_press',
+            'dots_2_initial_press': '2_initial_press',
+            'dots_2_long_press':    '2_long_press',
+            'dots_2_short_release': '2_short_release',
+            'dots_2_long_release':  '2_long_release',
+            'dots_2_double_press':  '2_double_press'
+          } %}
+          {{ m.get(feature_action, feature_action) }}
+
+    # ── Step 4: Route by action ──────────────────────────────────────────────
+    - choose:
+
+        # ────────────────────────────────────────────────────────────────────
+        # Media-player dedicated controls (no media-state branching needed)
+        # ────────────────────────────────────────────────────────────────────
+
+        # toggle — play/pause; always resets sleep timer when night mode is on
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "toggle" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ area_media_players | length > 0 }}'
+              then:
+                - action: media_player.media_play_pause
+                  target:
+                    entity_id: '{{ area_media_players }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+
+        # track_next — next track when playing; play area mood when not playing
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "track_next" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - action: media_player.media_next_track
+                  target:
+                    entity_id: '{{ area_media_players }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+              else:
+                - action: script.turn_on
+                  target:
+                    entity_id: script.audio_mood_play_in_area
+                  data: {}
+
+        # track_previous — previous track when playing; no-op when not playing
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "track_previous" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - action: media_player.media_previous_track
+                  target:
+                    entity_id: '{{ area_media_players }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+
+        # volume_up_hold — volume up + reset sleep timer when night mode
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "volume_up_hold" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ area_media_players | length > 0 }}'
+              then:
+                - action: media_player.volume_up
+                  target:
+                    entity_id: '{{ area_media_players }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+
+        # volume_down_hold — volume down + reset sleep timer when night mode
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "volume_down_hold" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ area_media_players | length > 0 }}'
+              then:
+                - action: media_player.volume_down
+                  target:
+                    entity_id: '{{ area_media_players }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+
+        # volume_up / volume_down — single step, no sleep timer interaction
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action in ["volume_up", "volume_down"] }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ area_media_players | length > 0 }}'
+              then:
+                - action: >-
+                    media_player.volume_{{ 'up' if mapped_action == 'volume_up' else 'down' }}
+                  target:
+                    entity_id: '{{ area_media_players }}'
+
+        # ────────────────────────────────────────────────────────────────────
+        # Button 1 — primary press (short_release only; initial_press ignored)
+        # Playing:     lights off + pause + (night: Sleep Timeout restart)
+        # Not playing: lights off + cancel Sleep Timeout timer
+        # ────────────────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "1_short_release" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - if:
+                    - condition: template
+                      value_template: '{{ resolved_area_id != "" }}'
+                  then:
+                    - action: light.turn_off
+                      target:
+                        area_id: '{{ resolved_area_id }}'
+                - action: media_player.media_pause
+                  target:
+                    entity_id: '{{ area_media_players }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+              else:
+                - if:
+                    - condition: template
+                      value_template: '{{ resolved_area_id != "" }}'
+                  then:
+                    - action: light.turn_off
+                      target:
+                        area_id: '{{ resolved_area_id }}'
+                - action: homeassistant.turn_off
+                  target:
+                    entity_id: script.labeled_feature_sleep_timeout
+
+        # ────────────────────────────────────────────────────────────────────
+        # Button 2 — primary press (short_release only; initial_press ignored)
+        # Playing:     pause + cancel Sleep Timeout timer
+        # Not playing: play + (night: Sleep Timeout restart)
+        # ────────────────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "2_short_release" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - action: media_player.media_pause
+                  target:
+                    entity_id: '{{ area_media_players }}'
+                - action: homeassistant.turn_off
+                  target:
+                    entity_id: script.labeled_feature_sleep_timeout
+              else:
+                - if:
+                    - condition: template
+                      value_template: '{{ area_media_players | length > 0 }}'
+                  then:
+                        - action: media_player.media_play
+                          target:
+                            entity_id: '{{ area_media_players }}'
+                        - if:
+                            - condition: template
+                              value_template: '{{ night_mode }}'
+                          then:
+                            # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
+                            - action: script.turn_on
+                              target:
+                                entity_id: script.labeled_feature_sleep_timeout
+                              data:
+                                variables:
+                                  area_media_players: '{{ area_media_players }}'
+
+        # ────────────────────────────────────────────────────────────────────
+        # Button 1 — double press
+        # Playing:     seek −30 s + (night: reset sleep timer)
+        # Not playing: previous track
+        # ────────────────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "1_double_press" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing and area_media_players | length > 0 }}'
+              then:
+                - action: media_player.media_seek
+                  target:
+                    entity_id: '{{ area_media_players | first }}'
+                  data:
+                    seek_position: >-
+                      {{ [state_attr(area_media_players | first,
+                          'media_position') | float(0) - 30, 0] | max }}
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+              else:
+                - if:
+                    - condition: template
+                      value_template: '{{ area_media_players | length > 0 }}'
+                  then:
+                    - action: media_player.media_previous_track
+                      target:
+                        entity_id: '{{ area_media_players | first }}'
+
+        # ────────────────────────────────────────────────────────────────────
+        # Button 2 — double press
+        # Playing:     seek +30 s + (night: reset sleep timer)
+        # Not playing: next track
+        # ────────────────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_action == "2_double_press" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing and area_media_players | length > 0 }}'
+              then:
+                - action: media_player.media_seek
+                  target:
+                    entity_id: '{{ area_media_players | first }}'
+                  data:
+                    seek_position: >-
+                      {{ state_attr(area_media_players | first,
+                         'media_position') | float(0) + 30 }}
+                - if:
+                    - condition: template
+                      value_template: '{{ night_mode }}'
+                  then:
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_sleep_timeout
+                      data:
+                        variables:
+                          area_media_players: '{{ area_media_players }}'
+              else:
+                - if:
+                    - condition: template
+                      value_template: '{{ area_media_players | length > 0 }}'
+                  then:
+                    - action: media_player.media_next_track
+                      target:
+                        entity_id: '{{ area_media_players | first }}'
+
+        # ────────────────────────────────────────────────────────────────────
+        # Button 1 — hold (long_release is the canonical hold action;
+        #            long_press handled identically for immediate feedback)
+        # Playing:     volume up + (night: Sleep Timeout restart)
+        # Not playing: (no-op — fan is a manual override)
+        # ────────────────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: >-
+                {{ mapped_action in ["1_long_release", "1_long_press"] }}
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - if:
+                    - condition: template
+                      value_template: '{{ area_media_players | length > 0 }}'
+                  then:
+                    - action: media_player.volume_up
+                      target:
+                        entity_id: '{{ area_media_players }}'
+                    - if:
+                        - condition: template
+                          value_template: '{{ night_mode }}'
+                      then:
+                        - action: script.turn_on
+                          target:
+                            entity_id: script.labeled_feature_sleep_timeout
+                          data:
+                            variables:
+                              area_media_players: '{{ area_media_players }}'
+
+        # ────────────────────────────────────────────────────────────────────
+        # Button 2 — hold
+        # Button 2 — hold
+        # Playing:     volume down + (night: Sleep Timeout restart)
+        # Not playing: toggle night mode
+        # ────────────────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: >-
+                {{ mapped_action in ["2_long_release", "2_long_press"] }}
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - if:
+                    - condition: template
+                      value_template: '{{ area_media_players | length > 0 }}'
+                  then:
+                    - action: media_player.volume_down
+                      target:
+                        entity_id: '{{ area_media_players }}'
+                    - if:
+                        - condition: template
+                          value_template: '{{ night_mode }}'
+                      then:
+                        - action: script.turn_on
+                          target:
+                            entity_id: script.labeled_feature_sleep_timeout
+                          data:
+                            variables:
+                              area_media_players: '{{ area_media_players }}'
+              else:
+                - action: input_boolean.toggle
+                  target:
+                    entity_id: input_boolean.night_mode
