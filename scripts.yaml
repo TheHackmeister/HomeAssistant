@@ -3830,7 +3830,7 @@ labeled_feature_button:
     - variables:
         resolved_area_id: >-
           {%- if scope is defined and scope == 'area'
-              and scope_id is defined and scope_id != '' -%}
+              and scope_id is defined and scope_id is not none and scope_id != '' -%}
             {{ scope_id }}
           {%- elif follower_entity_id is defined and follower_entity_id != '' -%}
             {{ area_id(follower_entity_id) | default('') }}

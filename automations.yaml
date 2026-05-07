@@ -2135,7 +2135,7 @@
               feature_name: '{{ repeat.item }}'
               leader_enabled: '{{ leader_features[repeat.item].enabled }}'
               resolved_scope: '{{ leader_features[repeat.item].scope }}'
-              resolved_area_id: '{{ area_id(leader_entity_id) | trim }}'
+              resolved_area_id: '{{ area_id(leader_entity_id) | default("", true) | trim }}'
               resolved_floor_id: >-
                 {%- if resolved_scope == 'floor' -%}
                 {%- set aid = area_id(leader_entity_id) -%}
@@ -2219,8 +2219,8 @@
                 {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
                 {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
                 {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
-                {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_f.get(key, {}).get(fld, raw) | string}) %}
-                {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_l.get(key, {}).get(fld, raw) | string}) %}
+                {% if root == 'features' %}{% set rk = feature_name if key == 'feature_name' else key %}{% set ns.d = dict(ns.d, **{field: lf_f.get(rk, {}).get(fld, raw) | string}) %}
+                {% elif root == 'leaders' %}{% set rk = leader_entity_id if key == 'feature_leader' else key %}{% set ns.d = dict(ns.d, **{field: lf_l.get(rk, {}).get(fld, raw) | string}) %}
                 {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
                 {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
                 {% endif %}{% endfor %}{{ ns.d }}
@@ -2236,8 +2236,8 @@
                 {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
                 {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
                 {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
-                {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_f.get(key, {}).get(fld, raw) | string}) %}
-                {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_l.get(key, {}).get(fld, raw) | string}) %}
+                {% if root == 'features' %}{% set rk = feature_name if key == 'feature_name' else key %}{% set ns.d = dict(ns.d, **{field: lf_f.get(rk, {}).get(fld, raw) | string}) %}
+                {% elif root == 'leaders' %}{% set rk = leader_entity_id if key == 'feature_leader' else key %}{% set ns.d = dict(ns.d, **{field: lf_l.get(rk, {}).get(fld, raw) | string}) %}
                 {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
                 {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
                 {% endif %}{% endfor %}{{ ns.d }}
@@ -2255,8 +2255,8 @@
                 {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
                 {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
                 {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
-                {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_f.get(key, {}).get(fld, raw) | string}) %}
-                {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_l.get(key, {}).get(fld, raw) | string}) %}
+                {% if root == 'features' %}{% set rk = feature_name if key == 'feature_name' else key %}{% set ns.d = dict(ns.d, **{field: lf_f.get(rk, {}).get(fld, raw) | string}) %}
+                {% elif root == 'leaders' %}{% set rk = leader_entity_id if key == 'feature_leader' else key %}{% set ns.d = dict(ns.d, **{field: lf_l.get(rk, {}).get(fld, raw) | string}) %}
                 {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
                 {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
                 {% endif %}{% endfor %}{{ ns.d }}
