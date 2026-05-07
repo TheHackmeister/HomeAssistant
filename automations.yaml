@@ -2126,10 +2126,10 @@
             \  | reject('none')\n   | list }}\n"
           all_leader_label_names: "{{ labels(leader_entity_id)\n   | map('label_name')\n
             \  | reject('none')\n   | map('lower')\n   | list }}\n"
-              leader_features: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
-                {}).get('features', {}) }}\n"
-              leader_current_value: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
-                {}).get('current_value', '') }}\n"
+          leader_features: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
+            {}).get('features', {}) }}\n"
+          leader_current_value: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
+            {}).get('current_value', '') }}\n"
       - repeat:
           for_each: '{{ leader_features | list }}'
           sequence:
