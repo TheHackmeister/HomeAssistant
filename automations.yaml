@@ -2461,6 +2461,68 @@
                 = ns.floor_entities + area_ents %}\n  {% endfor %}\n  {{ all_followers
                 | select('in', ns.floor_entities | unique | list) | list }}\n{% else
                 %}\n  {{ all_followers }}\n{% endif %}\n"
+          # === Leader-side FEATURE_NAME: state_value override detection ===
+          # When the leader has labels like 'Area Fan: 1_short_release' and
+          # leader_current_value == '1_short_release', those feature names are
+          # collected here. Their followers will be dispatched with leader_enabled:
+          # true BEFORE the main follower loop runs (Default Script Leader pattern).
+          - variables:
+              leader_feature_overrides: >-
+                {% set cv_lower = leader_current_value | lower %}
+                {% if cv_lower != '' %}
+                  {% set ns = namespace(features=[]) %}
+                  {% for lbl in all_leader_label_names %}
+                    {% if lbl.endswith(': ' + cv_lower) %}
+                      {% set prefix = lbl | regex_replace(': ' + cv_lower + '$', '') %}
+                      {% if not prefix | regex_search('^(area |floor |)leader')
+                            and not prefix | regex_search('^feature')
+                            and not prefix | regex_search(' (enable|disable|invert|only|script|error mode)$')
+                            and not prefix | regex_search(' (between|not between|increasing|decreasing)$')
+                            and not prefix | regex_search(' arg ') %}
+                        {% set ns.features = ns.features + [prefix] %}
+                      {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ ns.features }}
+                {% else %}
+                  {{ [] }}
+                {% endif %}
+          # Dispatch override-feature followers with leader_enabled: true first.
+          - repeat:
+              for_each: '{{ leader_feature_overrides }}'
+              sequence:
+              - variables:
+                  _ovr_fname: '{{ repeat.item }}'
+                  _ovr_follower_label_name: >-
+                    {%- if resolved_scope == 'area' -%}area follower: {{ _ovr_fname }}{%- elif resolved_scope == 'floor' -%}floor follower: {{ _ovr_fname }}{%- else -%}follower: {{ _ovr_fname }}{%- endif -%}
+                  _ovr_all_followers: '{{ label_entities(_ovr_follower_label_name) }}'
+                  _ovr_followers: "{% if resolved_scope == 'area' %}\n  {% set area_ents = area_entities(resolved_area_id) | list %}\n  {% set area_devs = area_devices(resolved_area_id) %}\n  {% set ns = namespace(dev_ents=[]) %}\n  {% for d in area_devs %}\n    {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list %}\n  {% endfor %}\n  {% set all_area_ents = (area_ents + ns.dev_ents) | unique | list %}\n  {{ _ovr_all_followers | select('in', all_area_ents) | list }}\n{% elif resolved_scope == 'floor' %}\n  {% set floor_area_list = floor_areas(resolved_floor_id) %}\n  {% set ns = namespace(floor_entities=[]) %}\n  {% for a in floor_area_list %}\n    {% set area_ents = area_entities(a) | list %}\n    {% set area_devs = area_devices(a) %}\n    {% for d in area_devs %}\n      {% set ns.floor_entities = ns.floor_entities + device_entities(d) | list %}\n    {% endfor %}\n    {% set ns.floor_entities = ns.floor_entities + area_ents %}\n  {% endfor %}\n  {{ _ovr_all_followers | select('in', ns.floor_entities | unique | list) | list }}\n{% else %}\n  {{ _ovr_all_followers }}\n{% endif %}\n"
+              - repeat:
+                  for_each: '{{ _ovr_followers }}'
+                  sequence:
+                  - action: script.labeled_feature_follower
+                    data:
+                      follower_entity_id: '{{ repeat.item }}'
+                      feature: '{{ _ovr_fname }}'
+                      leader_entity_id: '{{ leader_entity_id }}'
+                      leader_enabled: true
+                      scope: '{{ resolved_scope }}'
+                      scope_id: '{{ resolved_scope_id }}'
+                    continue_on_error: true
+                  - if:
+                    - condition: template
+                      value_template: '{{ error is defined }}'
+                    then:
+                    - if:
+                      - condition: template
+                        value_template: '{{ feature_error_mode == ''log'' }}'
+                      then:
+                      - action: system_log.write
+                        data:
+                          level: error
+                          message: 'Labeled Feature Leaders: error calling override follower
+                            {{ repeat.item }} (override feature: {{ _ovr_fname }},
+                            current feature: {{ feature_name }}): {{ error }}'
           - repeat:
               for_each: '{{ followers }}'
               sequence:
@@ -2470,6 +2532,11 @@
                        | map('label_name') | reject('none') | map('lower') | list
                        | select('match', '^' + feature_name + ': ' + (leader_current_value | lower) + '$')
                        | list | count > 0 }}
+              # Skip this follower's default-script path when a leader-side override
+              # was already dispatched to the appropriate feature's followers.
+              # (follower_value_match = true still proceeds — it has its own explicit value.)
+              - condition: template
+                value_template: "{{ not (leader_feature_overrides | length > 0 and not follower_value_match) }}"
               - action: script.labeled_feature_follower
                 data:
                   follower_entity_id: '{{ repeat.item }}'
