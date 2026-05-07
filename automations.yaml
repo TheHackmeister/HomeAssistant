@@ -2126,8 +2126,10 @@
             \  | reject('none')\n   | list }}\n"
           all_leader_label_names: "{{ labels(leader_entity_id)\n   | map('label_name')\n
             \  | reject('none')\n   | map('lower')\n   | list }}\n"
-          leader_features: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
-            {}).get('features', {}) }}\n"
+              leader_features: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
+                {}).get('features', {}) }}\n"
+              leader_current_value: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
+                {}).get('current_value', '') }}\n"
       - repeat:
           for_each: '{{ leader_features | list }}'
           sequence:
@@ -2462,12 +2464,18 @@
           - repeat:
               for_each: '{{ followers }}'
               sequence:
+              - variables:
+                  follower_value_match: >-
+                    {{ labels(repeat.item)
+                       | map('label_name') | reject('none') | map('lower') | list
+                       | select('match', '^' + feature_name + ': ' + (leader_current_value | lower) + '$')
+                       | list | count > 0 }}
               - action: script.labeled_feature_follower
                 data:
                   follower_entity_id: '{{ repeat.item }}'
-                  feature: '{{ feature_name }}'
+                  feature: "{{ leader_current_value if follower_value_match else feature_name }}"
                   leader_entity_id: '{{ leader_entity_id }}'
-                  leader_enabled: '{{ leader_enabled }}'
+                  leader_enabled: "{{ true if follower_value_match else leader_enabled }}"
                   scope: '{{ resolved_scope }}'
                   scope_id: '{{ resolved_scope_id }}'
                 continue_on_error: true
