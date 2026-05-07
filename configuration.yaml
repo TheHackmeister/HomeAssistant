@@ -89,7 +89,7 @@ template:
             {% endfor %}
             {% set ns.result = dict(ns.result, **{
               e.entity_id: {
-                'current_value': e.state,
+                'current_value': e.attributes.event_type | default(e.state) if e.domain == 'event' else e.state,
                 'previous_value': prev.get(e.entity_id, {}).get('current_value', ''),
                 'last_changed_timestamp': e.last_changed_timestamp,
                 'features': fns.features
