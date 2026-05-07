@@ -2468,11 +2468,11 @@
           # true BEFORE the main follower loop runs (Default Script Leader pattern).
           - variables:
               leader_feature_overrides: >-
-                {% set cv_lower = leader_current_value | lower %}
+                {% set cv_lower = leader_current_value | lower | trim %}
                 {% if cv_lower != '' %}
                   {% set ns = namespace(features=[]) %}
                   {% for lbl in all_leader_label_names %}
-                    {% if lbl.endswith(': ' + cv_lower) %}
+                    {% if lbl | regex_search(': ' + cv_lower + '$') %}
                       {% set prefix = lbl | regex_replace(': ' + cv_lower + '$', '') %}
                       {% if not prefix | regex_search('^(area |floor |)leader')
                             and not prefix | regex_search('^feature')
