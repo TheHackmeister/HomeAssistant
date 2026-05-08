@@ -2120,8 +2120,8 @@
       sequence:
       - variables:
           leader_entity_id: '{{ repeat.item }}'
-          is_increasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
-          is_decreasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
+          is_increasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.from_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
+          is_decreasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.from_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
           all_leader_labels: "{{ labels(leader_entity_id)\n   | map('label_name')\n
             \  | reject('none')\n   | list }}\n"
           leader_features: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,

@@ -41,11 +41,13 @@ template:
             {{ 0 }}
           {% endif %}
         leaders: >
-          {% set prev = this.attributes.leaders | default({}) %}
           {% set entities = expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp') %}
           {% set ns = namespace(result={}) %}
           {% for e in entities %}
+            {% set cv_raw = e.attributes.event_type | default(e.state) if e.domain == 'event' else e.state %}
+            {% set cv = this.attributes.leaders.get(e.entity_id, {}).get('current_value', cv_raw)
+                if cv_raw | regex_search('_initial_press$') else cv_raw %}
             {% set labels = labels(e.entity_id)
                 | map('label_name') | reject('none') | list %}
             {% set fns = namespace(features={}) %}
@@ -91,8 +93,7 @@ template:
             {% endfor %}
             {% set ns.result = dict(ns.result, **{
               e.entity_id: {
-                'current_value': e.attributes.event_type | default(e.state) if e.domain == 'event' else e.state,
-                'previous_value': prev.get(e.entity_id, {}).get('current_value', ''),
+                'current_value': cv,
                 'last_changed_timestamp': e.last_changed_timestamp,
                 'features': fns.features
               }
