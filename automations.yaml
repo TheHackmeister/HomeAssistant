@@ -2212,7 +2212,7 @@
                 {% endif %}
           - condition: template
             value_template: '{{ leader_should_proceed }}'
-          # === Leader script (consolidated; Enable/Disable Script fallback to Script) ===
+          # === Leader script + args (combined) ===
           - variables:
               leader_script: >-
                 {%- if leader_enabled | bool -%}
@@ -2236,7 +2236,6 @@
                   {%- endif -%}
                   {{- s -}}
                 {%- endif -%}
-          - variables:
               leader_script_args: >-
                 {% set ns = namespace(d={}) %}
                 {% set lf_l = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
@@ -2313,7 +2312,7 @@
                   data:
                     variables: >
                       {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} | combine(leader_script_args) }}
-          # === Follower dispatch (single loop; overrides replace current feature) ===
+          # === Follower dispatch (scope → followers → dispatch_list, combined) ===
           - variables:
               follower_label_name: >-
                 {%- if resolved_scope == 'area' -%}Area Follower: {{ feature_name }}{%- elif resolved_scope == 'floor' -%}Floor Follower: {{ feature_name }}{%- else -%}Follower: {{ feature_name }}{%- endif -%}
@@ -2348,22 +2347,24 @@
                 {% else %}
                   {{ all_f }}
                 {% endif %}
-          - variables:
               dispatch_list: >-
                 {% set ns = namespace(items=[]) %}
-                {% for f in followers %}
-                  {% set ns.items = ns.items + [{'f': f, 'feat': feature_name, 'en': leader_enabled}] %}
-                {% endfor %}
-                {% for ovr in leader_feature_overrides | sort %}
-                  {% set inverted = (ovr + ' Invert: true') in all_leader_labels %}
-                  {% set eff_en = (not leader_enabled) if inverted else leader_enabled %}
-                  {% set ovr_lbl = 'Area Follower: ' + ovr if resolved_scope == 'area' else ('Floor Follower: ' + ovr if resolved_scope == 'floor' else 'Follower: ' + ovr) %}
-                  {% set all_ovr_f = label_entities(ovr_lbl) | list %}
-                  {% set ovr_followers = all_ovr_f | select('in', scope_entity_set) | list if scope_entity_set | length > 0 else all_ovr_f %}
-                  {% for f in ovr_followers %}
-                    {% set ns.items = ns.items + [{'f': f, 'feat': ovr, 'en': eff_en}] %}
+                {% if leader_feature_overrides | length > 0 %}
+                  {% for ovr in leader_feature_overrides | sort %}
+                    {% set inverted = (ovr + ' Invert: true') in all_leader_labels %}
+                    {% set eff_en = false if inverted else true %}
+                    {% set ovr_lbl = 'Area Follower: ' + ovr if resolved_scope == 'area' else ('Floor Follower: ' + ovr if resolved_scope == 'floor' else 'Follower: ' + ovr) %}
+                    {% set all_ovr_f = label_entities(ovr_lbl) | list %}
+                    {% set ovr_followers = all_ovr_f | select('in', scope_entity_set) | list if scope_entity_set | length > 0 else all_ovr_f %}
+                    {% for f in ovr_followers %}
+                      {% set ns.items = ns.items + [{'f': f, 'feat': ovr, 'en': eff_en}] %}
+                    {% endfor %}
                   {% endfor %}
-                {% endfor %}
+                {% else %}
+                  {% for f in followers %}
+                    {% set ns.items = ns.items + [{'f': f, 'feat': feature_name, 'en': leader_enabled}] %}
+                  {% endfor %}
+                {% endif %}
                 {{ ns.items }}
           - repeat:
               for_each: '{{ dispatch_list }}'
