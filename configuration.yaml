@@ -34,7 +34,10 @@ template:
       attributes:
         last_updated_at: >
           {% set entities = expand(label_entities('feature_leader'))
-              | sort(attribute='last_changed_timestamp') | list %}
+              | sort(attribute='last_changed_timestamp')
+              | rejectattr('state', 'in', ['unknown', 'unavailable'])
+              | rejectattr('attributes.event_type', 'match', '.*_initial_press$')
+              | list %}
           {% if entities | count > 0 %}
             {{ entities | last | attr('last_changed_timestamp') }}
           {% else %}
@@ -46,8 +49,9 @@ template:
           {% set ns = namespace(result={}) %}
           {% for e in entities %}
             {% set cv_raw = e.attributes.event_type | default(e.state) if e.domain == 'event' else e.state %}
-            {% set cv = this.attributes.leaders.get(e.entity_id, {}).get('current_value', cv_raw)
-                if cv_raw | regex_search('_initial_press$') else cv_raw %}
+            {% set is_skip = cv_raw | regex_search('_initial_press$') or cv_raw | lower in ['unknown', 'unavailable'] %}
+            {% set cv = this.attributes.leaders.get(e.entity_id, {}).get('current_value', cv_raw) if is_skip else cv_raw %}
+            {% set cv_ts = this.attributes.leaders.get(e.entity_id, {}).get('last_changed_timestamp', e.last_changed_timestamp) if is_skip else e.last_changed_timestamp %}
             {% set labels = labels(e.entity_id)
                 | map('label_name') | reject('none') | list %}
             {% set fns = namespace(features={}) %}
@@ -94,7 +98,7 @@ template:
             {% set ns.result = dict(ns.result, **{
               e.entity_id: {
                 'current_value': cv,
-                'last_changed_timestamp': e.last_changed_timestamp,
+                'last_changed_timestamp': cv_ts,
                 'features': fns.features
               }
             }) %}
