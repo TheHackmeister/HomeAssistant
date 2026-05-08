@@ -108,6 +108,8 @@ template:
           {% set ns = namespace(result={}) %}
           {% for entity in expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp') %}
+            {% set cv_raw = entity.attributes.event_type | default(entity.state) if entity.domain == 'event' else entity.state %}
+            {% set is_skip = cv_raw | regex_search('_initial_press$') or cv_raw | lower in ['unknown', 'unavailable'] %}
             {% set labels  = labels(entity.entity_id)
                 | map('label_name') | reject('none') | list %}
             {% for label in labels %}
@@ -143,12 +145,14 @@ template:
                 {% endif %}
                 {% set inverted = (fname + ' Invert: true') in labels %}
                 {% set feat_enabled = (not feat_enabled) if inverted else feat_enabled %}
+                {% set feat_value = this.attributes.features.get(fname, {}).get('value', entity.state) if is_skip else entity.state %}
+                {% set feat_ts = this.attributes.features.get(fname, {}).get('timestamp', entity.last_changed_timestamp) if is_skip else entity.last_changed_timestamp %}
                 {% set ns.result = dict(ns.result, **{
                   fname: {
                     'leader_entity_id': entity.entity_id,
-                    'value': entity.state,
+                    'value': feat_value,
                     'enabled': feat_enabled,
-                    'timestamp': entity.last_changed_timestamp
+                    'timestamp': feat_ts
                   }
                 }) %}
               {% endif %}
