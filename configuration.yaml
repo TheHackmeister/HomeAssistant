@@ -46,29 +46,27 @@ template:
               | sort(attribute='last_changed_timestamp') %}
           {% set ns = namespace(result={}) %}
           {% for e in entities %}
-            {% set lbl_lower = labels(e.entity_id)
-                | map('label_name') | reject('none') | map('lower') | list %}
-            {% set lbl_orig = labels(e.entity_id)
+            {% set labels = labels(e.entity_id)
                 | map('label_name') | reject('none') | list %}
             {% set fns = namespace(features={}) %}
-            {% for lbl in lbl_lower %}
-              {% set feature_match = lbl
-                  | regex_replace('^(area |floor |)leader: ', '') %}
-              {% if feature_match != lbl %}
+            {% for label in labels %}
+              {% set feature_match = label
+                  | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
+              {% if feature_match != label %}
                 {% set fname = feature_match %}
-                {% set scope = 'area' if lbl.startswith('area leader') else
-                               ('floor' if lbl.startswith('floor leader') else 'none') %}
-                {% set en_lbl = lbl_orig
-                    | select('match', '(?i)^' + fname + ' enable: .+')
+                {% set scope = 'area' if label | lower | regex_search('^area leader') else
+                               ('floor' if label | lower | regex_search('^floor leader') else 'none') %}
+                {% set en_lbl = labels
+                    | select('match', '^' + fname + ' Enable: .+')
                     | first | default('') %}
-                {% set dis_lbl = lbl_orig
-                    | select('match', '(?i)^' + fname + ' disable: .+')
+                {% set dis_lbl = labels
+                    | select('match', '^' + fname + ' Disable: .+')
                     | first | default('') %}
-                {% set en_val = en_lbl | regex_replace('(?i)^.+: ', '') %}
-                {% set dis_val = dis_lbl | regex_replace('(?i)^.+: ', '') %}
+                {% set en_val = en_lbl | regex_replace('^.+: ', '') %}
+                {% set dis_val = dis_lbl | regex_replace('^.+: ', '') %}
                 {% if en_val != '' or dis_val != '' %}
-                  {% set by_en = en_val != '' and e.state | lower == en_val | lower %}
-                  {% set by_dis = dis_val != '' and e.state | lower == dis_val | lower %}
+                  {% set by_en = en_val != '' and e.state == en_val %}
+                  {% set by_dis = dis_val != '' and e.state == dis_val %}
                   {% if en_val != '' and dis_val != '' %}
                     {% set base_enabled = by_en and not by_dis %}
                   {% elif en_val != '' %}
@@ -77,10 +75,14 @@ template:
                     {% set base_enabled = not by_dis %}
                   {% endif %}
                 {% else %}
-                  {% set base_enabled = e.state | lower in
-                      ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] %}
+                  {% if e.domain in ['event', 'button'] %}
+                    {% set base_enabled = true %}
+                  {% else %}
+                    {% set base_enabled = e.state | lower in
+                        ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] %}
+                  {% endif %}
                 {% endif %}
-                {% set inverted = (fname + ' invert: true') in lbl_lower %}
+                {% set inverted = (fname + ' Invert: true') in labels %}
                 {% set final_enabled = (not base_enabled) if inverted else base_enabled %}
                 {% set fns.features = dict(fns.features, **{
                   fname: {'enabled': final_enabled, 'scope': scope}
@@ -101,26 +103,24 @@ template:
           {% set ns = namespace(result={}) %}
           {% for entity in expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp') %}
-            {% set lbl_lower = labels(entity.entity_id)
-                | map('label_name') | reject('none') | map('lower') | list %}
-            {% set lbl_orig  = labels(entity.entity_id)
+            {% set labels  = labels(entity.entity_id)
                 | map('label_name') | reject('none') | list %}
-            {% for lbl in lbl_lower %}
-              {% set feature_match = lbl
-                  | regex_replace('^(area |floor |)leader: ', '') %}
-              {% if feature_match != lbl %}
+            {% for label in labels %}
+              {% set feature_match = label
+                  | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
+              {% if feature_match != label %}
                 {% set fname = feature_match %}
-                {% set en_lbl = lbl_orig
-                    | select('match', '(?i)^' + fname + ' enable: .+')
+                {% set en_lbl = labels
+                    | select('match', '^' + fname + ' Enable: .+')
                     | first | default('') %}
-                {% set dis_lbl = lbl_orig
-                    | select('match', '(?i)^' + fname + ' disable: .+')
+                {% set dis_lbl = labels
+                    | select('match', '^' + fname + ' Disable: .+')
                     | first | default('') %}
-                {% set en_val  = en_lbl  | regex_replace('(?i)^.+: ', '') %}
-                {% set dis_val = dis_lbl | regex_replace('(?i)^.+: ', '') %}
+                {% set en_val  = en_lbl  | regex_replace('^.+: ', '') %}
+                {% set dis_val = dis_lbl | regex_replace('^.+: ', '') %}
                 {% if en_val != '' or dis_val != '' %}
-                  {% set by_en  = en_val  != '' and entity.state | lower == en_val  | lower %}
-                  {% set by_dis = dis_val != '' and entity.state | lower == dis_val | lower %}
+                  {% set by_en  = en_val  != '' and entity.state == en_val %}
+                  {% set by_dis = dis_val != '' and entity.state == dis_val %}
                   {% if en_val != '' and dis_val != '' %}
                     {% set feat_enabled = by_en and not by_dis %}
                   {% elif en_val != '' %}
@@ -129,10 +129,14 @@ template:
                     {% set feat_enabled = not by_dis %}
                   {% endif %}
                 {% else %}
-                  {% set feat_enabled = entity.state | lower in
-                      ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] %}
+                  {% if entity.domain in ['event', 'button'] %}
+                    {% set feat_enabled = true %}
+                  {% else %}
+                    {% set feat_enabled = entity.state | lower in
+                        ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] %}
+                  {% endif %}
                 {% endif %}
-                {% set inverted = (fname + ' invert: true') in lbl_lower %}
+                {% set inverted = (fname + ' Invert: true') in labels %}
                 {% set feat_enabled = (not feat_enabled) if inverted else feat_enabled %}
                 {% set ns.result = dict(ns.result, **{
                   fname: {

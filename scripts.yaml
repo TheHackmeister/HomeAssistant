@@ -3024,35 +3024,32 @@ labeled_feature_follower:
         text: {}
   sequence:
   - variables:
-      feature_name: '{{ feature | lower }}'
-      follower_label_names_original: "{{ labels(follower_entity_id)\n   | map('label_name')\n
+      feature_name: '{{ feature }}'
+      follower_labels: "{{ labels(follower_entity_id)\n   | map('label_name')\n
         \  | reject('none')\n   | list }}\n"
-      follower_label_names: "{{ labels(follower_entity_id)\n   | map('label_name')\n
-        \  | reject('none')\n   | map('lower')\n   | list }}\n"
       follower_domain: '{{ follower_entity_id.split(''.'')[0] }}'
   - variables:
-      follower_error_mode: "{% set em_pfx = feature_name + ' error mode: ' %} {%
-        set match = follower_label_names\n    | select('match', '^' + em_pfx + '(silent|log|alert|stop)$')\n
-        \   | first | default('') %} {{ match | regex_replace('^.+: ', '') | default('log',
-        true) }}\n"
-      follower_inverted: '{{ (feature_name + '' invert: true'') in follower_label_names
-        }}
+      follower_error_mode: "{% set em_pfx = feature_name + ' Error Mode: ' %} {%
+        set match = follower_labels\n    | select('match', '^' + em_pfx
+        + '(silent|log|alert|stop)$')\n    | first | default('') %} {{ match | regex_replace('^.+:
+        ', '') | default('log', true) }}\n"
+      follower_inverted: '{{ (feature_name + '' Invert: true'') in follower_labels
 
-        '
+        }}'
       follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled
         }}
 
         '
   - variables:
-      follower_only: "{% set only_label = feature_name + ' only: ' %} {% set match
-        = follower_label_names\n               | select('match', '^' + only_label
-        + '(enable|disable)$')\n               | first | default('') %}\n{{ match
+      follower_only: "{% set only_label = feature_name + ' Only: ' %} {% set match
+        = follower_labels\n               | select('match', '^' + only_label
+        + '(Enable|Disable)$')\n               | first | default('') %}\n{{ match
         | regex_replace('^.+: ', '') }}\n"
-      follower_between: "{{ follower_label_names_original\n   | select('match', '(?i)^'
-        + feature_name + ' between: .+')\n   | map('regex_replace', '(?i)^.+: ',
-        '')\n   | list }}\n"
-      follower_not_between: "{{ follower_label_names_original\n   | select('match',
-        '(?i)^' + feature_name + ' not between: .+')\n   | map('regex_replace', '(?i)^.+:
+      follower_between: "{{ follower_labels\n   | select('match', '^'
+        + feature_name + ' Between: .+')\n   | map('regex_replace', '^.+: ', '')\n
+        \  | list }}\n"
+      follower_not_between: "{{ follower_labels\n   | select('match',
+        '^' + feature_name + ' Not Between: .+')\n   | map('regex_replace', '^.+:
         ', '')\n   | list }}\n"
       follower_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set ns =
         namespace(ok=true, any_b=false) %} {% for val in follower_between %} {% set
@@ -3070,7 +3067,7 @@ labeled_feature_follower:
         or s<=e) else (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.ok =
         false %}{% endif %} {% endfor %} {{ ns.ok }}\n"
       follower_should_act: >-
-        {%- set only = follower_only | trim -%}
+        {%- set only = follower_only | trim | lower -%}
         {%- if only == 'enable' and not leader_enabled -%}false
         {%- elif only == 'disable' and leader_enabled -%}false
         {%- elif only != '' and only not in ['enable', 'disable'] -%}false
@@ -3080,16 +3077,22 @@ labeled_feature_follower:
   - condition: template
     value_template: '{{ follower_should_act }}'
   - variables:
-      follower_target_value: "{% set pfx = feature_name + (' enable: ' if follower_enabled\n        else ' disable: ') %} {% set match = follower_label_names_original\n               |\n        select('match', '(?i)^' + pfx + '.+')\n               | first | default('')\n        %} {% if match == '' %} {% set pfx2 = feature_name + ': ' %} {% set match\n        = follower_label_names_original | select('match', '(?i)^' + pfx2 + '.+')\n        | first | default('') %} {% endif %} {{ match | regex_replace('(?i)^.+: ',\n        '') | trim }}\n"
-      follower_enable_script: "{% set pfx = feature_name + ' enable script: ' %} {{
-        follower_label_names_original\n   | select('match', '(?i)^' + pfx + '.+')\n
-        \  | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
-      follower_disable_script: "{% set pfx = feature_name + ' disable script: ' %}
-        {{ follower_label_names_original\n   | select('match', '(?i)^' + pfx + '.+')\n
-        \  | first | default('')\n   | regex_replace('(?i)^.+: ', '') }}\n"
-      follower_default_script: "{% set pfx = feature_name + ' script: ' %} {{ follower_label_names_original\n
-        \  | select('match', '(?i)^' + pfx + '.+')\n   | first | default('')\n   |
-        regex_replace('(?i)^.+: ', '') }}\n"
+      follower_target_value: "{% set pfx = feature_name + (' Enable: ' if follower_enabled\n
+        \       else ' Disable: ') %} {% set match = follower_labels\n
+        \              |\n        select('match', '^' + pfx + '.+')\n               |
+        first | default('')\n        %} {% if match == '' %} {% set pfx2 = feature_name
+        + ': ' %} {% set match\n        = follower_labels | select('match',
+        '^' + pfx2 + '.+')\n        | first | default('') %} {% endif %} {{ match
+        | regex_replace('^.+: ',\n        '') | trim }}\n"
+      follower_enable_script: "{% set pfx = feature_name + ' Enable Script: ' %} {{
+        follower_labels\n   | select('match', '^' + pfx + '.+')\n  |
+        first | default('')\n   | regex_replace('^.+: ', '') }}\n"
+      follower_disable_script: "{% set pfx = feature_name + ' Disable Script: ' %}
+        {{ follower_labels\n   | select('match', '^' + pfx + '.+')\n
+        \  | first | default('')\n   | regex_replace('^.+: ', '') }}\n"
+      follower_default_script: "{% set pfx = feature_name + ' Script: ' %} {{ follower_labels\n
+        \  | select('match', '^' + pfx + '.+')\n   | first | default('')\n   | regex_replace('^.+:
+        ', '') }}\n"
   # === Dynamic Arg Label System + Argument Substitutions ===
   # Collects FEATURE (Enable|Disable) Arg FIELD: value labels from the follower entity.
   # Values matching [root].[key].[field] are substituted from sensor.labeled_features_state.
@@ -3101,9 +3104,9 @@ labeled_feature_follower:
         {% set ns = namespace(d={}) %}
         {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
         {% set lf_features = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
-        {% for lbl in follower_label_names_original %}
-        {% if lbl | lower | regex_search('^' + feature_name + ' enable arg [^:]+:') %}
-        {% set field = lbl | regex_replace('(?i)^.+ enable arg ([^:]+): .*$', '\\1') | trim %}
+        {% for lbl in follower_labels %}
+        {% if lbl | regex_search('^' + feature_name + ' Enable Arg [^:]+:') %}
+        {% set field = lbl | regex_replace('^.+ Enable Arg ([^:]+): .*$', '\\1') | trim %}
         {% set raw = lbl | regex_replace('^[^:]*: ', '') | trim %}
         {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
         {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
@@ -3119,9 +3122,9 @@ labeled_feature_follower:
         {% set ns = namespace(d={}) %}
         {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
         {% set lf_features = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
-        {% for lbl in follower_label_names_original %}
-        {% if lbl | lower | regex_search('^' + feature_name + ' disable arg [^:]+:') %}
-        {% set field = lbl | regex_replace('(?i)^.+ disable arg ([^:]+): .*$', '\\1') | trim %}
+        {% for lbl in follower_labels %}
+        {% if lbl | regex_search('^' + feature_name + ' Disable Arg [^:]+:') %}
+        {% set field = lbl | regex_replace('^.+ Disable Arg ([^:]+): .*$', '\\1') | trim %}
         {% set raw = lbl | regex_replace('^[^:]*: ', '') | trim %}
         {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
         {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
@@ -3137,11 +3140,10 @@ labeled_feature_follower:
         {% set ns = namespace(d={}) %}
         {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
         {% set lf_features = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
-        {% for lbl in follower_label_names_original %}
-        {% set lbl_lower = lbl | lower %}
-        {% if lbl_lower | regex_search('^' + feature_name + ' arg [^:]+:')
-        and not lbl_lower | regex_search('^' + feature_name + ' (enable|disable) arg ') %}
-        {% set field = lbl | regex_replace('(?i)^.+ arg ([^:]+): .*$', '\\1') | trim %}
+        {% for lbl in follower_labels %}
+        {% if lbl | regex_search('^' + feature_name + ' Arg [^:]+:')
+        and not lbl | regex_search('^' + feature_name + ' (Enable|Disable) Arg ') %}
+        {% set field = lbl | regex_replace('^.+ Arg ([^:]+): .*$', '\\1') | trim %}
         {% set raw = lbl | regex_replace('^[^:]*: ', '') | trim %}
         {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
         {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
