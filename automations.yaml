@@ -2351,22 +2351,19 @@
           - variables:
               dispatch_list: >-
                 {% set ns = namespace(items=[]) %}
-                {% if leader_feature_overrides | length > 0 %}
-                  {% for ovr in leader_feature_overrides | sort %}
-                    {% set inverted = (ovr + ' Invert: true') in all_leader_labels %}
-                    {% set eff_en = false if inverted else true %}
-                    {% set ovr_lbl = 'Area Follower: ' + ovr if resolved_scope == 'area' else ('Floor Follower: ' + ovr if resolved_scope == 'floor' else 'Follower: ' + ovr) %}
-                    {% set all_ovr_f = label_entities(ovr_lbl) | list %}
-                    {% set ovr_followers = all_ovr_f | select('in', scope_entity_set) | list if scope_entity_set | length > 0 else all_ovr_f %}
-                    {% for f in ovr_followers %}
-                      {% set ns.items = ns.items + [{'f': f, 'feat': ovr, 'en': eff_en}] %}
-                    {% endfor %}
+                {% for f in followers %}
+                  {% set ns.items = ns.items + [{'f': f, 'feat': feature_name, 'en': leader_enabled}] %}
+                {% endfor %}
+                {% for ovr in leader_feature_overrides | sort %}
+                  {% set inverted = (ovr + ' Invert: true') in all_leader_labels %}
+                  {% set eff_en = (not leader_enabled) if inverted else leader_enabled %}
+                  {% set ovr_lbl = 'Area Follower: ' + ovr if resolved_scope == 'area' else ('Floor Follower: ' + ovr if resolved_scope == 'floor' else 'Follower: ' + ovr) %}
+                  {% set all_ovr_f = label_entities(ovr_lbl) | list %}
+                  {% set ovr_followers = all_ovr_f | select('in', scope_entity_set) | list if scope_entity_set | length > 0 else all_ovr_f %}
+                  {% for f in ovr_followers %}
+                    {% set ns.items = ns.items + [{'f': f, 'feat': ovr, 'en': eff_en}] %}
                   {% endfor %}
-                {% else %}
-                  {% for f in followers %}
-                    {% set ns.items = ns.items + [{'f': f, 'feat': feature_name, 'en': leader_enabled}] %}
-                  {% endfor %}
-                {% endif %}
+                {% endfor %}
                 {{ ns.items }}
           - repeat:
               for_each: '{{ dispatch_list }}'
