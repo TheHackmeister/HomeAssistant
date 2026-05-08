@@ -2196,7 +2196,8 @@
                   {% set ns = namespace(features=[]) %}
                   {% for lbl in all_leader_labels %}
                     {% if lbl | regex_search(': ' + cv + '$') %}
-                      {% set prefix = lbl | regex_replace(': ' + cv + '$', '') | trim %}
+                      {% set prefix_raw = lbl | regex_replace(': ' + cv + '$', '') | trim %}
+                      {% set prefix = prefix_raw | regex_replace('^(Area |Floor )', '') | trim %}
                       {% if not prefix | regex_search('^(Area |Floor |)Leader')
                             and not prefix | regex_search('^Feature')
                             and not prefix | regex_search(' (Enable|Disable|Invert|Only|Script|Error Mode)$')
