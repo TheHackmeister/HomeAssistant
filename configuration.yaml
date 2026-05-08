@@ -36,7 +36,7 @@ template:
           {% set entities = expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp')
               | rejectattr('state', 'in', ['unknown', 'unavailable'])
-              | rejectattr('attributes.event_type', 'match', '.*_initial_press$')
+              | rejectattr('state', 'match', '.*_initial_press$')
               | list %}
           {% if entities | count > 0 %}
             {{ entities | last | attr('last_changed_timestamp') }}
