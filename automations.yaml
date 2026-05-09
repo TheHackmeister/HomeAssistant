@@ -2179,12 +2179,13 @@
                 and (e=='-' or now_time<=e)) if (s=='-' or e=='-' or s<=e) else (now_time>=s
                 or now_time<=e) %} {% if in_r %}{% set ns.ok = false %}{% endif %}
                 {% endfor %} {{ ns.ok }}\n"
-              leader_should_proceed: '{% if leader_only == ''enable'' and not leader_enabled
-                %} false {% elif leader_only == ''disable'' and leader_enabled %}
-                false {% elif leader_direction == ''increasing'' and not is_increasing
-                %} false {% elif leader_direction == ''decreasing'' and not is_decreasing
-                %} false {% elif not leader_time_ok %} false {% else %} true {% endif
-                %}
+              leader_toggle: "{{ (feature_name + ' Toggle: true') in all_leader_labels }}\n"
+              leader_should_proceed: '{% if leader_toggle %} true {% elif leader_only
+                == ''enable'' and not leader_enabled %} false {% elif leader_only
+                == ''disable'' and leader_enabled %} false {% elif leader_direction
+                == ''increasing'' and not is_increasing %} false {% elif leader_direction
+                == ''decreasing'' and not is_decreasing %} false {% elif not leader_time_ok
+                %} false {% else %} true {% endif %}
 
                 '
               feature_error_mode: "{% set pfx = feature_name + ' Error Mode: ' %}\n
@@ -2356,16 +2357,17 @@
                   {% for ovr in leader_feature_overrides | sort %}
                     {% set inverted = (ovr + ' Invert: true') in all_leader_labels %}
                     {% set eff_en = false if inverted else true %}
+                    {% set ovr_toggle = (ovr + ' Toggle: true') in all_leader_labels %}
                     {% set ovr_lbl = 'Area Follower: ' + ovr if resolved_scope == 'area' else ('Floor Follower: ' + ovr if resolved_scope == 'floor' else 'Follower: ' + ovr) %}
                     {% set all_ovr_f = label_entities(ovr_lbl) | list %}
                     {% set ovr_followers = all_ovr_f | select('in', scope_entity_set) | list if scope_entity_set | length > 0 else all_ovr_f %}
                     {% for f in ovr_followers %}
-                      {% set ns.items = ns.items + [{'f': f, 'feat': ovr, 'en': eff_en}] %}
+                      {% set ns.items = ns.items + [{'f': f, 'feat': ovr, 'en': eff_en, 'toggle': ovr_toggle}] %}
                     {% endfor %}
                   {% endfor %}
                 {% else %}
                   {% for f in followers %}
-                    {% set ns.items = ns.items + [{'f': f, 'feat': feature_name, 'en': leader_enabled}] %}
+                    {% set ns.items = ns.items + [{'f': f, 'feat': feature_name, 'en': leader_enabled, 'toggle': leader_toggle}] %}
                   {% endfor %}
                 {% endif %}
                 {{ ns.items }}
@@ -2378,6 +2380,7 @@
                   feature: '{{ repeat.item.feat }}'
                   leader_entity_id: '{{ leader_entity_id }}'
                   leader_enabled: '{{ repeat.item.en }}'
+                  toggle: '{{ repeat.item.toggle | default(false) }}'
                   scope: '{{ resolved_scope }}'
                   scope_id: '{{ resolved_scope_id }}'
                 continue_on_error: true
