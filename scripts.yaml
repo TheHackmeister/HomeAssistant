@@ -3373,10 +3373,10 @@ labeled_feature_follower:
           data:
             variables: >
               {{ _disable_script_std_fields | combine(_disable_script_valid_args) }}
-  # 3. Direct value OR Default Script (value wins; default script only if no value found)
+  # 3. Direct value — only when a value label was found AND not in toggle mode
   - if:
     - condition: template
-      value_template: '{{ follower_target_value != "" }}'
+      value_template: '{{ follower_target_value != "" and not follower_toggle }}'
     then:
     - condition: template
       value_template: '{{ states(follower_entity_id) != follower_target_value }}'
@@ -3447,119 +3447,176 @@ labeled_feature_follower:
             entity_id: '{{ follower_entity_id }}'
           data:
             brightness_pct: '{{ [follower_target_value | int(0), 100] | min }}'
-    else:
-    # 4. Default Script (only when no direct value label was found)
+  # 4. Default Script — only when no direct value label was found and not in toggle mode
+  - if:
+    - condition: template
+      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_default_script | trim != "" }}'
+    then:
     - if:
       - condition: template
-        value_template: '{{ follower_default_script | trim != "" }}'
+        value_template: '{{ follower_default_script.startswith(''automation.'')
+          or follower_default_script.startswith(''scene.'') }}'
       then:
-        - if:
+      - action: '{{ follower_default_script | trim }}'
+        data: {}
+      else:
+      - choose:
+        # No Arg labels: synchronous call preserving continue_on_error / error propagation
+        - conditions:
           - condition: template
-            value_template: '{{ follower_default_script.startswith(''automation.'')
-              or follower_default_script.startswith(''scene.'') }}'
-          then:
-          - action: '{{ follower_default_script | trim }}'
-            data: {}
-          else:
-          - choose:
-            # No Arg labels: synchronous call preserving continue_on_error / error propagation
-            - conditions:
+            value_template: '{{ _default_script_args | length == 0 }}'
+          sequence:
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode != ''stop'' }}'
+            then:
+            - action: '{{ follower_default_script | trim }}'
+              data: >
+                {{ _default_script_std_fields }}
+              continue_on_error: true
+            - if:
               - condition: template
-                value_template: '{{ _default_script_args | length == 0 }}'
-              sequence:
+                value_template: '{{ error is defined }}'
+              then:
               - if:
                 - condition: template
-                  value_template: '{{ follower_error_mode != ''stop'' }}'
+                  value_template: '{{ follower_error_mode == ''log'' }}'
                 then:
-                - action: '{{ follower_default_script | trim }}'
-                  data: >
-                    {{ _default_script_std_fields }}
-                  continue_on_error: true
-                - if:
-                  - condition: template
-                    value_template: '{{ error is defined }}'
-                  then:
-                  - if:
-                    - condition: template
-                      value_template: '{{ follower_error_mode == ''log'' }}'
-                    then:
-                    - action: system_log.write
-                      data:
-                        level: error
-                        message: 'Labeled Feature Follower: error calling default script
-                          {{ follower_default_script }} for {{ follower_entity_id }} (feature:
-                          {{ feature_name }}): {{ error }}'
-                  - if:
-                    - condition: template
-                      value_template: '{{ follower_error_mode == ''alert'' }}'
-                    then:
-                    - action: script.send_alert
-                      data:
-                        alert_severity: high
-                        alert_title: Labeled Feature Script Error
-                        alert_message: 'Error calling default script for {{ follower_entity_id
-                          }} (feature: {{ feature_name }}): {{ error }}'
-                else:
-                - action: '{{ follower_default_script | trim }}'
-                  data: >
-                    {{ _default_script_std_fields }}
-            # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
-            default:
-            - if:
-              - condition: template
-                value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
-              then:
-              - stop: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} (feature: {{ feature }})'
-                error: true
-            - if:
-              - condition: template
-                value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
-              then:
-              - action: system_log.write
-                data:
-                  level: warning
-                  message: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
-            - if:
-              - condition: template
-                value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
-              then:
-              - action: script.send_alert
-                data:
-                  alert_severity: high
-                  alert_title: Labeled Feature Script Arg Error
-                  alert_message: 'Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
-            - action: script.turn_on
-              target:
-                entity_id: '{{ follower_default_script | trim }}'
-              data:
-                variables: >
-                  {{ _default_script_std_fields | combine(_default_script_valid_args) }}
-      # 5. Toggle path - when follower_toggle is true and no direct-value label was found
-      - if:
-        - condition: template
-          value_template: '{{ follower_toggle }}'
-        then:
-        - variables:
-            _toggle_current_on: >-
-              {{ states(follower_entity_id) | lower in
-                 ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] }}
-            _toggle_supported_domains: >-
-              {{ ['light', 'switch', 'input_boolean', 'fan', 'cover',
-                  'media_player', 'climate', 'humidifier', 'siren', 'remote',
-                  'automation', 'script', 'lock'] }}
-            _toggle_unsupported_domains: >-
-              {{ ['select', 'input_select', 'number', 'input_number', 'text',
-                  'input_text', 'scene', 'button', 'event', 'sensor',
-                  'binary_sensor', 'vacuum'] }}
+                - action: system_log.write
+                  data:
+                    level: error
+                    message: 'Labeled Feature Follower: error calling default script
+                      {{ follower_default_script }} for {{ follower_entity_id }} (feature:
+                      {{ feature_name }}): {{ error }}'
+              - if:
+                - condition: template
+                  value_template: '{{ follower_error_mode == ''alert'' }}'
+                then:
+                - action: script.send_alert
+                  data:
+                    alert_severity: high
+                    alert_title: Labeled Feature Script Error
+                    alert_message: 'Error calling default script for {{ follower_entity_id
+                      }} (feature: {{ feature_name }}): {{ error }}'
+            else:
+            - action: '{{ follower_default_script | trim }}'
+              data: >
+                {{ _default_script_std_fields }}
+        # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
+        default:
         - if:
           - condition: template
-            value_template: '{{ follower_domain in _toggle_unsupported_domains }}'
+            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
           then:
+          - stop: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} (feature: {{ feature }})'
+            error: true
+        - if:
+          - condition: template
+            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
+          then:
+          - action: system_log.write
+            data:
+              level: warning
+              message: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
+        - if:
+          - condition: template
+            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
+          then:
+          - action: script.send_alert
+            data:
+              alert_severity: high
+              alert_title: Labeled Feature Script Arg Error
+              alert_message: 'Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
+        - action: script.turn_on
+          target:
+            entity_id: '{{ follower_default_script | trim }}'
+          data:
+            variables: >
+              {{ _default_script_std_fields | combine(_default_script_valid_args) }}
+  # 5. Toggle path — when follower_toggle is true (direct-value labels are skipped above)
+  - if:
+    - condition: template
+      value_template: '{{ follower_toggle }}'
+    then:
+    - variables:
+        _toggle_current_on: >-
+          {{ states(follower_entity_id) | lower in
+             ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] }}
+        _toggle_supported_domains: >-
+          {{ ['light', 'switch', 'input_boolean', 'fan', 'cover',
+              'media_player', 'climate', 'humidifier', 'siren', 'remote',
+              'automation', 'script', 'lock'] }}
+        _toggle_unsupported_domains: >-
+          {{ ['select', 'input_select', 'number', 'input_number', 'text',
+              'input_text', 'scene', 'button', 'event', 'sensor',
+              'binary_sensor', 'vacuum'] }}
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain in _toggle_unsupported_domains }}'
+      then:
+      - if:
+        - condition: template
+          value_template: '{{ follower_error_mode == "stop" }}'
+        then:
+        - stop: 'Labeled Feature Follower: toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+          error: true
+      - if:
+        - condition: template
+          value_template: '{{ follower_error_mode == "log" }}'
+        then:
+        - action: system_log.write
+          data:
+            level: error
+            message: 'Labeled Feature Follower: toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+      - if:
+        - condition: template
+          value_template: '{{ follower_error_mode == "alert" }}'
+        then:
+        - action: script.send_alert
+          data:
+            alert_severity: high
+            alert_title: Labeled Feature Toggle Error
+            alert_message: 'Toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+    - if:
+      - condition: template
+        value_template: '{{ follower_domain == "lock" }}'
+      then:
+      - action: '{{ "lock.unlock" if _toggle_current_on else "lock.lock" }}'
+        target:
+          entity_id: '{{ follower_entity_id }}'
+    - if:
+      - condition: template
+        value_template: >-
+          {{ follower_domain == 'media_player' and
+             follower_domain not in _toggle_unsupported_domains }}
+      then:
+      - variables:
+          _mp_supported: '{{ state_attr(follower_entity_id, "supported_features") | int(0) }}'
+          _mp_supports_on_off: '{{ _mp_supported | bitwise_and(128) > 0 }}'
+          _mp_supports_mute: '{{ _mp_supported | bitwise_and(4) > 0 }}'
+      - if:
+        - condition: template
+          value_template: '{{ _mp_supports_on_off }}'
+        then:
+        - action: media_player.toggle
+          target:
+            entity_id: '{{ follower_entity_id }}'
+        else:
+        - if:
+          - condition: template
+            value_template: '{{ _mp_supports_mute }}'
+          then:
+          - action: media_player.volume_mute
+            target:
+              entity_id: '{{ follower_entity_id }}'
+            data:
+              is_volume_muted: '{{ not (state_attr(follower_entity_id, "is_volume_muted") | bool(false)) }}'
+          else:
           - if:
             - condition: template
               value_template: '{{ follower_error_mode == "stop" }}'
             then:
-            - stop: 'Labeled Feature Follower: toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+            - stop: 'Labeled Feature Follower: media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
               error: true
           - if:
             - condition: template
@@ -3568,7 +3625,7 @@ labeled_feature_follower:
             - action: system_log.write
               data:
                 level: error
-                message: 'Labeled Feature Follower: toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+                message: 'Labeled Feature Follower: media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
           - if:
             - condition: template
               value_template: '{{ follower_error_mode == "alert" }}'
@@ -3577,160 +3634,103 @@ labeled_feature_follower:
               data:
                 alert_severity: high
                 alert_title: Labeled Feature Toggle Error
-                alert_message: 'Toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
-        - if:
-          - condition: template
-            value_template: '{{ follower_domain == "lock" }}'
-          then:
-          - action: '{{ "lock.unlock" if _toggle_current_on else "lock.lock" }}'
-            target:
-              entity_id: '{{ follower_entity_id }}'
-        - if:
-          - condition: template
-            value_template: >-
-              {{ follower_domain == 'media_player' and
-                 follower_domain not in _toggle_unsupported_domains }}
-          then:
-          - variables:
-              _mp_supported: '{{ state_attr(follower_entity_id, "supported_features") | int(0) }}'
-              _mp_supports_on_off: '{{ _mp_supported | bitwise_and(128) > 0 }}'
-              _mp_supports_mute: '{{ _mp_supported | bitwise_and(4) > 0 }}'
-          - if:
-            - condition: template
-              value_template: '{{ _mp_supports_on_off }}'
-            then:
-            - action: media_player.toggle
-              target:
-                entity_id: '{{ follower_entity_id }}'
-            else:
-            - if:
-              - condition: template
-                value_template: '{{ _mp_supports_mute }}'
-              then:
-              - action: media_player.volume_mute
-                target:
-                  entity_id: '{{ follower_entity_id }}'
-                data:
-                  is_volume_muted: '{{ not (state_attr(follower_entity_id, "is_volume_muted") | bool(false)) }}'
-              else:
-              - if:
-                - condition: template
-                  value_template: '{{ follower_error_mode == "stop" }}'
-                then:
-                - stop: 'Labeled Feature Follower: media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
-                  error: true
-              - if:
-                - condition: template
-                  value_template: '{{ follower_error_mode == "log" }}'
-                then:
-                - action: system_log.write
-                  data:
-                    level: error
-                    message: 'Labeled Feature Follower: media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
-              - if:
-                - condition: template
-                  value_template: '{{ follower_error_mode == "alert" }}'
-                then:
-                - action: script.send_alert
-                  data:
-                    alert_severity: high
-                    alert_title: Labeled Feature Toggle Error
-                    alert_message: 'media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
-        - if:
-          - condition: template
-            value_template: >-
-              {{ follower_domain in _toggle_supported_domains and
-                 follower_domain not in ['lock', 'media_player'] }}
-          then:
-          - action: homeassistant.toggle
-            target:
-              entity_id: '{{ follower_entity_id }}'
-      # 6. Fallback: turn_on/turn_off based on follower_enabled (post-invert)
+                alert_message: 'media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
+    - if:
+      - condition: template
+        value_template: >-
+          {{ follower_domain in _toggle_supported_domains and
+             follower_domain not in ['lock', 'media_player'] }}
+      then:
+      - action: homeassistant.toggle
+        target:
+          entity_id: '{{ follower_entity_id }}'
+  # 6. Fallback: turn_on/turn_off based on follower_enabled (post-invert)
+  #    Only runs when no direct value, no toggle, and no default script handled it.
+  - if:
+    - condition: template
+      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain == ''light'' }}'
+    then:
+    - condition: template
+      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
+        if follower_enabled else ['off']) }}\n"
+    - action: 'light.turn_{{ ''on'' if follower_enabled else ''off'' }}
+
+        '
+      target:
+        entity_id: '{{ follower_entity_id }}'
+  - if:
+    - condition: template
+      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain in [''switch'', ''input_boolean''] }}
+
+        '
+    then:
+    - condition: template
+      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
+        if follower_enabled else ['off']) }}\n"
+    - action: '{{ follower_domain }}.turn_{{ ''on'' if follower_enabled else ''off''
+        }}
+
+        '
+      target:
+        entity_id: '{{ follower_entity_id }}'
+  - if:
+    - condition: template
+      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain == ''media_player'' }}'
+    then:
+    - variables:
+        mp_supported: '{{ state_attr(follower_entity_id, ''supported_features'')
+          | int(0) }}
+
+          '
+        mp_supports_on_off: '{{ mp_supported | bitwise_and(128) > 0 }}
+
+          '
+        mp_supports_mute: '{{ mp_supported | bitwise_and(4) > 0 }}
+
+          '
+    - if:
+      - condition: template
+        value_template: '{{ mp_supports_on_off }}'
+      then:
+      - condition: template
+        value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
+          'playing', 'idle', 'paused', 'buffering']\n    if follower_enabled else
+          ['off', 'unavailable', 'standby']) }}\n"
+      - action: 'media_player.turn_{{ ''on'' if follower_enabled else ''off''
+          }}
+
+          '
+        target:
+          entity_id: '{{ follower_entity_id }}'
+      else:
       - if:
         - condition: template
-          value_template: '{{ follower_domain == ''light'' }}'
+          value_template: '{{ mp_supports_mute }}'
         then:
         - condition: template
-          value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
-            if follower_enabled else ['off']) }}\n"
-        - action: 'light.turn_{{ ''on'' if follower_enabled else ''off'' }}
-
-            '
+          value_template: "{{ state_attr(follower_entity_id, 'is_volume_muted')\n
+            \  != (not follower_enabled) }}\n"
+        - action: media_player.volume_mute
           target:
             entity_id: '{{ follower_entity_id }}'
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain in [''switch'', ''input_boolean''] }}
+          data:
+            is_volume_muted: '{{ not follower_enabled }}'
+  - if:
+    - condition: template
+      value_template: "{{ follower_target_value == '' and not follower_toggle and follower_domain not in ['light', 'switch', 'input_boolean',\n
+        \  'media_player', 'number', 'input_number', 'text',\n   'input_text',
+        'select', 'input_select'] }}\n"
+    then:
+    - condition: template
+      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
+        'true', 'home', 'open', 'detected', 'active', 'unlocked']\n    if follower_enabled
+        else\n    ['off', 'false', 'away', 'closed', 'clear', 'inactive', 'locked'])
+        }}\n"
+    - action: 'homeassistant.turn_{{ ''on'' if follower_enabled else ''off'' }}
 
-            '
-        then:
-        - condition: template
-          value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
-            if follower_enabled else ['off']) }}\n"
-        - action: '{{ follower_domain }}.turn_{{ ''on'' if follower_enabled else ''off''
-            }}
-
-            '
-          target:
-            entity_id: '{{ follower_entity_id }}'
-      - if:
-        - condition: template
-          value_template: '{{ follower_domain == ''media_player'' }}'
-        then:
-        - variables:
-            mp_supported: '{{ state_attr(follower_entity_id, ''supported_features'')
-              | int(0) }}
-
-              '
-            mp_supports_on_off: '{{ mp_supported | bitwise_and(128) > 0 }}
-
-              '
-            mp_supports_mute: '{{ mp_supported | bitwise_and(4) > 0 }}
-
-              '
-        - if:
-          - condition: template
-            value_template: '{{ mp_supports_on_off }}'
-          then:
-          - condition: template
-            value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
-              'playing', 'idle', 'paused', 'buffering']\n    if follower_enabled else
-              ['off', 'unavailable', 'standby']) }}\n"
-          - action: 'media_player.turn_{{ ''on'' if follower_enabled else ''off''
-              }}
-
-              '
-            target:
-              entity_id: '{{ follower_entity_id }}'
-          else:
-          - if:
-            - condition: template
-              value_template: '{{ mp_supports_mute }}'
-            then:
-            - condition: template
-              value_template: "{{ state_attr(follower_entity_id, 'is_volume_muted')\n
-                \  != (not follower_enabled) }}\n"
-            - action: media_player.volume_mute
-              target:
-                entity_id: '{{ follower_entity_id }}'
-              data:
-                is_volume_muted: '{{ not follower_enabled }}'
-      - if:
-        - condition: template
-          value_template: "{{ follower_domain not in ['light', 'switch', 'input_boolean',\n
-            \  'media_player', 'number', 'input_number', 'text',\n   'input_text',
-            'select', 'input_select'] }}\n"
-        then:
-        - condition: template
-          value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
-            'true', 'home', 'open', 'detected', 'active', 'unlocked']\n    if follower_enabled
-            else\n    ['off', 'false', 'away', 'closed', 'clear', 'inactive', 'locked'])
-            }}\n"
-        - action: 'homeassistant.turn_{{ ''on'' if follower_enabled else ''off'' }}
-
-            '
-          target:
-            entity_id: '{{ follower_entity_id }}'
+        '
+      target:
+        entity_id: '{{ follower_entity_id }}'
 
 labeled_feature_sleep_timeout:
   alias: Labeled Feature Sleep Timeout
