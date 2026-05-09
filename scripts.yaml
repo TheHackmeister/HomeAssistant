@@ -3052,7 +3052,7 @@ labeled_feature_follower:
         set match = follower_labels\n    | select('match', '^' + em_pfx
         + '(silent|log|alert|stop)$')\n    | first | default('') %} {{ match | regex_replace('^.+:
         ', '') | default('log', true) }}\n"
-      follower_inverted: '{{ (scoped_feature + '' Invert: true'') in follower_labels
+      follower_inverted: '{{ (scoped_feature + '' Invert: True'') in follower_labels
 
         }}'
       follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled
@@ -3179,7 +3179,7 @@ labeled_feature_follower:
   # When in toggle mode, Invert is ignored (we read the raw current state).
   - variables:
       follower_toggle: >-
-        {{ (toggle | default(false) | bool) or ((scoped_feature + ' Toggle: true') in follower_labels) }}
+        {{ (toggle | default(false) | bool) or ((scoped_feature + ' Toggle: True') in follower_labels) }}
       _std_fields_base: >-
         {{ {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id, 'toggle': follower_toggle} }}
       _enable_script_fields: >-

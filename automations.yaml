@@ -2158,8 +2158,8 @@
                 match = all_leader_labels\n               | select('match',
                 '^' + only_label + '(Enable|Disable)$')\n               | first | default('')
                 %}\n{{ match | regex_replace('^.+: ', '') }}\n"
-              leader_direction: "{% if (scoped_feature_leader + ' Increasing: true') in all_leader_labels
-                %}\n  increasing\n{% elif (scoped_feature_leader + ' Decreasing: true') in
+              leader_direction: "{% if (scoped_feature_leader + ' Increasing: True') in all_leader_labels
+                %}\n  increasing\n{% elif (scoped_feature_leader + ' Decreasing: True') in
                 all_leader_labels %}\n  decreasing\n{% else %}\n  none\n{%
                 endif %}\n"
               leader_between: "{{ all_leader_labels\n   | select('match',
@@ -2185,7 +2185,7 @@
                 and (e=='-' or now_time<=e)) if (s=='-' or e=='-' or s<=e) else (now_time>=s
                 or now_time<=e) %} {% if in_r %}{% set ns.ok = false %}{% endif %}
                 {% endfor %} {{ ns.ok }}\n"
-              leader_toggle: "{{ (scoped_feature_leader + ' Toggle: true') in all_leader_labels }}\n"
+              leader_toggle: "{{ (scoped_feature_leader + ' Toggle: True') in all_leader_labels }}\n"
               leader_should_proceed: '{% if leader_toggle %} true {% elif leader_only
                 == ''enable'' and not leader_enabled %} false {% elif leader_only
                 == ''disable'' and leader_enabled %} false {% elif leader_direction
@@ -2361,9 +2361,9 @@
                 {% set ns = namespace(items=[]) %}
                 {% if leader_feature_overrides | length > 0 %}
                   {% for ovr in leader_feature_overrides | sort %}
-                    {% set inverted = (ovr + ' Invert: true') in all_leader_labels %}
+                    {% set inverted = (ovr + ' Invert: True') in all_leader_labels %}
                     {% set eff_en = false if inverted else true %}
-                    {% set ovr_toggle = (ovr + ' Toggle: true') in all_leader_labels %}
+                    {% set ovr_toggle = (ovr + ' Toggle: True') in all_leader_labels %}
                     {% set ovr_lbl = 'Area Follower: ' + ovr if resolved_scope == 'area' else ('Floor Follower: ' + ovr if resolved_scope == 'floor' else 'Follower: ' + ovr) %}
                     {% set all_ovr_f = label_entities(ovr_lbl) | list %}
                     {% set ovr_followers = all_ovr_f | select('in', scope_entity_set) | list if scope_entity_set | length > 0 else all_ovr_f %}
