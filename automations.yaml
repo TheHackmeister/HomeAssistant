@@ -2120,8 +2120,6 @@
       sequence:
       - variables:
           leader_entity_id: '{{ repeat.item }}'
-          is_increasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur > prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
-          is_decreasing: "{% set cur = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') | float(-99999) %} {% set prev = trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') | float(-99999) %} {% if cur != -99999 and prev != -99999 %}\n  {{ cur < prev }}\n{% else %}\n  {{ none }}\n{% endif %}\n"
           all_leader_labels: "{{ labels(leader_entity_id)\n   | map('label_name')\n
             \  | reject('none')\n   | list }}\n"
           leader_features: "{{ trigger.to_state.attributes.leaders.get(leader_entity_id,
@@ -2158,10 +2156,6 @@
                 match = all_leader_labels\n               | select('match',
                 '^' + only_label + '(Enable|Disable)$')\n               | first | default('')
                 %}\n{{ match | regex_replace('^.+: ', '') }}\n"
-              leader_direction: "{% if (scoped_feature_leader + ' Increasing: True') in all_leader_labels
-                %}\n  increasing\n{% elif (scoped_feature_leader + ' Decreasing: True') in
-                all_leader_labels %}\n  decreasing\n{% else %}\n  none\n{%
-                endif %}\n"
               leader_between: "{{ all_leader_labels\n   | select('match',
                 '^' + scoped_feature_leader + ' Between: .+')\n   | map('regex_replace', '^.+:
                 ', '')\n   | list }}\n"
@@ -2188,9 +2182,7 @@
               leader_toggle: "{{ (scoped_feature_leader + ' Toggle: True') in all_leader_labels }}\n"
               leader_should_proceed: '{% if leader_toggle %} true {% elif leader_only
                 == ''enable'' and not leader_enabled %} false {% elif leader_only
-                == ''disable'' and leader_enabled %} false {% elif leader_direction
-                == ''increasing'' and not is_increasing %} false {% elif leader_direction
-                == ''decreasing'' and not is_decreasing %} false {% elif not leader_time_ok
+                == ''disable'' and leader_enabled %} false {% elif not leader_time_ok
                 %} false {% else %} true {% endif %}
 
                 '
