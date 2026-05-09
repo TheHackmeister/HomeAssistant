@@ -59,6 +59,34 @@ template:
             {% set prev_cv_l = '' if prev_cv_l_raw | regex_search('_initial_press$') or prev_cv_l_raw | lower in ['unknown', 'unavailable'] else prev_cv_l_raw %}
             {% set labels = labels(e.entity_id)
                 | map('label_name') | reject('none') | list %}
+            {# Pre-check: if ALL features on this entity are direction-gated and none match,
+               treat this update as a skip (carry over previous values, don't advance state).
+               This mirrors the _initial_press / unknown / unavailable suppression pattern. #}
+            {% set dir_ns = namespace(has_dir=false, any_dir_match=false, has_non_dir=false) %}
+            {% for lbl in labels %}
+              {% set fm = lbl | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
+              {% if fm != lbl %}
+                {% set fn = fm %}
+                {% set has_inc = (fn + ' Increasing: True') in labels %}
+                {% set has_dec = (fn + ' Decreasing: True') in labels %}
+                {% if has_inc or has_dec %}
+                  {% set dir_ns.has_dir = true %}
+                  {% set cur_n = cv | float(none) %}
+                  {% set prev_n = prev_cv_l | float(none) %}
+                  {% set mv = cur_n is not none and prev_n is not none %}
+                  {% if (has_inc and mv and cur_n > prev_n) or (has_dec and mv and cur_n < prev_n) %}
+                    {% set dir_ns.any_dir_match = true %}
+                  {% endif %}
+                {% else %}
+                  {% set dir_ns.has_non_dir = true %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {# Skip if all features are direction-gated and none matched direction #}
+            {% set is_skip = is_skip or (dir_ns.has_dir and not dir_ns.any_dir_match and not dir_ns.has_non_dir) %}
+            {# Re-resolve cv/cv_ts after potential direction-based skip #}
+            {% set cv = prev_l.get('current_value', cv_raw) if is_skip else cv_raw %}
+            {% set cv_ts = prev_l.get('last_changed_timestamp', e.last_changed_timestamp) if is_skip else e.last_changed_timestamp %}
             {% set fns = namespace(features={}) %}
             {% for label in labels %}
               {% set feature_match = label
@@ -130,6 +158,34 @@ template:
             {% set is_skip = cv_raw | regex_search('_initial_press$') or cv_raw | lower in ['unknown', 'unavailable'] %}
             {% set labels  = labels(entity.entity_id)
                 | map('label_name') | reject('none') | list %}
+            {# Pre-check: if ALL features on this entity are direction-gated and none match,
+               treat this update as a skip (carry over previous values, don't advance state).
+               This mirrors the _initial_press / unknown / unavailable suppression pattern. #}
+            {% set dir_ns = namespace(has_dir=false, any_dir_match=false, has_non_dir=false) %}
+            {% for lbl in labels %}
+              {% set fm = lbl | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
+              {% if fm != lbl %}
+                {% set fn = fm %}
+                {% set has_inc = (fn + ' Increasing: True') in labels %}
+                {% set has_dec = (fn + ' Decreasing: True') in labels %}
+                {% if has_inc or has_dec %}
+                  {% set dir_ns.has_dir = true %}
+                  {% set prev_f_pre = this.attributes.get('features', {}).get(fn, {}) %}
+                  {% set cur_val = prev_f_pre.get('value', entity.state) if is_skip else entity.state %}
+                  {% set prev_val = prev_f_pre.get('previous_value', '') %}
+                  {% set cur_n = cur_val | float(none) %}
+                  {% set prev_n = prev_val | float(none) %}
+                  {% set mv = cur_n is not none and prev_n is not none %}
+                  {% if (has_inc and mv and cur_n > prev_n) or (has_dec and mv and cur_n < prev_n) %}
+                    {% set dir_ns.any_dir_match = true %}
+                  {% endif %}
+                {% else %}
+                  {% set dir_ns.has_non_dir = true %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {# Skip if all features are direction-gated and none matched direction #}
+            {% set is_skip = is_skip or (dir_ns.has_dir and not dir_ns.any_dir_match and not dir_ns.has_non_dir) %}
             {% for label in labels %}
               {% set feature_match = label
                   | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}

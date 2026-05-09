@@ -2183,7 +2183,10 @@
               leader_should_proceed: '{% if leader_toggle %} true {% elif leader_only
                 == ''enable'' and not leader_enabled %} false {% elif leader_only
                 == ''disable'' and leader_enabled %} false {% elif not leader_time_ok
-                %} false {% else %} true {% endif %}
+                %} false {% elif not leader_enabled and ((scoped_feature_leader +
+                '' Increasing: True'') in all_leader_labels or (scoped_feature_leader
+                + '' Decreasing: True'') in all_leader_labels) %} false {% else %}
+                true {% endif %}
 
                 '
               feature_error_mode: "{% set pfx = feature_name + ' Error Mode: ' %}\n
