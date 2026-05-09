@@ -3052,13 +3052,8 @@ labeled_feature_follower:
         set match = follower_labels\n    | select('match', '^' + em_pfx
         + '(silent|log|alert|stop)$')\n    | first | default('') %} {{ match | regex_replace('^.+:
         ', '') | default('log', true) }}\n"
-      follower_inverted: '{{ (scoped_feature + '' Invert: True'') in follower_labels
-
-        }}'
-      follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled
-        }}
-
-        }}'
+      follower_inverted: '{{ (scoped_feature + '' Invert: True'') in follower_labels }}'
+      follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled }}'
   - variables:
       follower_only: "{% set only_label = scoped_feature + ' Only: ' %} {% set match
         = follower_labels\n               | select('match', '^' + only_label
