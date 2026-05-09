@@ -3041,27 +3041,34 @@ labeled_feature_follower:
         \  | reject('none')\n   | list }}\n"
       follower_domain: '{{ follower_entity_id.split(''.'')[0] }}'
   - variables:
-      follower_error_mode: "{% set em_pfx = feature_name + ' Error Mode: ' %} {%
+      # scoped_feature: the label prefix used for all optional labels on this follower.
+      # It prepends the scope ("Area " / "Floor ") to the bare feature name so that
+      # optional labels like "Area Fan: Toggle", "Area Fan Only: Enable", etc. are
+      # matched correctly.  The bare feature name is still passed to scripts via the
+      # `feature` std field so scripts don't need to know about scope.
+      scoped_feature: >-
+        {{ (scope | default('') | capitalize + ' ') if scope | default('') in ['area', 'floor'] else '' }}{{ feature_name }}
+      follower_error_mode: "{% set em_pfx = scoped_feature + ' Error Mode: ' %} {%
         set match = follower_labels\n    | select('match', '^' + em_pfx
         + '(silent|log|alert|stop)$')\n    | first | default('') %} {{ match | regex_replace('^.+:
         ', '') | default('log', true) }}\n"
-      follower_inverted: '{{ (feature_name + '' Invert: true'') in follower_labels
+      follower_inverted: '{{ (scoped_feature + '' Invert: true'') in follower_labels
 
         }}'
       follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled
         }}
 
-        '
+        }}'
   - variables:
-      follower_only: "{% set only_label = feature_name + ' Only: ' %} {% set match
+      follower_only: "{% set only_label = scoped_feature + ' Only: ' %} {% set match
         = follower_labels\n               | select('match', '^' + only_label
         + '(Enable|Disable)$')\n               | first | default('') %}\n{{ match
         | regex_replace('^.+: ', '') }}\n"
       follower_between: "{{ follower_labels\n   | select('match', '^'
-        + feature_name + ' Between: .+')\n   | map('regex_replace', '^.+: ', '')\n
+        + scoped_feature + ' Between: .+')\n   | map('regex_replace', '^.+: ', '')\n
         \  | list }}\n"
       follower_not_between: "{{ follower_labels\n   | select('match',
-        '^' + feature_name + ' Not Between: .+')\n   | map('regex_replace', '^.+:
+        '^' + scoped_feature + ' Not Between: .+')\n   | map('regex_replace', '^.+:
         ', '')\n   | list }}\n"
       follower_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set ns =
         namespace(ok=true, any_b=false) %} {% for val in follower_between %} {% set
@@ -3089,20 +3096,20 @@ labeled_feature_follower:
   - condition: template
     value_template: '{{ follower_should_act }}'
   - variables:
-      follower_target_value: "{% set pfx = feature_name + (' Enable: ' if follower_enabled\n
+      follower_target_value: "{% set pfx = scoped_feature + (' Enable: ' if follower_enabled\n
         \       else ' Disable: ') %} {% set match = follower_labels\n
         \              |\n        select('match', '^' + pfx + '.+')\n               |
-        first | default('')\n        %} {% if match == '' %} {% set pfx2 = feature_name
+        first | default('')\n        %} {% if match == '' %} {% set pfx2 = scoped_feature
         + ': ' %} {% set match\n        = follower_labels | select('match',
         '^' + pfx2 + '.+')\n        | first | default('') %} {% endif %} {{ match
         | regex_replace('^.+: ',\n        '') | trim }}\n"
-      follower_enable_script: "{% set pfx = feature_name + ' Enable Script: ' %} {{
+      follower_enable_script: "{% set pfx = scoped_feature + ' Enable Script: ' %} {{
         follower_labels\n   | select('match', '^' + pfx + '.+')\n  |
         first | default('')\n   | regex_replace('^.+: ', '') }}\n"
-      follower_disable_script: "{% set pfx = feature_name + ' Disable Script: ' %}
+      follower_disable_script: "{% set pfx = scoped_feature + ' Disable Script: ' %}
         {{ follower_labels\n   | select('match', '^' + pfx + '.+')\n
         \  | first | default('')\n   | regex_replace('^.+: ', '') }}\n"
-      follower_default_script: "{% set pfx = feature_name + ' Script: ' %} {{ follower_labels\n
+      follower_default_script: "{% set pfx = scoped_feature + ' Script: ' %} {{ follower_labels\n
         \  | select('match', '^' + pfx + '.+')\n   | first | default('')\n   | regex_replace('^.+:
         ', '') }}\n"
   # === Dynamic Arg Label System + Argument Substitutions ===
@@ -3172,7 +3179,7 @@ labeled_feature_follower:
   # When in toggle mode, Invert is ignored (we read the raw current state).
   - variables:
       follower_toggle: >-
-        {{ (toggle | default(false) | bool) or ((feature_name + ' Toggle: true') in follower_labels) }}
+        {{ (toggle | default(false) | bool) or ((scoped_feature + ' Toggle: true') in follower_labels) }}
       _std_fields_base: >-
         {{ {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id, 'toggle': follower_toggle} }}
       _enable_script_fields: >-

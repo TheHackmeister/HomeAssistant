@@ -2148,19 +2148,25 @@
                 {%- endif -%}
               resolved_scope_id: >-
                 {%- if resolved_scope == 'area' -%}{{- resolved_area_id | trim -}}{%- elif resolved_scope == 'floor' -%}{{- resolved_floor_id | trim -}}{%- endif -%}
-              leader_only: "{% set only_label = feature_name + ' Only: ' %} {% set
+              # scoped_feature_leader: the label prefix for all optional labels on this leader.
+              # Mirrors the same logic in labeled_feature_follower so that e.g.
+              # "Area Fan Only: Enable", "Area Fan Toggle: true", "Area Fan Between: 22:00:08:00"
+              # are all matched correctly.
+              scoped_feature_leader: >-
+                {{ (resolved_scope | capitalize + ' ') if resolved_scope in ['area', 'floor'] else '' }}{{ feature_name }}
+              leader_only: "{% set only_label = scoped_feature_leader + ' Only: ' %} {% set
                 match = all_leader_labels\n               | select('match',
                 '^' + only_label + '(Enable|Disable)$')\n               | first | default('')
                 %}\n{{ match | regex_replace('^.+: ', '') }}\n"
-              leader_direction: "{% if (feature_name + ' Increasing: true') in all_leader_labels
-                %}\n  increasing\n{% elif (feature_name + ' Decreasing: true') in
+              leader_direction: "{% if (scoped_feature_leader + ' Increasing: true') in all_leader_labels
+                %}\n  increasing\n{% elif (scoped_feature_leader + ' Decreasing: true') in
                 all_leader_labels %}\n  decreasing\n{% else %}\n  none\n{%
                 endif %}\n"
               leader_between: "{{ all_leader_labels\n   | select('match',
-                '^' + feature_name + ' Between: .+')\n   | map('regex_replace', '^.+:
+                '^' + scoped_feature_leader + ' Between: .+')\n   | map('regex_replace', '^.+:
                 ', '')\n   | list }}\n"
               leader_not_between: "{{ all_leader_labels\n   | select('match',
-                '^' + feature_name + ' Not Between: .+')\n   | map('regex_replace',
+                '^' + scoped_feature_leader + ' Not Between: .+')\n   | map('regex_replace',
                 '^.+: ', '')\n   | list }}\n"
               leader_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set
                 ns = namespace(ok=true, any_b=false) %} {% for val in leader_between
@@ -2179,7 +2185,7 @@
                 and (e=='-' or now_time<=e)) if (s=='-' or e=='-' or s<=e) else (now_time>=s
                 or now_time<=e) %} {% if in_r %}{% set ns.ok = false %}{% endif %}
                 {% endfor %} {{ ns.ok }}\n"
-              leader_toggle: "{{ (feature_name + ' Toggle: true') in all_leader_labels }}\n"
+              leader_toggle: "{{ (scoped_feature_leader + ' Toggle: true') in all_leader_labels }}\n"
               leader_should_proceed: '{% if leader_toggle %} true {% elif leader_only
                 == ''enable'' and not leader_enabled %} false {% elif leader_only
                 == ''disable'' and leader_enabled %} false {% elif leader_direction
