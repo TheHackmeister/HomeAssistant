@@ -67,8 +67,9 @@ template:
               {% set fm = lbl | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
               {% if fm != lbl %}
                 {% set fn = fm %}
-                {% set has_inc = (fn + ' Increasing: True') in labels %}
-                {% set has_dec = (fn + ' Decreasing: True') in labels %}
+                {% set scope_pfx = 'Area ' if lbl | lower | regex_search('^area leader') else ('Floor ' if lbl | lower | regex_search('^floor leader') else '') %}
+                {% set has_inc = (scope_pfx + fn + ' Increasing: True') in labels %}
+                {% set has_dec = (scope_pfx + fn + ' Decreasing: True') in labels %}
                 {% if has_inc or has_dec %}
                   {% set dir_ns.has_dir = true %}
                   {% set cur_n = cv | float(none) %}
@@ -95,8 +96,9 @@ template:
                 {% set fname = feature_match %}
                 {% set scope = 'area' if label | lower | regex_search('^area leader') else
                                ('floor' if label | lower | regex_search('^floor leader') else 'none') %}
-                {% set inc_lbl = (fname + ' Increasing: True') in labels %}
-                {% set dec_lbl = (fname + ' Decreasing: True') in labels %}
+                {% set scope_pfx = 'Area ' if scope == 'area' else ('Floor ' if scope == 'floor' else '') %}
+                {% set inc_lbl = (scope_pfx + fname + ' Increasing: True') in labels %}
+                {% set dec_lbl = (scope_pfx + fname + ' Decreasing: True') in labels %}
                 {% if inc_lbl or dec_lbl %}
                   {# Direction takes precedence over Enable/Disable labels #}
                   {% set cur_n  = cv  | float(none) %}
@@ -166,8 +168,9 @@ template:
               {% set fm = lbl | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
               {% if fm != lbl %}
                 {% set fn = fm %}
-                {% set has_inc = (fn + ' Increasing: True') in labels %}
-                {% set has_dec = (fn + ' Decreasing: True') in labels %}
+                {% set scope_pfx = 'Area ' if lbl | lower | regex_search('^area leader') else ('Floor ' if lbl | lower | regex_search('^floor leader') else '') %}
+                {% set has_inc = (scope_pfx + fn + ' Increasing: True') in labels %}
+                {% set has_dec = (scope_pfx + fn + ' Decreasing: True') in labels %}
                 {% if has_inc or has_dec %}
                   {% set dir_ns.has_dir = true %}
                   {% set prev_f_pre = this.attributes.get('features', {}).get(fn, {}) %}
@@ -192,8 +195,9 @@ template:
               {% if feature_match != label %}
                 {% set fname = feature_match %}
                 {% set prev_f = this.attributes.get('features', {}).get(fname, {}) %}
-                {% set inc_lbl = (fname + ' Increasing: True') in labels %}
-                {% set dec_lbl = (fname + ' Decreasing: True') in labels %}
+                {% set scope_pfx = 'Area ' if label | lower | regex_search('^area leader') else ('Floor ' if label | lower | regex_search('^floor leader') else '') %}
+                {% set inc_lbl = (scope_pfx + fname + ' Increasing: True') in labels %}
+                {% set dec_lbl = (scope_pfx + fname + ' Decreasing: True') in labels %}
                 {% if inc_lbl or dec_lbl %}
                   {# Direction takes precedence over Enable/Disable labels #}
                   {% set feat_value_cur = prev_f.get('value', entity.state) if is_skip else entity.state %}
