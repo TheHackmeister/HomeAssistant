@@ -53,6 +53,8 @@ template:
             {% set prev_l = this.attributes.get('leaders', {}).get(e.entity_id, {}) %}
             {% set cv = prev_l.get('current_value', cv_raw) if is_skip else cv_raw %}
             {% set cv_ts = prev_l.get('last_changed_timestamp', e.last_changed_timestamp) if is_skip else e.last_changed_timestamp %}
+            {% set prev_cv_l = prev_l.get('current_value', '') %}
+            {% set prev_cv_l = '' if prev_cv_l | regex_search('_initial_press$') or prev_cv_l | lower in ['unknown', 'unavailable'] else prev_cv_l %}
             {% set labels = labels(e.entity_id)
                 | map('label_name') | reject('none') | list %}
             {% set fns = namespace(features={}) %}
@@ -99,6 +101,7 @@ template:
             {% set ns.result = dict(ns.result, **{
               e.entity_id: {
                 'current_value': cv,
+                'previous_value': prev_cv_l,
                 'last_changed_timestamp': cv_ts,
                 'features': fns.features
               }
@@ -149,10 +152,13 @@ template:
                 {% set prev_f = this.attributes.get('features', {}).get(fname, {}) %}
                 {% set feat_value = prev_f.get('value', entity.state) if is_skip else entity.state %}
                 {% set feat_ts = prev_f.get('timestamp', entity.last_changed_timestamp) if is_skip else entity.last_changed_timestamp %}
+                {% set prev_val_f = prev_f.get('value', '') %}
+                {% set prev_val_f = '' if prev_val_f | regex_search('_initial_press$') or prev_val_f | lower in ['unknown', 'unavailable'] else prev_val_f %}
                 {% set ns.result = dict(ns.result, **{
                   fname: {
                     'leader_entity_id': entity.entity_id,
                     'value': feat_value,
+                    'previous_value': prev_val_f,
                     'enabled': feat_enabled,
                     'timestamp': feat_ts
                   }
