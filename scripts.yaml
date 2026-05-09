@@ -3040,14 +3040,13 @@ labeled_feature_follower:
       follower_labels: "{{ labels(follower_entity_id)\n   | map('label_name')\n
         \  | reject('none')\n   | list }}\n"
       follower_domain: '{{ follower_entity_id.split(''.'')[0] }}'
-  - variables:
       # scoped_feature: the label prefix used for all optional labels on this follower.
       # It prepends the scope ("Area " / "Floor ") to the bare feature name so that
       # optional labels like "Area Fan: Toggle", "Area Fan Only: Enable", etc. are
       # matched correctly.  The bare feature name is still passed to scripts via the
       # `feature` std field so scripts don't need to know about scope.
       scoped_feature: >-
-        {{ (scope | default('') | capitalize + ' ') if scope | default('') in ['area', 'floor'] else '' }}{{ feature_name }}
+        {{ (scope | default('') | capitalize + ' ') if scope | default('') in ['area', 'floor'] else '' }}{{ feature }}
       follower_error_mode: "{% set em_pfx = scoped_feature + ' Error Mode: ' %} {%
         set match = follower_labels\n    | select('match', '^' + em_pfx
         + '(silent|log|alert|stop)$')\n    | first | default('') %} {{ match | regex_replace('^.+:
@@ -3059,7 +3058,6 @@ labeled_feature_follower:
         }}
 
         }}'
-  - variables:
       follower_only: "{% set only_label = scoped_feature + ' Only: ' %} {% set match
         = follower_labels\n               | select('match', '^' + only_label
         + '(Enable|Disable)$')\n               | first | default('') %}\n{{ match
@@ -3112,13 +3110,14 @@ labeled_feature_follower:
       follower_default_script: "{% set pfx = scoped_feature + ' Script: ' %} {{ follower_labels\n
         \  | select('match', '^' + pfx + '.+')\n   | first | default('')\n   | regex_replace('^.+:
         ', '') }}\n"
+      follower_toggle: >-
+        {{ (toggle | default(false) | bool) or ((scoped_feature + ' Toggle: True') in follower_labels) }}
   # === Dynamic Arg Label System + Argument Substitutions ===
   # Collects FEATURE (Enable|Disable) Arg FIELD: value labels from the follower entity.
   # Values matching [root].[key].[field] are substituted from sensor.labeled_features_state.
   # Without Arg labels the original synchronous call path (with error propagation) runs.
   # With Arg labels scripts are called asynchronously via script.turn_on with variables
   # (the only HA-native way to pass dynamic key names to a script at runtime).
-  - variables:
       _enable_script_args: >-
         {% set ns = namespace(d={}) %}
         {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
@@ -3175,11 +3174,6 @@ labeled_feature_follower:
         {% endif %}{% endfor %}
         {{ ns.d }}
   # === 3.1/3.2: Field-inspection helpers — validate Arg names + conditionally include std fields ===
-  # follower_toggle: true when toggle was passed in OR the follower has the Toggle label.
-  # When in toggle mode, Invert is ignored (we read the raw current state).
-  - variables:
-      follower_toggle: >-
-        {{ (toggle | default(false) | bool) or ((scoped_feature + ' Toggle: True') in follower_labels) }}
       _std_fields_base: >-
         {{ {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id, 'toggle': follower_toggle} }}
       _enable_script_fields: >-
