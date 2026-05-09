@@ -2203,6 +2203,7 @@
                       {% set prefix_raw = lbl | regex_replace(': ' + cv + '$', '') | trim %}
                       {% set prefix = prefix_raw | regex_replace('^(Area |Floor )', '') | trim %}
                       {% if not prefix | regex_search('^(Area |Floor |)Leader')
+                            and not prefix | regex_search('^(Area |Floor |)Follower')
                             and not prefix | regex_search('^Feature')
                             and not prefix | regex_search(' (Enable|Disable|Invert|Only|Script|Error Mode)$')
                             and not prefix | regex_search(' (Between|Not Between|Increasing|Decreasing)$')
