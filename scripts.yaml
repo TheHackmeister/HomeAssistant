@@ -3642,10 +3642,9 @@ labeled_feature_follower:
               {{ follower_domain in _toggle_supported_domains and
                  follower_domain not in ['lock', 'media_player'] }}
           then:
-          - action: 'homeassistant.toggle'
+          - action: homeassistant.toggle
             target:
               entity_id: '{{ follower_entity_id }}'
-      else:
       # 6. Fallback: turn_on/turn_off based on follower_enabled (post-invert)
       - if:
         - condition: template
