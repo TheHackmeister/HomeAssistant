@@ -3881,106 +3881,22 @@ labeled_feature_sleep_timeout:
               volume_level: '{{ original_volumes.get(repeat.item, 0.5) }}'
 
 
-labeled_feature_button:
-  alias: Labeled Feature Button
+labeled_feature_error_mode:
+  alias: Labeled Feature Error Mode
   description: >
-    Handles button-based features for the Labeled Feature system. Called via the
-    Default Script pattern by labeled_feature_follower. The 'feature' field receives
-    the button action string (e.g. '1_short_release', 'toggle') from the
-    [leaders].[entity_id].[current_value] substitution on the follower entity.
-    Checks media playing state and night mode in the resolved area to determine
-    the correct action. dots_N_* events are mapped to their N_* equivalents so
-    2-button and media-player (IKEA E2123) devices share the same logic.
-    Night-mode interactions call labeled_feature_sleep_timeout (mode: restart)
-    to start/reset the sleep countdown, and homeassistant.turn_off on that same
-    script to cancel it.
+    Shared helper for the Labeled Feature system's Error Mode dispatch.
+    Handles the silent / log / alert tiers. The `stop` tier is intentionally
+    left to the caller: a `stop:` inside this script would only halt this
+    helper, not the parent — so callers should follow this call with their
+    own `stop: error: true` when `error_mode == "stop"`.
   mode: parallel
   max: 50
   fields:
-    feature:
-      name: Feature (Button Action)
-      description: >
-        The button event to handle. 2-button: 1_initial_press, 1_long_press,
-        1_short_release, 1_long_release, 1_double_press (and 2_* variants).
-        Media player: toggle, track_previous, track_next, volume_up, volume_down,
-        volume_up_hold, volume_down_hold, dots_1_* / dots_2_* (mapped internally).
-      required: true
-      selector:
-        select:
-          custom_value: true
-          options:
-            - 1_initial_press
-            - 1_long_press
-            - 1_short_release
-            - 1_long_release
-            - 1_double_press
-            - 2_initial_press
-            - 2_long_press
-            - 2_short_release
-            - 2_long_release
-            - 2_double_press
-            - toggle
-            - track_previous
-            - track_next
-            - volume_up
-            - volume_down
-            - volume_up_hold
-            - volume_down_hold
-            - dots_1_initial_press
-            - dots_1_long_press
-            - dots_1_short_release
-            - dots_1_long_release
-            - dots_1_double_press
-            - dots_2_initial_press
-            - dots_2_long_press
-            - dots_2_short_release
-            - dots_2_long_release
-            - dots_2_double_press
-    follower_entity_id:
-      name: Follower Entity ID
-      description: >
-        Used for area lookup. Passed automatically by labeled_feature_follower.
-      required: false
-      default: ''
-      selector:
-        entity: {}
-    leader_entity_id:
-      name: Leader Entity ID (the button)
-      description: >
-        The button entity that triggered this script. Used as fallback for area
-        lookup when follower_entity_id is not provided.
-      required: false
-      default: ''
-      selector:
-        entity: {}
-    leader_enabled:
-      name: Leader Enabled
-      description: >
-        Passed by labeled_feature_follower. Not used directly by button logic
-        (the feature string drives action selection instead).
-      required: false
-      default: true
-      selector:
-        boolean: {}
-    scope:
-      name: Scope
-      description: Scope of the feature (area, floor, or none).
-      required: false
-      selector:
-        select:
-          options:
-            - area
-            - floor
-            - none
     error_mode:
       name: Error Mode
-      description: >
-        Default error mode for action failures inside the button script.
-        Priority: `<feature> Error Mode:` label on the leader entity →
-        this field → 'log'.
-        Tiers: silent | log | alert | stop.
+      description: silent | log | alert | stop. Default 'log'.
       required: false
-      default: ''
+      default: log
       selector:
         select:
           custom_value: true
@@ -3989,6 +3905,647 @@ labeled_feature_button:
             - log
             - alert
             - stop
+    message:
+      name: Message
+      description: Human-readable error message describing what went wrong.
+      required: true
+      selector:
+        text:
+          multiline: true
+    source:
+      name: Source
+      description: >
+        Short label for the calling script, used as a prefix in logs/alerts.
+        Examples: 'Labeled Feature Generics', 'Labeled Feature Somrig'.
+      required: false
+      default: Labeled Feature
+      selector:
+        text: {}
+    severity:
+      name: Severity
+      description: Severity for the alert tier (low | medium | high).
+      required: false
+      default: medium
+      selector:
+        select:
+          custom_value: true
+          options:
+            - low
+            - medium
+            - high
+  sequence:
+    - variables:
+        _mode: '{{ (error_mode | default("log") | lower) }}'
+        _source: '{{ source | default("Labeled Feature") }}'
+        _severity: '{{ severity | default("medium") }}'
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ _mode == "silent" }}'
+          sequence: []
+        - conditions:
+            - condition: template
+              value_template: '{{ _mode == "log" }}'
+          sequence:
+            - action: system_log.write
+              data:
+                level: warning
+                message: '{{ _source }}: {{ message }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ _mode == "alert" }}'
+          sequence:
+            - action: script.send_alert
+              data:
+                alert_severity: '{{ _severity }}'
+                alert_title: '{{ _source }}'
+                alert_message: '{{ message }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ _mode == "stop" }}'
+          sequence:
+            # Log the message as well so there's a record before the parent
+            # aborts. The caller is expected to follow up with its own
+            # `stop: error: true` to actually halt parent execution.
+            - action: system_log.write
+              data:
+                level: error
+                message: '{{ _source }}: {{ message }}'
+
+
+labeled_feature_generics:
+  alias: Labeled Feature Generics
+  description: >
+    Generic feature dispatcher for the Labeled Feature system. Maps a generic
+    feature name (Lights Off, Volume Up, Fan On, Night, …) to a domain-specific
+    service call against an entity set resolved by label first, then by the
+    feature's domain fallback. Honors `<scope-prefix><Feature> Exclude: True`
+    labels on candidate entities to opt them out. Supports a `toggle` modifier
+    that swaps the action for a domain toggle where it makes sense.
+
+    Per-feature resolution algorithm:
+      1. Build scope_entity_set from scope/scope_id (area/floor) or fall back
+         to follower_entity_id / leader_entity_id area lookup.
+      2. label_targets = entities labeled `(Area |Floor |)Follower: <Feature>`
+         that are in scope_entity_set.
+      3. excluded = entities labeled `<scope-prefix><Feature> Exclude: True`.
+      4. If (label_targets - excluded) is non-empty → use it.
+      5. Else fallback to entities in scope_entity_set whose domain matches
+         the feature's default domain, minus excluded.
+      6. If still empty and feature has no domain fallback → Error Mode.
+      7. Run feature action against final target set.
+
+    See `Label Based Features.md` → "Labeled Feature Generics" for the full
+    catalog of supported features.
+  mode: parallel
+  max: 50
+  fields:
+    feature:
+      name: Feature
+      description: >
+        Generic feature name (case-sensitive). Examples: 'Lights Off',
+        'Volume Up', 'Media Pause', 'Fan On', 'Night'. See Labeled Feature
+        Generics docs for the full catalog.
+      required: true
+      selector:
+        select:
+          custom_value: true
+          options:
+            - Media Toggle
+            - Media Play
+            - Media Pause
+            - Media Next
+            - Media Previous
+            - Media Seek Back
+            - Media Seek Forward
+            - Volume Up
+            - Volume Down
+            - Lights On
+            - Lights Off
+            - Lights Up
+            - Lights Down
+            - Fan On
+            - Fan Off
+            - Fan Up
+            - Fan Down
+            - Ads
+            - Night
+    scope:
+      name: Scope
+      description: Scope of the feature (area, floor, or none).
+      required: false
+      default: area
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - none
+    scope_id:
+      name: Scope ID
+      description: The resolved area_id or floor_id. Falls back to follower/leader entity area.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    follower_entity_id:
+      name: Follower Entity ID
+      description: Used for area fallback when scope_id is empty.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_entity_id:
+      name: Leader Entity ID
+      description: Used for area fallback when follower_entity_id is also empty.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_enabled:
+      name: Leader Enabled
+      description: Pass-through from the leader. Not used directly by generics.
+      required: false
+      default: true
+      selector:
+        boolean: {}
+    toggle:
+      name: Toggle
+      description: >
+        When true, swap the per-feature action for a domain toggle where it
+        makes sense (light/fan/media toggle). For features where toggle is
+        not meaningful (Media Next, Volume Up, Seek, …) this triggers Error
+        Mode handling.
+      required: false
+      default: false
+      selector:
+        boolean: {}
+    error_mode:
+      name: Error Mode
+      description: silent | log | alert | stop. Default 'log'.
+      required: false
+      default: log
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
+  sequence:
+    # ── Step 1: Resolve scope ids and scope entity set ──────────────────────
+    - variables:
+        _feature: '{{ feature | trim }}'
+        _scope: '{{ (scope | default("area") | lower) }}'
+        _toggle: '{{ (toggle | default(false)) | bool(false) }}'
+        _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        _resolved_area_id: >-
+          {%- if _scope == 'area' and scope_id is defined and scope_id != '' -%}
+            {{ scope_id }}
+          {%- elif follower_entity_id is defined and follower_entity_id != '' -%}
+            {{ area_id(follower_entity_id) | default('') }}
+          {%- elif leader_entity_id is defined and leader_entity_id != '' -%}
+            {{ area_id(leader_entity_id) | default('') }}
+          {%- else -%}{{ '' }}{%- endif -%}
+        _resolved_floor_id: >-
+          {%- if _scope == 'floor' and scope_id is defined and scope_id != '' -%}
+            {{ scope_id }}
+          {%- elif _scope == 'floor' and follower_entity_id is defined and follower_entity_id != '' -%}
+            {%- set aid = area_id(follower_entity_id) -%}
+            {%- set ns = namespace(found='') -%}
+            {%- for fid in floors() -%}
+              {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+            {%- endfor -%}{{ ns.found }}
+          {%- else -%}{{ '' }}{%- endif -%}
+    - variables:
+        scope_entity_set: >-
+          {% if _scope == 'area' and _resolved_area_id != '' %}
+            {% set area_ents = area_entities(_resolved_area_id) | list %}
+            {% set area_devs = area_devices(_resolved_area_id) %}
+            {% set ns = namespace(dev_ents=[]) %}
+            {% for d in area_devs %}
+              {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list %}
+            {% endfor %}
+            {{ (area_ents + ns.dev_ents) | unique | list }}
+          {% elif _scope == 'floor' and _resolved_floor_id != '' %}
+            {% set ns = namespace(ents=[]) %}
+            {% for a in floor_areas(_resolved_floor_id) %}
+              {% set ns.ents = ns.ents + area_entities(a) | list %}
+              {% for d in area_devices(a) %}
+                {% set ns.ents = ns.ents + device_entities(d) | list %}
+              {% endfor %}
+            {% endfor %}
+            {{ ns.ents | unique | list }}
+          {% else %}
+            {{ [] }}
+          {% endif %}
+        scope_prefix: >-
+          {{ 'Area ' if _scope == 'area' else ('Floor ' if _scope == 'floor' else '') }}
+        follower_label: >-
+          {{ ('Area Follower: ' if _scope == 'area' else
+              ('Floor Follower: ' if _scope == 'floor' else 'Follower: ')) ~ _feature }}
+        exclude_label: '{{ _feature ~ " Exclude: True" }}'
+        scoped_exclude_label: >-
+          {{ (('Area ' if _scope == 'area' else
+               ('Floor ' if _scope == 'floor' else '')) ~ _feature) ~ " Exclude: True" }}
+
+    # ── Step 2: Label-based + Exclude resolution ────────────────────────────
+    - variables:
+        _label_targets_raw: >-
+          {% set all_f = label_entities(follower_label) | list %}
+          {% if scope_entity_set | length > 0 %}
+            {{ all_f | select('in', scope_entity_set) | list }}
+          {% else %}
+            {{ all_f }}
+          {% endif %}
+        _excluded: >-
+          {% set unscoped = label_entities(exclude_label) | list %}
+          {% set scoped = label_entities(scoped_exclude_label) | list %}
+          {{ (unscoped + scoped) | unique | list }}
+        label_targets: >-
+          {{ _label_targets_raw | reject('in', _excluded) | list }}
+
+    # ── Step 3: Feature metadata (domain fallback + selected action) ────────
+    - variables:
+        feature_meta: >-
+          {% set m = {
+            'Media Toggle':         {'domain': 'media_player', 'kind': 'media_toggle'},
+            'Media Play':           {'domain': 'media_player', 'kind': 'media_play'},
+            'Media Pause':          {'domain': 'media_player', 'kind': 'media_pause'},
+            'Media Next':           {'domain': 'media_player', 'kind': 'media_next'},
+            'Media Previous':       {'domain': 'media_player', 'kind': 'media_previous'},
+            'Media Seek Back':      {'domain': 'media_player', 'kind': 'media_seek_back'},
+            'Media Seek Forward':   {'domain': 'media_player', 'kind': 'media_seek_forward'},
+            'Volume Up':            {'domain': 'media_player', 'kind': 'volume_up'},
+            'Volume Down':          {'domain': 'media_player', 'kind': 'volume_down'},
+            'Lights On':            {'domain': 'light',        'kind': 'light_on'},
+            'Lights Off':           {'domain': 'light',        'kind': 'light_off'},
+            'Lights Up':            {'domain': 'light',        'kind': 'light_up'},
+            'Lights Down':          {'domain': 'light',        'kind': 'light_down'},
+            'Fan On':               {'domain': 'fan',          'kind': 'fan_on'},
+            'Fan Off':              {'domain': 'fan',          'kind': 'fan_off'},
+            'Fan Up':               {'domain': 'fan',          'kind': 'fan_up'},
+            'Fan Down':             {'domain': 'fan',          'kind': 'fan_down'},
+            'Ads':                  {'domain': '',             'kind': 'ads'},
+            'Night':                {'domain': '',             'kind': 'night'}
+          } %}
+          {{ m.get(_feature, {'domain': '', 'kind': 'unknown'}) }}
+
+    # ── Step 4: Resolve final target set (label-first, then domain fallback) ─
+    - variables:
+        _domain_fallback_raw: >-
+          {% set dom = feature_meta.domain %}
+          {% if dom != '' and scope_entity_set | length > 0 %}
+            {{ scope_entity_set
+               | select('match', '^' + dom + '\\.')
+               | reject('in', _excluded)
+               | list }}
+          {% else %}
+            {{ [] }}
+          {% endif %}
+        final_targets: >-
+          {% if label_targets | length > 0 %}
+            {{ label_targets }}
+          {% else %}
+            {{ _domain_fallback_raw }}
+          {% endif %}
+
+    # ── Step 5: Validate target set ─────────────────────────────────────────
+    - if:
+        - condition: template
+          value_template: '{{ final_targets | length == 0 }}'
+      then:
+        - action: script.labeled_feature_error_mode
+          data:
+            error_mode: '{{ _err_mode }}'
+            source: Labeled Feature Generics
+            message: >-
+              No target entities resolved for feature '{{ _feature }}' in
+              scope '{{ _scope }}' (scope_id={{ scope_id | default('') }}).
+        - if:
+            - condition: template
+              value_template: '{{ _err_mode == "stop" }}'
+          then:
+            - stop: >-
+                Labeled Feature Generics: no targets for '{{ _feature }}'.
+              error: true
+        - stop: 'No targets resolved (handled per error_mode).'
+
+    # ── Step 6: Toggle modifier — short-circuit per-domain ──────────────────
+    - if:
+        - condition: template
+          value_template: '{{ _toggle }}'
+      then:
+        - choose:
+            # Light domain → light.toggle
+            - conditions:
+                - condition: template
+                  value_template: '{{ feature_meta.domain == "light" }}'
+              sequence:
+                - action: light.toggle
+                  target:
+                    entity_id: '{{ final_targets }}'
+            # Fan domain → fan.toggle
+            - conditions:
+                - condition: template
+                  value_template: '{{ feature_meta.domain == "fan" }}'
+              sequence:
+                - action: fan.toggle
+                  target:
+                    entity_id: '{{ final_targets }}'
+            # Media play/pause family → media_player.media_play_pause
+            - conditions:
+                - condition: template
+                  value_template: >-
+                    {{ feature_meta.kind in ['media_toggle','media_play','media_pause'] }}
+              sequence:
+                - action: media_player.media_play_pause
+                  target:
+                    entity_id: '{{ final_targets }}'
+            # Ads / Night → homeassistant.toggle (toggle flag is a no-op)
+            - conditions:
+                - condition: template
+                  value_template: '{{ feature_meta.kind in ["ads","night"] }}'
+              sequence:
+                - action: homeassistant.toggle
+                  target:
+                    entity_id: '{{ final_targets }}'
+          default:
+            - action: script.labeled_feature_error_mode
+              data:
+                error_mode: '{{ _err_mode }}'
+                source: Labeled Feature Generics
+                message: >-
+                  Feature '{{ _feature }}' does not support the toggle modifier.
+            - if:
+                - condition: template
+                  value_template: '{{ _err_mode == "stop" }}'
+              then:
+                - stop: >-
+                    Labeled Feature Generics: invalid toggle for '{{ _feature }}'.
+                  error: true
+        - stop: 'Toggle path complete.'
+
+    # ── Step 7: Non-toggle dispatch by feature kind ─────────────────────────
+    - choose:
+        # ── Media: simple service-call features ─────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_toggle" }}'
+          sequence:
+            - action: media_player.media_play_pause
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_play" }}'
+          sequence:
+            - action: media_player.media_play
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_pause" }}'
+          sequence:
+            - action: media_player.media_pause
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_next" }}'
+          sequence:
+            - action: media_player.media_next_track
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_previous" }}'
+          sequence:
+            - action: media_player.media_previous_track
+              target:
+                entity_id: '{{ final_targets }}'
+
+        # ── Media: seek (operates on first entity only) ─────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_seek_back" }}'
+          sequence:
+            - action: media_player.media_seek
+              target:
+                entity_id: '{{ final_targets | first }}'
+              data:
+                seek_position: >-
+                  {{ [state_attr(final_targets | first, 'media_position')
+                      | float(0) - 30, 0] | max }}
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_seek_forward" }}'
+          sequence:
+            - action: media_player.media_seek
+              target:
+                entity_id: '{{ final_targets | first }}'
+              data:
+                seek_position: >-
+                  {{ state_attr(final_targets | first, 'media_position')
+                     | float(0) + 30 }}
+
+        # ── Volume ──────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "volume_up" }}'
+          sequence:
+            - action: media_player.volume_up
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "volume_down" }}'
+          sequence:
+            - action: media_player.volume_down
+              target:
+                entity_id: '{{ final_targets }}'
+
+        # ── Lights ──────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_on" }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_off" }}'
+          sequence:
+            - action: light.turn_off
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_up" }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+              data:
+                brightness_step_pct: 10
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_down" }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+              data:
+                brightness_step_pct: -10
+
+        # ── Fan ─────────────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_on" }}'
+          sequence:
+            - action: fan.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_off" }}'
+          sequence:
+            - action: fan.turn_off
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_up" }}'
+          sequence:
+            - action: fan.increase_speed
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_down" }}'
+          sequence:
+            - action: fan.decrease_speed
+              target:
+                entity_id: '{{ final_targets }}'
+
+        # ── Ads / Night ─────────────────────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind in ["ads","night"] }}'
+          sequence:
+            - action: homeassistant.toggle
+              target:
+                entity_id: '{{ final_targets }}'
+
+      default:
+        # Unknown feature kind → helper + optional stop
+        - action: script.labeled_feature_error_mode
+          data:
+            error_mode: '{{ _err_mode }}'
+            source: Labeled Feature Generics
+            message: "Unknown feature '{{ _feature }}'."
+        - if:
+            - condition: template
+              value_template: '{{ _err_mode == "stop" }}'
+          then:
+            - stop: "Labeled Feature Generics: unknown feature '{{ _feature }}'."
+              error: true
+
+
+labeled_feature_somrig:
+  alias: Labeled Feature Somrig
+  description: >
+    Maps IKEA Somrig (and other 2-button) device events into one or more calls
+    to `script.labeled_feature_generics`. Reads the raw button event from the
+    `feature` field (e.g. '1_short_release', '2_double_press'); also accepts
+    `dots_N_*` (IKEA E2123) variants by stripping the 'dots_' prefix.
+
+    Only canonical "user did the thing" events are tracked:
+      *_short_release, *_double_press, *_long_press
+    All other events (initial_press, long_release, etc.) are ignored.
+
+    Contextual state: only `media_playing` (computed by inspecting
+    media_player entities in the resolved area) is used to pick between the
+    Playing and Not-Playing branches of the mapping table. Night-mode and
+    sleep-timeout behavior live as their own generic features (`Night`).
+
+    Event → generic-feature mapping:
+      1_short_release  Playing: Lights Off + Media Pause   Not Playing: Lights Off
+      2_short_release  Playing: Media Pause                Not Playing: Media Play
+      1_double_press   Playing: Media Seek Back            Not Playing: Fan On (toggle:true)
+      2_double_press   Playing: Media Seek Forward         Not Playing: Night
+      1_long_press     Playing: Volume Up                  Not Playing: Lights Up
+      2_long_press     Playing: Volume Down                Not Playing: Ads
+  mode: parallel
+  max: 50
+  fields:
+    feature:
+      name: Feature (Button Event)
+      description: >
+        The raw button event string from the button entity, e.g.
+        '1_short_release', '2_double_press', '1_long_press', or the
+        'dots_'-prefixed variants for IKEA E2123.
+      required: true
+      selector:
+        select:
+          custom_value: true
+          options:
+            - 1_short_release
+            - 1_double_press
+            - 1_long_press
+            - 2_short_release
+            - 2_double_press
+            - 2_long_press
+            - dots_1_short_release
+            - dots_1_double_press
+            - dots_1_long_press
+            - dots_2_short_release
+            - dots_2_double_press
+            - dots_2_long_press
+    follower_entity_id:
+      name: Follower Entity ID
+      description: Used for area lookup. Passed automatically by labeled_feature_follower.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_entity_id:
+      name: Leader Entity ID (the button)
+      description: Used as fallback for area lookup.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_enabled:
+      name: Leader Enabled
+      description: Pass-through from the leader. Not used directly by the somrig mapping.
+      required: false
+      default: true
+      selector:
+        boolean: {}
+    toggle:
+      name: Toggle
+      description: >
+        Pass-through toggle flag from the leader. Forwarded to every
+        labeled_feature_generics call. The 1_double_press Not-Playing
+        branch always overrides this with toggle:true (fan toggle).
+      required: false
+      default: false
+      selector:
+        boolean: {}
+    scope:
+      name: Scope
+      description: Scope of the feature (area, floor, or none).
+      required: false
+      default: area
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - none
     scope_id:
       name: Scope ID
       description: The resolved area_id or floor_id passed by the automation.
@@ -3996,502 +4553,183 @@ labeled_feature_button:
       default: ''
       selector:
         text: {}
+    error_mode:
+      name: Error Mode
+      description: silent | log | alert | stop. Default 'log'.
+      required: false
+      default: log
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
   sequence:
-    # ── Step 1: Resolve the operating area ──────────────────────────────────
+    # ── Step 1: Resolve area + media_playing context ────────────────────────
     - variables:
-        resolved_area_id: >-
-          {%- if scope is defined and scope == 'area'
-              and scope_id is defined and scope_id is not none and scope_id != '' -%}
+        _scope: '{{ (scope | default("area") | lower) }}'
+        _toggle_in: '{{ (toggle | default(false)) | bool(false) }}'
+        _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        _resolved_area_id: >-
+          {%- if _scope == 'area' and scope_id is defined and scope_id != '' -%}
             {{ scope_id }}
           {%- elif follower_entity_id is defined and follower_entity_id != '' -%}
             {{ area_id(follower_entity_id) | default('') }}
           {%- elif leader_entity_id is defined and leader_entity_id != '' -%}
             {{ area_id(leader_entity_id) | default('') }}
-          {%- else -%}
-            {{ '' }}
-          {%- endif -%}
-
-    # ── Step 2: Gather area context ─────────────────────────────────────────
-    # All variables here are independent of each other; they only reference
-    # resolved_area_id which was set in Step 1.
+          {%- else -%}{{ '' }}{%- endif -%}
     - variables:
-        area_media_players: >-
-          {% if resolved_area_id != '' %}
-            {{ states.media_player
-               | selectattr('entity_id', 'in', area_entities(resolved_area_id))
-               | map(attribute='entity_id') | list }}
-          {% else %}
-            {{ [] }}
-          {% endif %}
         media_playing: >-
-          {% if resolved_area_id != '' %}
+          {% if _resolved_area_id != '' %}
             {{ states.media_player
-               | selectattr('entity_id', 'in', area_entities(resolved_area_id))
+               | selectattr('entity_id', 'in', area_entities(_resolved_area_id))
                | selectattr('state', 'in', ['playing', 'buffering'])
                | list | count > 0 }}
           {% else %}
             false
           {% endif %}
-        night_mode: '{{ is_state(''input_boolean.night_mode'', ''on'') }}'
-        feature_action: '{{ feature | lower | trim }}'
+        # Strip the dots_ prefix so both device families share the same
+        # branches below.
+        mapped_event: >-
+          {{ (feature | trim) | regex_replace('^dots_', '') }}
 
-    # ── Step 3: Map dots_N_* events → N_* for unified handling ──────────────
-    # IKEA E2123 dots buttons produce dots_1_* / dots_2_* events.
-    # IKEA Somrig / generic 2-button devices produce 1_* / 2_* events.
-    # Both device types share identical logic after this mapping.
-    - variables:
-        mapped_action: >-
-          {% set m = {
-            'dots_1_initial_press': '1_initial_press',
-            'dots_1_long_press':    '1_long_press',
-            'dots_1_short_release': '1_short_release',
-            'dots_1_long_release':  '1_long_release',
-            'dots_1_double_press':  '1_double_press',
-            'dots_2_initial_press': '2_initial_press',
-            'dots_2_long_press':    '2_long_press',
-            'dots_2_short_release': '2_short_release',
-            'dots_2_long_release':  '2_long_release',
-            'dots_2_double_press':  '2_double_press'
-          } %}
-          {{ m.get(feature_action, feature_action) }}
-
-    # ── Step 4: Resolve effective error mode ────────────────────────────────
-    # Priority: <feature> Error Mode: label on leader → caller error_mode field → 'log'
-    - variables:
-        _button_leader_labels: >-
-          {% if leader_entity_id is defined and leader_entity_id != '' %}
-            {{ labels(leader_entity_id) | map('label_name') | reject('none') | list }}
-          {% else %}{{ [] }}{% endif %}
-        _button_scoped_pfx: >-
-          {{ (scope | default('') | capitalize + ' ') if scope | default('') in ['area', 'floor'] else '' }}
-        _button_label_error_mode: >-
-          {% set match = _button_leader_labels
-               | select('match', '^' + _button_scoped_pfx + (feature | default('')) + ' Error Mode: (Silent|Log|Alert|Stop)$')
-               | first | default('') %}
-          {{ (match | regex_replace('^.+: ', '') | lower) if match else '' }}
-        effective_error_mode: >-
-          {{ _button_label_error_mode
-             if _button_label_error_mode != ''
-             else ((error_mode | default('') | lower)
-                   if (error_mode | default('') | lower) != ''
-                   else 'log') }}
-
-    # ── Step 5: Route by action ──────────────────────────────────────────────
+    # ── Step 2: Branch by event + media_playing ─────────────────────────────
     - choose:
-
-        # ────────────────────────────────────────────────────────────────────
-        # Media-player dedicated controls (no media-state branching needed)
-        # ────────────────────────────────────────────────────────────────────
-
-        # toggle — play/pause; always resets sleep timer when night mode is on
+        # ────────────── 1_short_release ──────────────
         - conditions:
             - condition: template
-              value_template: '{{ mapped_action == "toggle" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ area_media_players | length > 0 }}'
-              then:
-                - action: media_player.media_play_pause
-                  target:
-                    entity_id: '{{ area_media_players }}'
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
-
-        # track_next — next track when playing; play area mood when not playing
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "track_next" }}'
+              value_template: '{{ mapped_event == "1_short_release" }}'
           sequence:
             - if:
                 - condition: template
                   value_template: '{{ media_playing }}'
               then:
-                - action: media_player.media_next_track
-                  target:
-                    entity_id: '{{ area_media_players }}'
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
-              else:
-                - action: script.turn_on
-                  target:
-                    entity_id: script.audio_mood_play_in_area
-                  data: {}
-
-        # track_previous — previous track when playing; no-op when not playing
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "track_previous" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - action: media_player.media_previous_track
-                  target:
-                    entity_id: '{{ area_media_players }}'
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
-
-        # volume_up_hold — volume up + reset sleep timer when night mode
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "volume_up_hold" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ area_media_players | length > 0 }}'
-              then:
-                - action: media_player.volume_up
-                  target:
-                    entity_id: '{{ area_media_players }}'
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
-
-        # volume_down_hold — volume down + reset sleep timer when night mode
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "volume_down_hold" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ area_media_players | length > 0 }}'
-              then:
-                - action: media_player.volume_down
-                  target:
-                    entity_id: '{{ area_media_players }}'
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
-
-        # volume_up / volume_down — single step, no sleep timer interaction
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action in ["volume_up", "volume_down"] }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ area_media_players | length > 0 }}'
-              then:
-                - action: >-
-                    media_player.volume_{{ 'up' if mapped_action == 'volume_up' else 'down' }}
-                  target:
-                    entity_id: '{{ area_media_players }}'
-
-        # ────────────────────────────────────────────────────────────────────
-        # Button 1 — primary press (short_release only; initial_press ignored)
-        # Playing:     lights off + pause + (night: Sleep Timeout restart)
-        # Not playing: lights off + cancel Sleep Timeout timer
-        # ────────────────────────────────────────────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "1_short_release" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - if:
-                    - condition: template
-                      value_template: '{{ resolved_area_id != "" }}'
-                  then:
-                    - action: light.turn_off
-                      target:
-                        area_id: '{{ resolved_area_id }}'
-                - action: media_player.media_pause
-                  target:
-                    entity_id: '{{ area_media_players }}'
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
-              else:
-                - if:
-                    - condition: template
-                      value_template: '{{ resolved_area_id != "" }}'
-                  then:
-                    - action: light.turn_off
-                      target:
-                        area_id: '{{ resolved_area_id }}'
-                - action: homeassistant.turn_off
-                  target:
-                    entity_id: script.labeled_feature_sleep_timeout
-
-        # ────────────────────────────────────────────────────────────────────
-        # Button 2 — primary press (short_release only; initial_press ignored)
-        # Playing:     pause + cancel Sleep Timeout timer
-        # Not playing: play + (night: Sleep Timeout restart)
-        # ────────────────────────────────────────────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "2_short_release" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - action: media_player.media_pause
-                  target:
-                    entity_id: '{{ area_media_players }}'
-                - action: homeassistant.turn_off
-                  target:
-                    entity_id: script.labeled_feature_sleep_timeout
-              else:
-                - if:
-                    - condition: template
-                      value_template: '{{ area_media_players | length > 0 }}'
-                  then:
-                        - action: media_player.media_play
-                          target:
-                            entity_id: '{{ area_media_players }}'
-                        - if:
-                            - condition: template
-                              value_template: '{{ night_mode }}'
-                          then:
-                            # Sleep Timeout: restart via labeled_feature_sleep_timeout (mode: restart)
-                            - action: script.turn_on
-                              target:
-                                entity_id: script.labeled_feature_sleep_timeout
-                              data:
-                                variables:
-                                  area_media_players: '{{ area_media_players }}'
-
-        # ────────────────────────────────────────────────────────────────────
-        # Button 1 — double press
-        # Playing:     seek −30 s + (night: reset sleep timer)
-        # Not playing: previous track
-        # ────────────────────────────────────────────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "1_double_press" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing and area_media_players | length > 0 }}'
-              then:
-                - action: media_player.media_seek
-                  target:
-                    entity_id: '{{ area_media_players | first }}'
+                - action: script.labeled_feature_generics
                   data:
-                    seek_position: >-
-                      {{ [state_attr(area_media_players | first,
-                          'media_position') | float(0) - 30, 0] | max }}
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
-              else:
-                - if:
-                    - condition: template
-                      value_template: '{{ area_media_players | length > 0 }}'
-                  then:
-                    - action: media_player.media_previous_track
-                      target:
-                        entity_id: '{{ area_media_players | first }}'
-
-        # ────────────────────────────────────────────────────────────────────
-        # Button 2 — double press
-        # Playing:     seek +30 s + (night: reset sleep timer)
-        # Not playing: next track
-        # ────────────────────────────────────────────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_action == "2_double_press" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing and area_media_players | length > 0 }}'
-              then:
-                - action: media_player.media_seek
-                  target:
-                    entity_id: '{{ area_media_players | first }}'
+                    feature: Lights Off
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
+                - action: script.labeled_feature_generics
                   data:
-                    seek_position: >-
-                      {{ state_attr(area_media_players | first,
-                         'media_position') | float(0) + 30 }}
-                - if:
-                    - condition: template
-                      value_template: '{{ night_mode }}'
-                  then:
-                    - action: script.turn_on
-                      target:
-                        entity_id: script.labeled_feature_sleep_timeout
-                      data:
-                        variables:
-                          area_media_players: '{{ area_media_players }}'
+                    feature: Media Pause
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
               else:
-                - if:
-                    - condition: template
-                      value_template: '{{ area_media_players | length > 0 }}'
-                  then:
-                    - action: media_player.media_next_track
-                      target:
-                        entity_id: '{{ area_media_players | first }}'
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Lights Off
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
 
-        # ────────────────────────────────────────────────────────────────────
-        # Button 1 — hold (long_release is the canonical hold action;
-        #            long_press handled identically for immediate feedback)
-        # Playing:     volume up + (night: Sleep Timeout restart)
-        # Not playing: Ad-Toggle (toggles input_boolean.ad_toggle)
-        # ────────────────────────────────────────────────────────────────────
+        # ────────────── 2_short_release ──────────────
         - conditions:
             - condition: template
-              value_template: >-
-                {{ mapped_action in ["1_long_release", "1_long_press"] }}
+              value_template: '{{ mapped_event == "2_short_release" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Media Pause" if media_playing else "Media Play" }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── 1_double_press ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "1_double_press" }}'
           sequence:
             - if:
                 - condition: template
                   value_template: '{{ media_playing }}'
               then:
-                - if:
-                    - condition: template
-                      value_template: '{{ area_media_players | length > 0 }}'
-                  then:
-                    - action: media_player.volume_up
-                      target:
-                        entity_id: '{{ area_media_players }}'
-                    - if:
-                        - condition: template
-                          value_template: '{{ night_mode }}'
-                      then:
-                        - action: script.turn_on
-                          target:
-                            entity_id: script.labeled_feature_sleep_timeout
-                          data:
-                            variables:
-                              area_media_players: '{{ area_media_players }}'
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Media Seek Back
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
               else:
-                # Not playing: Ad-Toggle
-                - action: input_boolean.toggle
-                  target:
-                    entity_id: input_boolean.ads_playing_spencer_2
+                # Fan toggle: force toggle:true regardless of caller-passed value
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Fan On
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: true
+                    error_mode: '{{ _err_mode }}'
 
-        # ────────────────────────────────────────────────────────────────────
-        # Button 2 — hold
-        # Button 2 — hold
-        # Playing:     volume down + (night: Sleep Timeout restart)
-        # Not playing: toggle night mode
-        # ────────────────────────────────────────────────────────────────────
+        # ────────────── 2_double_press ──────────────
         - conditions:
             - condition: template
-              value_template: >-
-                {{ mapped_action in ["2_long_release", "2_long_press"] }}
+              value_template: '{{ mapped_event == "2_double_press" }}'
           sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - if:
-                    - condition: template
-                      value_template: '{{ area_media_players | length > 0 }}'
-                  then:
-                    - action: media_player.volume_down
-                      target:
-                        entity_id: '{{ area_media_players }}'
-                    - if:
-                        - condition: template
-                          value_template: '{{ night_mode }}'
-                      then:
-                        - action: script.turn_on
-                          target:
-                            entity_id: script.labeled_feature_sleep_timeout
-                          data:
-                            variables:
-                              area_media_players: '{{ area_media_players }}'
-              else:
-                - action: input_boolean.toggle
-                  target:
-                    entity_id: input_boolean.night_mode
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Media Seek Forward" if media_playing else "Night" }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
 
-      continue_on_error: true
+        # ────────────── 1_long_press ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "1_long_press" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
 
-    # ── Step 6: Error handling ───────────────────────────────────────────────
-    - if:
-      - condition: template
-        value_template: '{{ error is defined }}'
-      then:
-      - if:
-        - condition: template
-          value_template: '{{ effective_error_mode == "log" }}'
-        then:
-        - action: system_log.write
-          data:
-            level: error
-            message: >-
-              Labeled Feature Button: error on action '{{ mapped_action }}'
-              (leader: {{ leader_entity_id }}, area: {{ resolved_area_id }},
-              players: {{ area_media_players }}): {{ error }}
-      - if:
-        - condition: template
-          value_template: '{{ effective_error_mode == "alert" }}'
-        then:
-        - action: script.send_alert
-          data:
-            alert_severity: high
-            alert_title: Labeled Feature Button Error
-            alert_message: >-
-              Error on action '{{ mapped_action }}' for leader {{ leader_entity_id }}
-              in area {{ resolved_area_id }}: {{ error }}
-      - if:
-        - condition: template
-          value_template: '{{ effective_error_mode == "stop" }}'
-        then:
-        - stop: >-
-            Labeled Feature Button: error on action '{{ mapped_action }}'
-            (leader: {{ leader_entity_id }}): {{ error }}
-          error: true
+        # ────────────── 2_long_press ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "2_long_press" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Volume Down" if media_playing else "Ads" }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
