@@ -3005,6 +3005,23 @@ labeled_feature_follower:
       required: true
       selector:
         boolean: {}
+    error_mode:
+      name: Error Mode
+      description: >
+        Default error mode when the follower entity has no `<feature> Error Mode:`
+        label. Passed in by the leader automation from its per-feature evaluation.
+        Priority: follower entity label → this field → 'log'.
+        Tiers: silent | log | alert | stop.
+      required: false
+      default: ''
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
     toggle:
       name: Toggle
       description: >
@@ -3048,10 +3065,15 @@ labeled_feature_follower:
       # `feature` std field so scripts don't need to know about scope.
       scoped_feature: >-
         {{ (scope | default('') | capitalize + ' ') if scope | default('') in ['area', 'floor'] else '' }}{{ feature_name }}
-      follower_error_mode: "{% set em_pfx = scoped_feature + ' Error Mode: ' %} {%
-        set match = follower_labels\n    | select('match', '^' + em_pfx
-        + '(silent|log|alert|stop)$')\n    | first | default('') %} {{ match | regex_replace('^.+:
-        ', '') | default('log', true) }}\n"
+      follower_error_mode: >-
+        {% set em_pfx = scoped_feature + ' Error Mode: ' %}
+        {% set match = follower_labels
+            | select('match', '^' + em_pfx + '(silent|log|alert|stop)$')
+            | first | default('') %}
+        {% set from_label = match | regex_replace('^.+: ', '') | lower %}
+        {% if from_label != '' %}{{ from_label }}
+        {% elif (error_mode | default('') | lower) != '' %}{{ error_mode | lower }}
+        {% else %}log{% endif %}
       follower_inverted: '{{ (scoped_feature + '' Invert: True'') in follower_labels }}'
       follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled }}'
   - variables:
@@ -3176,7 +3198,7 @@ labeled_feature_follower:
       follower_toggle: >-
         {{ (toggle | default(false) | bool) or ((scoped_feature + ' Toggle: True') in follower_labels) }}
       _std_fields_base: >-
-        {{ {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id, 'toggle': follower_toggle} }}
+        {{ {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id, 'toggle': follower_toggle, 'error_mode': follower_error_mode} }}
       _enable_script_fields: >-
         {% if follower_enable_script | trim != "" %}{{ state_attr(follower_enable_script | trim, 'fields') | default({}) }}{% else %}{{ {} }}{% endif %}
       _enable_script_std_fields: >-
@@ -3950,6 +3972,23 @@ labeled_feature_button:
             - area
             - floor
             - none
+    error_mode:
+      name: Error Mode
+      description: >
+        Default error mode for action failures inside the button script.
+        Priority: `<feature> Error Mode:` label on the leader entity →
+        this field → 'log'.
+        Tiers: silent | log | alert | stop.
+      required: false
+      default: ''
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
     scope_id:
       name: Scope ID
       description: The resolved area_id or floor_id passed by the automation.
@@ -4016,7 +4055,28 @@ labeled_feature_button:
           } %}
           {{ m.get(feature_action, feature_action) }}
 
-    # ── Step 4: Route by action ──────────────────────────────────────────────
+    # ── Step 4: Resolve effective error mode ────────────────────────────────
+    # Priority: <feature> Error Mode: label on leader → caller error_mode field → 'log'
+    - variables:
+        _button_leader_labels: >-
+          {% if leader_entity_id is defined and leader_entity_id != '' %}
+            {{ labels(leader_entity_id) | map('label_name') | reject('none') | list }}
+          {% else %}{{ [] }}{% endif %}
+        _button_scoped_pfx: >-
+          {{ (scope | default('') | capitalize + ' ') if scope | default('') in ['area', 'floor'] else '' }}
+        _button_label_error_mode: >-
+          {% set match = _button_leader_labels
+               | select('match', '^' + _button_scoped_pfx + (feature | default('')) + ' Error Mode: (Silent|Log|Alert|Stop)$')
+               | first | default('') %}
+          {{ (match | regex_replace('^.+: ', '') | lower) if match else '' }}
+        effective_error_mode: >-
+          {{ _button_label_error_mode
+             if _button_label_error_mode != ''
+             else ((error_mode | default('') | lower)
+                   if (error_mode | default('') | lower) != ''
+                   else 'log') }}
+
+    # ── Step 5: Route by action ──────────────────────────────────────────────
     - choose:
 
         # ────────────────────────────────────────────────────────────────────
@@ -4397,3 +4457,41 @@ labeled_feature_button:
                 - action: input_boolean.toggle
                   target:
                     entity_id: input_boolean.night_mode
+
+      continue_on_error: true
+
+    # ── Step 6: Error handling ───────────────────────────────────────────────
+    - if:
+      - condition: template
+        value_template: '{{ error is defined }}'
+      then:
+      - if:
+        - condition: template
+          value_template: '{{ effective_error_mode == "log" }}'
+        then:
+        - action: system_log.write
+          data:
+            level: error
+            message: >-
+              Labeled Feature Button: error on action '{{ mapped_action }}'
+              (leader: {{ leader_entity_id }}, area: {{ resolved_area_id }},
+              players: {{ area_media_players }}): {{ error }}
+      - if:
+        - condition: template
+          value_template: '{{ effective_error_mode == "alert" }}'
+        then:
+        - action: script.send_alert
+          data:
+            alert_severity: high
+            alert_title: Labeled Feature Button Error
+            alert_message: >-
+              Error on action '{{ mapped_action }}' for leader {{ leader_entity_id }}
+              in area {{ resolved_area_id }}: {{ error }}
+      - if:
+        - condition: template
+          value_template: '{{ effective_error_mode == "stop" }}'
+        then:
+        - stop: >-
+            Labeled Feature Button: error on action '{{ mapped_action }}'
+            (leader: {{ leader_entity_id }}): {{ error }}
+          error: true

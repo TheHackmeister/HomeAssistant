@@ -2383,6 +2383,7 @@
                   leader_entity_id: '{{ leader_entity_id }}'
                   leader_enabled: '{{ repeat.item.en }}'
                   toggle: '{{ repeat.item.toggle | default(false) }}'
+                  error_mode: '{{ feature_error_mode }}'
                   scope: '{{ resolved_scope }}'
                   scope_id: '{{ resolved_scope_id }}'
                 continue_on_error: true
