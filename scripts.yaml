@@ -4715,8 +4715,11 @@ labeled_feature_somrig:
                   data:
                     feature: Lights Off
                     exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
+                    # Lights Off is intentionally forced to the leader's floor
+                    # so a single button press clears every light on the floor,
+                    # regardless of which area the button itself lives in.
+                    scope: floor
+                    scope_id: '{{ _resolved_floor_id }}'
                     follower_entity_id: '{{ follower_entity_id | default("") }}'
                     leader_entity_id: '{{ leader_entity_id | default("") }}'
                     leader_enabled: '{{ leader_enabled | default(true) }}'
@@ -4738,8 +4741,9 @@ labeled_feature_somrig:
                   data:
                     feature: Lights Off
                     exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
+                    # See note above: Lights Off always operates at the floor scope.
+                    scope: floor
+                    scope_id: '{{ _resolved_floor_id }}'
                     follower_entity_id: '{{ follower_entity_id | default("") }}'
                     leader_entity_id: '{{ leader_entity_id | default("") }}'
                     leader_enabled: '{{ leader_enabled | default(true) }}'
