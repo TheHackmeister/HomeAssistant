@@ -2189,7 +2189,7 @@
                 true {% endif %}
 
                 '
-              feature_error_mode: "{% set pfx = feature_name + ' Error Mode: ' %}\n
+              feature_error_mode: "{% set pfx = scoped_feature_leader + ' Error Mode: ' %}\n
                 \  {% set match = all_leader_labels\n     | select('match',
                 '^' + pfx + '(silent|log|alert|stop)$')\n     | first | default('')
                 %}\n  {{ match | regex_replace('^.+: ', '') | default(automation_error_mode,
@@ -2222,21 +2222,21 @@
           - variables:
               leader_script: >-
                 {%- if leader_enabled | bool -%}
-                  {%- set pfx = feature_name + ' Enable Script: ' -%}
+                  {%- set pfx = scoped_feature_leader + ' Enable Script: ' -%}
                   {%- set s = all_leader_labels | select('match', '^' + pfx + '.+')
                       | first | default('') | regex_replace('^.+: ', '') | trim -%}
                   {%- if s == '' -%}
-                    {%- set pfx = feature_name + ' Script: ' -%}
+                    {%- set pfx = scoped_feature_leader + ' Script: ' -%}
                     {%- set s = all_leader_labels | select('match', '^' + pfx + '.+')
                         | first | default('') | regex_replace('^.+: ', '') | trim -%}
                   {%- endif -%}
                   {{- s -}}
                 {%- else -%}
-                  {%- set pfx = feature_name + ' Disable Script: ' -%}
+                  {%- set pfx = scoped_feature_leader + ' Disable Script: ' -%}
                   {%- set s = all_leader_labels | select('match', '^' + pfx + '.+')
                       | first | default('') | regex_replace('^.+: ', '') | trim -%}
                   {%- if s == '' -%}
-                    {%- set pfx = feature_name + ' Script: ' -%}
+                    {%- set pfx = scoped_feature_leader + ' Script: ' -%}
                     {%- set s = all_leader_labels | select('match', '^' + pfx + '.+')
                         | first | default('') | regex_replace('^.+: ', '') | trim -%}
                   {%- endif -%}
@@ -2247,7 +2247,7 @@
                 {% set lf_l = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
                 {% set lf_f = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
                 {% for lbl in all_leader_labels %}
-                {% if lbl | regex_search('^' + feature_name + ' Arg [^:]+:') %}
+                {% if lbl | regex_search('^' + scoped_feature_leader + ' Arg [^:]+:') %}
                 {% set field = lbl | regex_replace('^.+ Arg ([^:]+): .*$', '\\1') | trim %}
                 {% set raw = lbl | regex_replace('^[^:]+: ', '') | trim %}
                 {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
