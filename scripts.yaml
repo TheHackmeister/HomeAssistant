@@ -4124,15 +4124,28 @@ labeled_feature_generics:
             {{ area_id(leader_entity_id) | default('') }}
           {%- else -%}{{ '' }}{%- endif -%}
         _resolved_floor_id: >-
-          {%- if _scope == 'floor' and scope_id is defined and scope_id != '' -%}
+          {%- if _scope != 'floor' -%}{{ '' }}
+          {%- elif scope_id is defined and scope_id != '' -%}
             {{ scope_id }}
-          {%- elif _scope == 'floor' and follower_entity_id is defined and follower_entity_id != '' -%}
-            {%- set aid = area_id(follower_entity_id) -%}
+          {%- else -%}
+            {%- set aid = '' -%}
+            {%- if follower_entity_id is defined and follower_entity_id != '' -%}
+              {%- set aid = area_id(follower_entity_id) | default('') -%}
+            {%- endif -%}
+            {%- if aid == '' and leader_entity_id is defined and leader_entity_id != '' -%}
+              {%- set aid = area_id(leader_entity_id) | default('') -%}
+            {%- endif -%}
+            {%- if aid == '' -%}
+              {%- set aid = _resolved_area_id -%}
+            {%- endif -%}
             {%- set ns = namespace(found='') -%}
-            {%- for fid in floors() -%}
-              {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
-            {%- endfor -%}{{ ns.found }}
-          {%- else -%}{{ '' }}{%- endif -%}
+            {%- if aid != '' -%}
+              {%- for fid in floors() -%}
+                {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+            {{ ns.found }}
+          {%- endif -%}
     - variables:
         scope_entity_set: >-
           {% if _scope == 'area' and _resolved_area_id != '' %}
@@ -4869,7 +4882,7 @@ labeled_feature_somrig:
                           toggle: '{{ _toggle_in }}'
                           error_mode: '{{ _err_mode }}'
                       - delay:
-                          milliseconds: 300
+                          milliseconds: 500
               else:
                 - action: script.labeled_feature_generics
                   data:
@@ -4920,7 +4933,7 @@ labeled_feature_somrig:
                               toggle: '{{ _toggle_in }}'
                               error_mode: '{{ _err_mode }}'
                           - delay:
-                              milliseconds: 300
+                              milliseconds: 500
                   else:
                     - action: script.labeled_feature_generics
                       data:
