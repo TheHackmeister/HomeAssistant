@@ -4366,20 +4366,34 @@ labeled_feature_generics:
                      | float(0) + 30 }}
 
         # ── Volume ──────────────────────────────────────────────────────────
+        # Use volume_set + per-entity current level so the step is deterministic
+        # at 5% regardless of the underlying media_player integration's defaults.
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_up" }}'
           sequence:
-            - action: media_player.volume_up
-              target:
-                entity_id: '{{ final_targets }}'
+            - repeat:
+                for_each: '{{ final_targets }}'
+                sequence:
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: '{{ repeat.item }}'
+                    data:
+                      volume_level: >-
+                        {{ [(state_attr(repeat.item, 'volume_level') | float(0)) + 0.05, 1.0] | min }}
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_down" }}'
           sequence:
-            - action: media_player.volume_down
-              target:
-                entity_id: '{{ final_targets }}'
+            - repeat:
+                for_each: '{{ final_targets }}'
+                sequence:
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: '{{ repeat.item }}'
+                    data:
+                      volume_level: >-
+                        {{ [(state_attr(repeat.item, 'volume_level') | float(0)) - 0.05, 0.0] | max }}
 
         # ── Lights ──────────────────────────────────────────────────────────
         - conditions:
@@ -4819,35 +4833,116 @@ labeled_feature_somrig:
                 error_mode: '{{ _err_mode }}'
 
         # ────────────── 1_long_press ──────────────
+        # Repeats the stepping action every 300ms until the leader entity's
+        # state changes (i.e. user releases or presses something else), with a
+        # safety cap. If leader_entity_id is missing we fall back to a single
+        # dispatch so this still does something when called manually.
         - conditions:
             - condition: template
               value_template: '{{ mapped_event == "1_long_press" }}'
           sequence:
-            - action: script.labeled_feature_generics
-              data:
-                feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
-                exclude_feature: '{{ _leader_feature }}'
-                scope: '{{ _scope }}'
-                scope_id: '{{ scope_id | default("") }}'
-                follower_entity_id: '{{ follower_entity_id | default("") }}'
-                leader_entity_id: '{{ leader_entity_id | default("") }}'
-                leader_enabled: '{{ leader_enabled | default(true) }}'
-                toggle: '{{ _toggle_in }}'
-                error_mode: '{{ _err_mode }}'
+            - variables:
+                _long_press_feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
+                _leader_initial_state: >-
+                  {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
+            - if:
+                - condition: template
+                  value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
+              then:
+                - repeat:
+                    # Safety cap: ~60s of held button at 300ms cadence.
+                    while:
+                      - condition: template
+                        value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
+                      - condition: template
+                        value_template: '{{ repeat.index <= 200 }}'
+                    sequence:
+                      - action: script.labeled_feature_generics
+                        data:
+                          feature: '{{ _long_press_feature }}'
+                          exclude_feature: '{{ _leader_feature }}'
+                          scope: '{{ _scope }}'
+                          scope_id: '{{ scope_id | default("") }}'
+                          follower_entity_id: '{{ follower_entity_id | default("") }}'
+                          leader_entity_id: '{{ leader_entity_id | default("") }}'
+                          leader_enabled: '{{ leader_enabled | default(true) }}'
+                          toggle: '{{ _toggle_in }}'
+                          error_mode: '{{ _err_mode }}'
+                      - delay:
+                          milliseconds: 300
+              else:
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: '{{ _long_press_feature }}'
+                    exclude_feature: '{{ _leader_feature }}'
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
 
         # ────────────── 2_long_press ──────────────
+        # Playing (Volume Down) repeats every 300ms with the same safety guard
+        # described above. Not-Playing (Ads) is a toggle, fires once.
         - conditions:
             - condition: template
               value_template: '{{ mapped_event == "2_long_press" }}'
           sequence:
-            - action: script.labeled_feature_generics
-              data:
-                feature: '{{ "Volume Down" if media_playing else "Ads" }}'
-                exclude_feature: '{{ _leader_feature }}'
-                scope: '{{ _scope }}'
-                scope_id: '{{ scope_id | default("") }}'
-                follower_entity_id: '{{ follower_entity_id | default("") }}'
-                leader_entity_id: '{{ leader_entity_id | default("") }}'
-                leader_enabled: '{{ leader_enabled | default(true) }}'
-                toggle: '{{ _toggle_in }}'
-                error_mode: '{{ _err_mode }}'
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - variables:
+                    _leader_initial_state: >-
+                      {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
+                - if:
+                    - condition: template
+                      value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
+                  then:
+                    - repeat:
+                        while:
+                          - condition: template
+                            value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
+                          - condition: template
+                            value_template: '{{ repeat.index <= 200 }}'
+                        sequence:
+                          - action: script.labeled_feature_generics
+                            data:
+                              feature: Volume Down
+                              exclude_feature: '{{ _leader_feature }}'
+                              scope: '{{ _scope }}'
+                              scope_id: '{{ scope_id | default("") }}'
+                              follower_entity_id: '{{ follower_entity_id | default("") }}'
+                              leader_entity_id: '{{ leader_entity_id | default("") }}'
+                              leader_enabled: '{{ leader_enabled | default(true) }}'
+                              toggle: '{{ _toggle_in }}'
+                              error_mode: '{{ _err_mode }}'
+                          - delay:
+                              milliseconds: 300
+                  else:
+                    - action: script.labeled_feature_generics
+                      data:
+                        feature: Volume Down
+                        exclude_feature: '{{ _leader_feature }}'
+                        scope: '{{ _scope }}'
+                        scope_id: '{{ scope_id | default("") }}'
+                        follower_entity_id: '{{ follower_entity_id | default("") }}'
+                        leader_entity_id: '{{ leader_entity_id | default("") }}'
+                        leader_enabled: '{{ leader_enabled | default(true) }}'
+                        toggle: '{{ _toggle_in }}'
+                        error_mode: '{{ _err_mode }}'
+              else:
+                # Ads — toggle, fires once
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Ads
+                    exclude_feature: '{{ _leader_feature }}'
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
