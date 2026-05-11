@@ -4877,19 +4877,29 @@ labeled_feature_somrig:
                       # state). This makes the visible step cadence consistent
                       # even when the underlying media_player / light service
                       # call latency varies.
+                      # Fire-and-forget dispatch via script.turn_on: returns
+                      # immediately so the loop's wall-clock cadence is
+                      # independent of how long the underlying media_player /
+                      # light service call takes. Inner error handling inside
+                      # labeled_feature_generics (Error Mode logging/alerts)
+                      # still applies; only error *propagation* back to this
+                      # loop is dropped.
                       - variables:
                           _tick_start: '{{ as_timestamp(now()) }}'
-                      - action: script.labeled_feature_generics
+                      - action: script.turn_on
+                        target:
+                          entity_id: script.labeled_feature_generics
                         data:
-                          feature: '{{ _long_press_feature }}'
-                          exclude_feature: '{{ _leader_feature }}'
-                          scope: '{{ _scope }}'
-                          scope_id: '{{ scope_id | default("") }}'
-                          follower_entity_id: '{{ follower_entity_id | default("") }}'
-                          leader_entity_id: '{{ leader_entity_id | default("") }}'
-                          leader_enabled: '{{ leader_enabled | default(true) }}'
-                          toggle: '{{ _toggle_in }}'
-                          error_mode: '{{ _err_mode }}'
+                          variables:
+                            feature: '{{ _long_press_feature }}'
+                            exclude_feature: '{{ _leader_feature }}'
+                            scope: '{{ _scope }}'
+                            scope_id: '{{ scope_id | default("") }}'
+                            follower_entity_id: '{{ follower_entity_id | default("") }}'
+                            leader_entity_id: '{{ leader_entity_id | default("") }}'
+                            leader_enabled: '{{ leader_enabled | default(true) }}'
+                            toggle: '{{ _toggle_in }}'
+                            error_mode: '{{ _err_mode }}'
                       - delay:
                           milliseconds: >-
                             {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
@@ -4931,21 +4941,24 @@ labeled_feature_somrig:
                           - condition: template
                             value_template: '{{ repeat.index <= 200 }}'
                         sequence:
-                          # Self-correcting tick — see note in the 1_long_press
-                          # branch above. Targets 500ms wall-clock per step.
+                          # Fire-and-forget dispatch — see note in 1_long_press
+                          # branch. Targets 500ms wall-clock per step.
                           - variables:
                               _tick_start: '{{ as_timestamp(now()) }}'
-                          - action: script.labeled_feature_generics
+                          - action: script.turn_on
+                            target:
+                              entity_id: script.labeled_feature_generics
                             data:
-                              feature: Volume Down
-                              exclude_feature: '{{ _leader_feature }}'
-                              scope: '{{ _scope }}'
-                              scope_id: '{{ scope_id | default("") }}'
-                              follower_entity_id: '{{ follower_entity_id | default("") }}'
-                              leader_entity_id: '{{ leader_entity_id | default("") }}'
-                              leader_enabled: '{{ leader_enabled | default(true) }}'
-                              toggle: '{{ _toggle_in }}'
-                              error_mode: '{{ _err_mode }}'
+                              variables:
+                                feature: Volume Down
+                                exclude_feature: '{{ _leader_feature }}'
+                                scope: '{{ _scope }}'
+                                scope_id: '{{ scope_id | default("") }}'
+                                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                                leader_enabled: '{{ leader_enabled | default(true) }}'
+                                toggle: '{{ _toggle_in }}'
+                                error_mode: '{{ _err_mode }}'
                           - delay:
                               milliseconds: >-
                                 {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
