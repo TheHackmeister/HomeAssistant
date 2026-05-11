@@ -4870,6 +4870,15 @@ labeled_feature_somrig:
                       - condition: template
                         value_template: '{{ repeat.index <= 200 }}'
                     sequence:
+                      # Self-correcting tick: budget 500ms wall-clock per
+                      # iteration. We measure how long the dispatch took and
+                      # subtract that from the delay (with a 50ms floor so the
+                      # while: still gets a real yield to re-check the leader
+                      # state). This makes the visible step cadence consistent
+                      # even when the underlying media_player / light service
+                      # call latency varies.
+                      - variables:
+                          _tick_start: '{{ as_timestamp(now()) }}'
                       - action: script.labeled_feature_generics
                         data:
                           feature: '{{ _long_press_feature }}'
@@ -4882,7 +4891,8 @@ labeled_feature_somrig:
                           toggle: '{{ _toggle_in }}'
                           error_mode: '{{ _err_mode }}'
                       - delay:
-                          milliseconds: 500
+                          milliseconds: >-
+                            {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
               else:
                 - action: script.labeled_feature_generics
                   data:
@@ -4921,6 +4931,10 @@ labeled_feature_somrig:
                           - condition: template
                             value_template: '{{ repeat.index <= 200 }}'
                         sequence:
+                          # Self-correcting tick — see note in the 1_long_press
+                          # branch above. Targets 500ms wall-clock per step.
+                          - variables:
+                              _tick_start: '{{ as_timestamp(now()) }}'
                           - action: script.labeled_feature_generics
                             data:
                               feature: Volume Down
@@ -4933,7 +4947,8 @@ labeled_feature_somrig:
                               toggle: '{{ _toggle_in }}'
                               error_mode: '{{ _err_mode }}'
                           - delay:
-                              milliseconds: 500
+                              milliseconds: >-
+                                {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
                   else:
                     - action: script.labeled_feature_generics
                       data:
