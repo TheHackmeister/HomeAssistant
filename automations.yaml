@@ -2284,7 +2284,7 @@
                     then:
                     - action: '{{ leader_script }}'
                       data: >
-                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
                       continue_on_error: true
                     - if:
                       - condition: template
@@ -2310,14 +2310,14 @@
                     else:
                     - action: '{{ leader_script }}'
                       data: >
-                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
+                        {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} }}
                 default:
                 - action: script.turn_on
                   target:
                     entity_id: '{{ leader_script }}'
                   data:
                     variables: >
-                      {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} | combine(leader_script_args) }}
+                      {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} | combine(leader_script_args) | combine({'leader_feature': feature_name}) }}
           # === Follower dispatch (scope → followers → dispatch_list, combined) ===
           - variables:
               follower_label_name: >-
