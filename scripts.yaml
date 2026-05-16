@@ -1,68 +1,3 @@
-'1610683330227':
-  alias: New Script
-  sequence:
-  - service: notify.mobile_app_one_a2005
-    data:
-      title: Check this out!
-      message: Something happened at home!
-  mode: single
-add_to_calibration_list:
-  variables:
-    entity:
-  fields:
-    added_entity:
-      description: The entity to add to the calibration list.
-      example: sensor.temp_sensor
-  alias: Add To Calibration List
-  sequence:
-  - service: var.set
-    data:
-      value_template: "{% if added_entity in states('var.calibration_entities') %}\n
-        \ {{ states('var.calibration_values') }}\n{% else %}\n  {%- if not states('var.calibration_entities')|length
-        == 0 %}{{ states('var.calibration_entities') }},{%- endif %}{{ added_entity
-        }}\n{% endif %}\n"
-      entity_id: var.calibration_entities
-    entity_id: var.calibration_entities
-  mode: parallel
-  icon: mdi:home
-  max: 10
-clear_calibration_list:
-  alias: Clear Calibration List
-  sequence:
-  - service: var.set
-    data:
-      value_template: '{}'
-      entity_id: var.calibration_entities
-    entity_id: var.calibration_entities
-  mode: parallel
-  icon: mdi:home
-  max: 10
-run_calibration:
-  alias: Run Calibration
-  sequence:
-  - service: system_log.write
-    data:
-      message: Running Calibration
-      level: warning
-stop_calibration:
-  alias: Stop Calibration
-  sequence:
-  - service: system_log.write
-    data:
-      message: Stopping Calibration
-      level: warning
-  mode: single
-  icon: mdi:home
-turn_off_all_lights:
-  alias: Turn Off All Lights
-  sequence:
-  - service: light.turn_off
-    target:
-      area_id:
-      - bathroom_main
-      - dining_room
-      - tv_room
-  mode: single
 vacuum_single_section:
   alias: 'Vacuum: Single Section'
   sequence:
@@ -88,66 +23,6 @@ vacuum_single_section:
   mode: queued
   icon: mdi:robot-vacuum
   max: 20
-audio_follow_the_area_leader:
-  alias: 'Audio: Follow the (Area) Leader'
-  sequence:
-  - variables:
-      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in label_entities('Area
-        Sound Leader') %}\n  {% set leader_entities.list = leader_entities.list +
-        [leader] %}\n{% endfor %} {{ leader_entities.list }}\n"
-      l2:
-      - test
-      - another
-      followers: "{% set leader_entities = namespace(list=[]) %} {% for leader in
-        label_entities('Area Sound Leader') %}\n  {% set area = device_attr(device_id(leader),
-        'area_id') %}\n  {% for s in states.media_player | selectattr('entity_id',
-        'in', area_entities(area)) %}\n    {% set leader_entities.list = leader_entities.list
-        + [s.entity_id] %}\n  {% endfor %}\n{% endfor %} {{ leader_entities.list }}\n"
-  - metadata: {}
-    data:
-      message: 'l6: {{ l6 }}'
-    action: persistent_notification.create
-  - repeat:
-      for_each: '{{ leaders }}'
-      sequence:
-      - metadata: {}
-        data:
-          message: a{{ repeat.item }}b
-        action: notify.persistent_notification
-      - variables:
-          followers: "{% set leader_entities = namespace(list=[]) %} {% set area =
-            device_attr(device_id(repeat.item), 'area_id') %} {% for s in states.media_player
-            | selectattr('entity_id', 'in', area_entities(area)) %}\n  {% set follower_entities.list
-            = follower_entities.list + [s.entity_id] %}\n{% endfor %} {{ follower_entities.list
-            }}\n"
-      - if:
-        - condition: state
-          entity_id: input_select.house_mode
-          state: Away
-        then:
-        - metadata: {}
-          data:
-            is_volume_muted: true
-          target:
-            entity_id: '{{ followers }}'
-          action: media_player.volume_mute
-        - metadata: {}
-          target:
-            entity_id: '{{ followers }}'
-          action: homeassistant.turn_off
-        else:
-        - metadata: {}
-          data:
-            is_volume_muted: '{{ is_state(repeat.item, ''off'') }}'
-          target:
-            entity_id: '{{ repeat.item }}'
-          action: media_player.volume_mute
-        - metadata: {}
-          target:
-            entity_id: '{{ repeat.item }}'
-          action: homeassistant.turn_on
-  description: ''
-  icon: mdi:cast-audio
 sleep_me_switch:
   alias: 'Sleep Me Switch: Dim Lights'
   sequence:
@@ -273,26 +148,6 @@ sleep_me_switch_go_forward:
     target:
       entity_id: button.spencer_laptop_next
   description: ''
-sleep_me_switch_sleep:
-  alias: 'Sleep Me Switch: Sleep'
-  sequence:
-  - if:
-    - condition: state
-      entity_id: sensor.spencer_laptop_media_info
-      attribute: playing
-      state: Playing
-    then:
-    - action: button.press
-      metadata: {}
-      data: {}
-      target:
-        entity_id: button.spencer_laptop_playpause
-  description: ''
-  fields:
-    shared_label:
-      selector:
-        text:
-      required: true
 audio_mood_morning:
   sequence:
   - action: squeezebox.call_method
@@ -1231,106 +1086,6 @@ audio_area_based_media_actions:
 
       '
   description: ''
-audio_swap_audio_sources:
-  sequence: []
-  alias: 'Audio: Swap Audio Sources'
-  description: ''
-audio_swap_output:
-  sequence:
-  - variables:
-      current_value: '{{ states(''select.aerofarms_laptop_speaker_select'') }}'
-  - variables:
-      previous_value: "{% set history = state_attr('sensor.history_stats', 'aerofarms_laptop_speaker_select')
-        %} {% if not history %}\n  {% set history = (states.select.aerofarms_laptop_speaker_select.attributes.options
-        | reject('eq', current_value) | list) %}\n{% endif %} {% for entry in history
-        %}\n  {% if entry.state != current_value %}\n    {{ entry.state }}\n    {%
-        break %}\n  {% endif %}\n{% else %}\n  {% set options = states.select.aerofarms_laptop_speaker_select.attributes.options
-        | list %}\n  {% if options and options|length > 1 %}\n    {{ (options | reject('eq',
-        current_value) | list)[0] }}\n  {% else %}\n    {{ current_value }}\n  {%
-        endif %}\n{% endfor %}"
-  - target:
-      entity_id: select.aerofarms_laptop_speaker_select
-    data:
-      option: '{{ previous_value }}'
-    action: select.select_option
-  alias: 'Audio: Swap Output'
-  description: ''
-water_supply_by_area:
-  sequence: []
-  alias: 'Water Supply: By Area'
-  description: ''
-dose_house_plants:
-  sequence:
-  - variables:
-      nutrients:
-      - 'Nutrient: Part A'
-      - 'Nutrient: Part B'
-      - 'Nutrient: pH Up'
-      - 'Nutrient: H2O2'
-      shake_start_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
-        selectattr(''entity_id'', ''in'', label_entities("Nutrient: Shake")) | map(attribute=''entity_id'')
-        | list }}
-
-        '
-      shake_stop_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
-        selectattr(''entity_id'', ''in'', label_entities("Stop Nutrient: Shake"))
-        | map(attribute=''entity_id'') | list }}
-
-        '
-  - action: script.dose_nutrient_v2
-    metadata: {}
-    data:
-      nutrient: 'Nutrient: RO Water'
-      area_id: water_supply_01
-      units: '{{ units | float }}'
-    enabled: true
-  - action: script.dose_nutrient_v2
-    metadata: {}
-    data:
-      nutrient: 'Nutrient: Shake'
-      area_id: water_supply_01
-      units: 10
-    enabled: true
-  - repeat:
-      sequence:
-      - action: script.dose_nutrient_v2
-        metadata: {}
-        data:
-          nutrient: '{{ repeat.item }}'
-          area_id: '{{ area_id }}'
-          units: '{{ (units | float) * 2.0 }}'
-      - action: script.dose_nutrient_v2
-        metadata: {}
-        data:
-          nutrient: 'Nutrient: Shake'
-          area_id: water_supply_01
-          units: 1
-        enabled: true
-      for_each: '{{ nutrients }}'
-    enabled: true
-  - action: script.dose_nutrient_v2
-    metadata: {}
-    data:
-      nutrient: 'Nutrient: Shake'
-      area_id: water_supply_01
-      units: 5
-    enabled: true
-  fields:
-    area_id:
-      selector:
-        text:
-      name: area_id
-      default: water_supply_01
-    units:
-      selector:
-        number:
-          min: 1
-          max: 100
-      name: Units
-      default: 1
-  alias: 'Dose: House Plants'
-  description: ''
-  icon: mdi:flower
 dose_pressurize_electrolytes:
   sequence:
   - variables:
@@ -1443,224 +1198,6 @@ dose_pressurize_electrolytes:
         typical cutoff. '
   alias: 'Dose: Pressurize Electrolytes'
   description: ''
-dose_nutrient:
-  sequence:
-  - variables:
-      pumps: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
-        selectattr(''entity_id'', ''in'', label_entities(nutrient)) | map(attribute=''entity_id'')
-        | list }}
-
-        '
-  - repeat:
-      sequence:
-      - variables:
-          pump: '{{ repeat.item }}'
-          pump_time: '{% set dose_label_id = labels(repeat.item) | select(''match'',
-            ''dose_seconds'') | list | first %} {% set dose_seconds_label = label_name(dose_label_id)
-            %} {% set dose_seconds = dose_seconds_label.split('':'')[1] | trim | float
-            %}
-
-            {% set dose_double_label_id = labels(repeat.item) | select(''match'',
-            ''dose_double'') | list | first %} {% set dose_double_seconds_label =
-            label_name(dose_double_label_id) %} {% set dose_double_seconds = dose_double_seconds_label.split('':'')[1]
-            | trim | float %}
-
-            {% set dose_offset = (dose_seconds * 2) - dose_double_seconds %} {% set
-            dose = dose_seconds - dose_offset %} {{ dose_offset + (dose * units) }}'
-          followers_different_area: '{% set dose_area_label_id = labels(repeat.item)
-            | select(''match'', ''dose_area'') | list | first %} {% set dose_area_label
-            = label_name(dose_area_label_id)  %}  {% set dose_area =  dose_area_label.split('':'')[1]  if
-            dose_area_label  else '''' %} {{  dose_area | trim  }}
-
-            '
-          followers_in_area: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
-            selectattr(''entity_id'', ''in'', label_entities(nutrient~'' Follower''))
-            | map(attribute=''entity_id'') | list }}'
-          pump_followers: '{{ followers_in_area [ followers_different_area ] }}'
-          sensor: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
-            selectattr(''entity_id'', ''in'', label_entities(nutrient~'' Sensor''))
-            | map(attribute=''entity_id'') | list | first }}
-
-            '
-          dose_stop: '{% set dose_stop_label_id = labels(sensor) | select(''match'',
-            ''dose_stop'') | list | first %} {% set dose_stop_label = label_name(dose_stop_label_id)
-            %} {{ dose_stop_label.split('':'')[1] if dose_stop_label else '''' }}
-
-            '
-          dose_timeout: '{% set dose_timeout_label_id = labels(pump) | select(''match'',
-            ''dose_timeout'') | list | first %} {% set dose_timeout_label = label_name(dose_timeout_label_id)
-            %}  {{ dose_timeout_label.split('':'')[1] if dose_timeout_label else ''''
-            }}
-
-            '
-      - if:
-        - condition: template
-          value_template: '{{ followers_different_area  | length > 0 }}'
-          enabled: true
-        then:
-        - action: script.turn_on
-          metadata: {}
-          data:
-            entity_id: '{{ this.entity_id }}'
-            variables:
-              area_id: '{{ followers_different_area }}'
-              nutrient: '{{ nutrient~'' Follower'' }}'
-              units: '{{ units | float }}'
-        enabled: true
-      - repeat:
-          sequence:
-          - action: script.turn_on
-            metadata: {}
-            data:
-              entity_id: '{{ this.entity_id }}'
-              variables:
-                area_id: '{{ area_id }}'
-                nutrient: '{{ nutrient~'' Follower'' }}'
-                units: '{{ units | float }}'
-          for_each: '{{ followers_in_area | list }}'
-        enabled: true
-      - action: switch.turn_on
-        metadata: {}
-        data: {}
-        target:
-          entity_id: '{{ pump }}'
-      - if:
-        - condition: template
-          value_template: '{{ sensor | length > 0 }}'
-        then:
-        - wait_template: '{{ states(sensor) | float > dose_stop | float }}'
-          continue_on_timeout: true
-          timeout: 0{{ timedelta(0, dose_timeout | float) }}
-          enabled: true
-        else:
-        - delay: '{{  pump_time | float }}'
-      - action: switch.turn_off
-        metadata: {}
-        data: {}
-        target:
-          entity_id: '{{ pump }}'
-      - repeat:
-          sequence:
-          - action: script.turn_on
-            metadata: {}
-            data:
-              entity_id: '{{ this.entity_id }}'
-              variables:
-                area_id: '{{ area_id }}'
-                nutrient: '{{ nutrient~'' Follower'' }}'
-                units: 0
-          for_each: '{{ followers_in_area | list }}'
-        enabled: true
-      for_each: '{{ pumps }}'
-  fields:
-    nutrient:
-      selector:
-        text:
-      name: Nutrient
-      default: 'Nutrient: Electrolytes'
-    area_id:
-      selector:
-        text:
-      name: area_id
-      default: poc_01
-    units:
-      selector:
-        number:
-          min: 1
-          max: 100
-      name: Units
-      default: 1
-  alias: 'Dose: Nutrient'
-  description: ''
-  mode: parallel
-  max: 50
-calibrated_values_initalize_helpers:
-  sequence:
-  - variables:
-      leaders: "{% set leader_entities = namespace(list=[]) %} {% for leader in label_entities('Calibrated
-        Value (2 Point)') %}\n  {% set leader_entities.list = leader_entities.list
-        + [leader] %}\n{% endfor %} {{ leader_entities.list }}\n"
-      l2:
-      - test
-      - another
-  - repeat:
-      for_each: '{{ leaders }}'
-      sequence:
-      - variables:
-          device_id: '{{ repeat.item }}'
-          device_name: '{{ device_id.split(''.'')[1] }}'
-          friendly_name: '{{ state_attr(repeat.item, ''friendly_name'') or states[repeat.item].name
-            }}'
-          area_id: '{{ area_name(repeat.item) }}'
-          ha_topic: homeassistant
-          device_topic: calibrated_value/{{ device_name }}
-      - action: mqtt.publish
-        data:
-          topic: '{{ ha_topic }}/button/{{ device_name }}_clear/config'
-          retain: true
-          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
-            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
-            \"Calibrated Value\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
-            \ \"name\": \"Clear Calibrations\",\n  \"uniq_id\": \"{{ device_name }}_clear\",\n
-            \ \"cmd_t\": \"~/calibration_data\",\n  \"pl_prs\": \"{}\"\n}\n"
-        enabled: true
-      - action: mqtt.publish
-        data:
-          topic: '{{ ha_topic }}/button/{{ device_name }}_record/config'
-          retain: true
-          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
-            device_name }}\"],\n    \"name\": \"{{ friendly_name}}\",\n    \"manufacturer\":
-            \"Calibrated Value\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
-            \ \"name\": \"Record Current Calibration Values\",\n  \"uniq_id\": \"{{
-            device_name }}_record\",\n  \"cmd_t\": \"~/calibration_data\",\n  \"command_template\":
-            \"{{ '{{' \n      }} {states('number.{{ device_name }}_known_calibration_value'):
-            states('{{ device_id }}')} {{ '' \n      }} | combine( state_attr('sensor.{{
-            device_name }}_calibrated_value', 'raw') | from_json ) {{ ''\n      }}
-            | to_json {{ \n    '}}' }}\"\n}\n"
-      - action: mqtt.publish
-        data:
-          topic: '{{ ha_topic }}/number/{{ device_name }}_known_value/config'
-          retain: true
-          payload: "{ \"~\": \"{{ device_topic }}\",\n  \"dev\": {\n    \"ids\": [\"{{
-            device_name }}\"],\n    \"name\": \"{{ friendly_name }}\",\n    \"manufacturer\":
-            \"Calibrated Value\",\n    \"suggested_area\": \"{{ area_id }}\"\n  },\n
-            \ \"name\": \"Known Calibration Value\",\n  \"uniq_id\": \"{{ device_name
-            }}_known_value\",\n  \"mode\": \"box\",\n  \"min\": \"0\",\n  \"max\":
-            \"10000000\",      \n  \"cmd_t\": \"~/known_value\",      \n  \"stat_t\":
-            \"~/known_value\"\n}\n"
-        enabled: true
-      - action: mqtt.publish
-        data:
-          topic: '{{ ha_topic }}/sensor/{{ device_name }}_calibrated_value/config'
-          retain: true
-          payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
-            [ device_name ],\n      \"name\": friendly_name ,\n      \"manufacturer\":
-            \"Calibrated Value\",\n      \"suggested_area\": \"{{ area_id }}\"\n    },\n
-            \   \"name\": \"Calibrated Value\",\n    \"uniq_id\": device_name~\"_calibrated_value\",\n
-            \   \"cmd_t\": \"~/calibrated_value\",\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
-            \   \"state_class\": \"measurement\",\n    \"value_template\": \"{{ \n
-            \     (states( '\"~device_id~\"' ) | float) * ( state_attr('\"~device_id~\"_calibrated_value',
-            'poly[1]')  \n      | float) + ( state_attr('\"~device_id~\"_calibrated_value',
-            'poly[0]')  \n      | float) | float }}\",\n    \"json_attributes_topic\":
-            \"~/calibration_data\",\n    \"json_attributes_template\": \"{% set cal_data
-            = value | from_json %}\n      {% set ns = namespace(sx=0, sy=0, sxy=0,
-            sxx=0) %}\n      {% set n = cal_data.keys()|list|length %}\n      {% for
-            y, x in cal_data.items() %}\n        {% set x = x|float %}\n        {%
-            set y = y|float %}\n        {% set ns.sx = ns.sx + x %}\n        {% set
-            ns.sy = ns.sy + y %}\n        {% set ns.sxy = ns.sxy + (x * y) %}\n        {%
-            set ns.sxx = ns.sxx + (x * x) %}\n      {% endfor %}\n      \n      {%
-            set den = n * ns.sxx - ns.sx * ns.sx %}\n      {% if den != 0 %}\n        {%
-            set a = (n * ns.sxy - ns.sx * ns.sy) / den %}\n        {% set b = (ns.sy
-            - a * ns.sx) / n %}\n      {% elif n != 0 %}\n        {% set a = 0 %}{%
-            set b = ns.sy / n %}\n      {% else %}\n        {% set a = 1 %}{% set
-            b = 0 %}\n      {% endif %}\n      {{ {'raw': value, 'poly[0]': (b)|string,
-            'poly[1]': (a)|string, 'poly[2]': '0', 'poly[3]': '0', 'poly[4]': '0'}
-            | to_json }}\n    \"\n  } | to_json\n}}\n"
-        enabled: true
-  alias: 'Calibrated Values: Initalize Helpers'
-  description: ''
-  icon: mdi:chart-bell-curve-cumulative
-  fields: {}
 water_supply_by_volume_plant_mix:
   sequence:
   - variables:
@@ -2325,276 +1862,6 @@ nutrient_dosing_initalize_helpers_v2:
   description: ''
   icon: mdi:chart-bell-curve-cumulative
   fields: {}
-water_supply_by_volume_plant_mix_shake:
-  sequence:
-  - variables:
-      nutrients:
-      - 'Nutrient: Part A'
-      - 'Nutrient: Part B'
-      - 'Nutrient: H2O2'
-      ph_up: 'Nutrient: pH Up'
-      shake_start_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
-        selectattr(''entity_id'', ''in'', label_entities("Nutrient: Shake")) | map(attribute=''entity_id'')
-        | list }}
-
-        '
-      shake_stop_button: '{{ states  | selectattr(''entity_id'', ''in'', area_entities(area_id))  |
-        selectattr(''entity_id'', ''in'', label_entities("Stop Nutrient: Shake"))
-        | map(attribute=''entity_id'') | list }}
-
-        '
-  - action: script.dose_nutrient_v2
-    metadata: {}
-    data:
-      nutrient: 'Nutrient: RO Water'
-      area_id: water_supply_01
-      units: '{{ units | float }}'
-    enabled: true
-  - action: script.dose_nutrient_v2
-    metadata: {}
-    data:
-      nutrient: 'Nutrient: Shake'
-      area_id: water_supply_01
-      units: 10
-    enabled: true
-  - repeat:
-      sequence:
-      - action: script.dose_nutrient_v2
-        metadata: {}
-        data:
-          nutrient: '{{ repeat.item }}'
-          area_id: '{{ area_id }}'
-          units: '{{ (units | float) }}'
-      - action: script.dose_nutrient_v2
-        metadata: {}
-        data:
-          nutrient: 'Nutrient: Shake'
-          area_id: water_supply_01
-          units: 1
-        enabled: true
-      for_each: '{{ nutrients }}'
-    enabled: true
-  - action: script.dose_nutrient_v2
-    metadata: {}
-    data:
-      nutrient: 'Nutrient: Shake'
-      area_id: water_supply_01
-      units: 10
-    enabled: true
-  - repeat:
-      sequence:
-      - if:
-        - condition: template
-          value_template: "{{ target_ph - 0.75 >= (states  | selectattr('entity_id',
-            'in', area_entities('water_supply_01'))  |\n    selectattr('entity_id',
-            'in', label_entities('Water Supply: pH')) | list \n    | first\n    ).state
-            | float }}"
-        then:
-        - action: script.dose_nutrient_v2
-          metadata: {}
-          data:
-            nutrient: '{{ ph_up }}'
-            area_id: '{{ area_id }}'
-            units: '{{ units*0 + 1.0 | float }}'
-        - action: script.dose_nutrient_v2
-          metadata: {}
-          data:
-            nutrient: 'Nutrient: Shake'
-            area_id: water_supply_01
-            units: 15
-          enabled: true
-      count: 1
-  fields:
-    area_id:
-      selector:
-        text:
-      name: area_id
-      default: water_supply_01
-    units:
-      selector:
-        number:
-          min: 1
-          max: 100
-      name: Units
-      default: 1
-    target_ph:
-      selector:
-        number:
-          min: 0
-          max: 14
-          step: 0.01
-      name: target_ph
-      default: 6.5
-  alias: 'Water Supply by Volume: Plant Mix (Shake)'
-  description: ''
-  icon: mdi:flower
-calculated_areas_initalize_helpers:
-  sequence:
-  - variables:
-      ha_topic: homeassistant
-      device_topic: area_leaders
-      area_leaders_sensor_name: area_leaders_active_count
-  - action: mqtt.publish
-    data:
-      topic: '{{ ha_topic }}/sensor/{{ area_leaders_sensor_name }}/config'
-      retain: true
-      payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\": [ \"area_leaders\"
-        ],\n      \"name\": \"Area Leaders\" ,\n      \"manufacturer\": \"Area Leader
-        System\"\n    },\n    \"name\": \"Active Count\",\n    \"uniq_id\": area_leaders_sensor_name,\n
-        \   \"object_id\": area_leaders_sensor_name,\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
-        \   \"retain\": false,\n    \"state_class\": \"measurement\",\n    \"value_template\":
-        \"{% set count = namespace(total=0) %}{% for label in labels() %}{% if label_name(label).startswith('Area
-        Leader: ') %}{% for entity_id in label_entities(label) %}{% if states(entity_id)
-        in ['on', 'open', 'home', 'active'] %}{% set count.total = count.total + 1
-        %}{% endif %}{% endfor %}{% endif %}{% endfor %}{{ count.total }}\"\n  } |
-        to_json\n}}\n"
-  - repeat:
-      sequence:
-      - variables:
-          area_id: '{{ repeat.item }}'
-          area: '{{ area_name(repeat.item) }}'
-          ha_topic: homeassistant
-          device_topic: tracked_area/{{ area_id }}
-      - action: mqtt.publish
-        data:
-          topic: '{{ ha_topic }}/sensor/{{ area_id }}_vpd/config'
-          retain: true
-          payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
-            [ area_id ],\n      \"name\": area ,\n      \"manufacturer\": \"Tracked
-            Area\",\n      \"suggested_area\": area\n    },\n    \"name\": \"VPD\",\n
-            \   \"device_class\": \"pressure\",\n    \"unit_of_measurement\": \"kPa\",\n
-            \   \"uniq_id\": area_id~\"_vpd\",\n    \"object_id\": area_id~\"_vpd\",\n
-            \   \"cmd_t\": \"~/calculated_value\",\n    \"stat_t\": \"calibrated_value/update_every_second\",\n
-            \   \"retain\": true,\n    \"expire_after\": 60,\n    \"state_class\":
-            \"measurement\",\n    \"suggested_display_precision\": \"2\",\n    \"value_template\":
-            \"{# Get temperature sensors from area #}\n      {% set temp_sensors =
-            states.sensor \n          | selectattr('entity_id', 'in', area_entities('\"~area_id~\"'))
-            \n          | selectattr('attributes.device_class', 'defined') \n          |
-            selectattr('attributes.device_class', 'match', 'temperature') \n          |
-            list %}\n      \n      {# Get humidity sensors from area #}\n      {%
-            set humidity_sensors = states.sensor \n          | selectattr('entity_id',
-            'in', area_entities('\"~area_id~\"')) \n          | selectattr('attributes.device_class',
-            'defined') \n          | selectattr('attributes.device_class', 'match',
-            'humidity') \n          | list %}\n      \n      {% if temp_sensors |
-            length > 0 and humidity_sensors | length > 0 %}\n        {% set ns = namespace(celsius_temps=[])
-            %}\n        {% for sensor in temp_sensors %}\n          {% set temp =
-            sensor.state | float %}\n          {% set unit = sensor.attributes.unit_of_measurement
-            %}\n          {% if unit == '°F' %}\n            {% set celsius_temp =
-            (temp - 32) * 5/9 %}\n          {% else %}\n            {% set celsius_temp
-            = temp %}\n          {% endif %}\n          {% set ns.celsius_temps =
-            ns.celsius_temps + [celsius_temp] %}\n        {% endfor %}\n        \n
-            \       {% set avg_temp = ns.celsius_temps | average %}\n        \n        \n
-            \       {% set avg_humidity = humidity_sensors \n            | map(attribute='state')
-            \n            | map('float', 0) \n            | average %}\n      \n        {#
-            Calculate saturation vapor pressure using Antoine equation #}\n        {%
-            set svp = 0.61078 * (10 ** ((7.5 * avg_temp) / (237.3 + avg_temp))) %}\n
-            \       \n        {# Calculate actual vapor pressure #}\n        {% set
-            avp = svp * (avg_humidity / 100) %}\n      \n        {# Calculate VPD
-            in kPa #}\n        {% set vpd = svp - avp %}\n        \n        {{ vpd
-            | round(2) }}\n      {% else %}\n        unavailable\n      {% endif %}\n
-            \   \"\n  } | to_json\n}}\n"
-        enabled: true
-      for_each: '{{ label_areas(''Type: Shoot Zone'') }}'
-  - repeat:
-      sequence:
-      - variables:
-          area_id: '{{ repeat.item }}'
-          area: '{{ area_name(repeat.item) }}'
-          ha_topic: homeassistant
-          device_topic: tracked_area/{{ area_id }}
-      - action: mqtt.publish
-        data:
-          topic: '{{ ha_topic }}/number/{{ area_id }}_tracked_psi/config'
-          retain: true
-          payload: "{{ \n  { \"~\": device_topic,\n    \"dev\": {\n      \"ids\":
-            [ area_id ],\n      \"name\": area ,\n      \"manufacturer\": \"Tracked
-            Area\",\n      \"suggested_area\": area\n    },\n    \"name\": \"Tracked
-            PSI\",\n    \"device_class\": \"pressure\",\n    \"unit_of_measurement\":
-            \"PSI\",\n    \"uniq_id\": area_id~\"_tracked_psi\",\n    \"object_id\":
-            area_id~\"_tracked_psi\",\n    \"retain\": true,\n    \"expire_after\":
-            60,\n    \"state_class\": \"total_increasing\",\n    \"cmd_t\": \"~/tracked_psi\",\n
-            \   \"stat_t\": \"~/tracked_psi\",\n    \"initial\": 0,\n    \"optimistic\":
-            true,\n    \"min\": 0,\n    \"max\": 2000,\n    \"step\": 0.10,\n    \"mode\":
-            \"box\",\n    \"suggested_display_precision\": \"2\"\n  } | to_json\n}}\n"
-        enabled: true
-      - action: mqtt.publish
-        data:
-          topic: '{{ device_topic~"/tracked_psi" }}'
-          retain: true
-          payload: '0'
-        enabled: false
-      for_each: '{{ label_areas(''Type: Root Zone'') }}'
-    enabled: true
-  alias: 'Area Types: Initalize Helpers'
-  description: ''
-  icon: mdi:chart-bell-curve-cumulative
-  fields: {}
-send_alert:
-  sequence:
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ alert_severity in [ ''low'', ''medium'', ''high'' ] }} '
-      sequence:
-      - data:
-          title: '{{ alert_title }}'
-          message: 'Alert: {{ alert_message }}'
-          notification_id: low_alert_{{ alert_title.replace('.', '_').replace(' ',
-            '_') }}
-        action: persistent_notification.create
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ alert_severity in [ ''high'', ''medium'' ]  }}'
-      sequence:
-      - action: notify.mobile_app_pixel_6
-        metadata: {}
-        data:
-          message: '{{ alert_message }}'
-          title: '{{ alert_title }}'
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ alert_severity in [ ''high'' ]  }}'
-      sequence:
-      - action: notify.mobile_app_pixel_6
-        metadata: {}
-        data:
-          message: 'URGENT: {{ alert_message }}'
-          title: '{{ alert_title }}'
-          data:
-            priority: high
-            channel: urgent_alerts
-      - action: script.high_severity_alert_handler
-        data:
-          title: '{{ alert_title }}'
-          message: '{{ alert_message }}'
-        enabled: false
-  fields:
-    alert_title:
-      selector:
-        text:
-      name: Alert Title
-      description: The title to use for the alert.
-      default: Change the alert_title
-    alert_message:
-      selector:
-        text:
-      name: Alert Message
-      description: Alert message to send
-      default: Change the alert_message
-    alert_severity:
-      selector:
-        select:
-          options:
-          - low
-          - medium
-          - high
-      name: Alert Severity
-      default: low
-  alias: Send Alert
-  description: Sends alerts with different notification methods based on severity
-    level
 sensors_create_plants:
   alias: 'Sensors: Create Plants'
   description: Dynamically create plant monitoring sensors via MQTT discovery
@@ -3007,29 +2274,31 @@ labeled_feature_follower:
         boolean: {}
     error_mode:
       name: Error Mode
-      description: >
-        Default error mode when the follower entity has no `<feature> Error Mode:`
-        label. Passed in by the leader automation from its per-feature evaluation.
-        Priority: follower entity label → this field → 'log'.
-        Tiers: silent | log | alert | stop.
+      description: 'Default error mode when the follower entity has no `<feature>
+        Error Mode:` label. Passed in by the leader automation from its per-feature
+        evaluation. Priority: follower entity label → this field → ''log''. Tiers:
+        silent | log | alert | stop.
+
+        '
       required: false
       default: ''
       selector:
         select:
           custom_value: true
           options:
-            - silent
-            - log
-            - alert
-            - stop
+          - silent
+          - log
+          - alert
+          - stop
     toggle:
       name: Toggle
-      description: >
-        When true, the follower will toggle its current state instead of setting
-        it to a specific value. Invert is ignored in toggle mode. Direct-value
-        labels are skipped; Enable/Disable/Default scripts still run with toggle
-        passed as an additional field. For domains without toggle support, Error
-        Mode handling applies.
+      description: 'When true, the follower will toggle its current state instead
+        of setting it to a specific value. Invert is ignored in toggle mode. Direct-value
+        labels are skipped; Enable/Disable/Default scripts still run with toggle passed
+        as an additional field. For domains without toggle support, Error Mode handling
+        applies.
+
+        '
       required: false
       default: false
       selector:
@@ -3041,9 +2310,9 @@ labeled_feature_follower:
       selector:
         select:
           options:
-            - area
-            - floor
-            - none
+          - area
+          - floor
+          - none
     scope_id:
       name: Scope ID
       description: The area_id or floor_id that corresponds to the resolved scope.
@@ -3054,176 +2323,161 @@ labeled_feature_follower:
   sequence:
   - variables:
       feature_name: '{{ feature }}'
-      follower_labels: "{{ labels(follower_entity_id)\n   | map('label_name')\n
-        \  | reject('none')\n   | list }}\n"
+      follower_labels: "{{ labels(follower_entity_id)\n   | map('label_name')\n   |
+        reject('none')\n   | list }}\n"
       follower_domain: '{{ follower_entity_id.split(''.'')[0] }}'
   - variables:
-      # scoped_feature: the label prefix used for all optional labels on this follower.
-      # It prepends the scope ("Area " / "Floor ") to the bare feature name so that
-      # optional labels like "Area Fan: Toggle", "Area Fan Only: Enable", etc. are
-      # matched correctly.  The bare feature name is still passed to scripts via the
-      # `feature` std field so scripts don't need to know about scope.
-      scoped_feature: >-
-        {{ (scope | default('') | capitalize + ' ') if scope | default('') in ['area', 'floor'] else '' }}{{ feature_name }}
-      follower_error_mode: >-
-        {% set em_pfx = scoped_feature + ' Error Mode: ' %}
-        {% set match = follower_labels
-            | select('match', '^' + em_pfx + '(silent|log|alert|stop)$')
-            | first | default('') %}
-        {% set from_label = match | regex_replace('^.+: ', '') | lower %}
-        {% if from_label != '' %}{{ from_label }}
-        {% elif (error_mode | default('') | lower) != '' %}{{ error_mode | lower }}
-        {% else %}log{% endif %}
-      follower_inverted: '{{ (scoped_feature + '' Invert: True'') in follower_labels }}'
-      follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled }}'
+      scoped_feature: '{{ (scope | default('''') | capitalize + '' '') if scope |
+        default('''') in [''area'', ''floor''] else '''' }}{{ feature_name }}'
+      follower_error_mode: "{% set em_pfx = scoped_feature + ' Error Mode: ' %} {%
+        set match = follower_labels\n    | select('match', '^' + em_pfx + '(silent|log|alert|stop)$')\n
+        \   | first | default('') %}\n{% set from_label = match | regex_replace('^.+:
+        ', '') | lower %} {% if from_label != '' %}{{ from_label }} {% elif (error_mode
+        | default('') | lower) != '' %}{{ error_mode | lower }} {% else %}log{% endif
+        %}"
+      follower_inverted: '{{ (scoped_feature + '' Invert: True'') in follower_labels
+        }}'
+      follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled
+        }}'
   - variables:
       follower_only: "{% set only_label = scoped_feature + ' Only: ' %} {% set match
-        = follower_labels\n               | select('match', '^' + only_label
-        + '(Enable|Disable)$')\n               | first | default('') %}\n{{ match
-        | regex_replace('^.+: ', '') }}\n"
-      follower_between: "{{ follower_labels\n   | select('match', '^'
-        + scoped_feature + ' Between: .+')\n   | map('regex_replace', '^.+: ', '')\n
-        \  | list }}\n"
-      follower_not_between: "{{ follower_labels\n   | select('match',
-        '^' + scoped_feature + ' Not Between: .+')\n   | map('regex_replace', '^.+:
-        ', '')\n   | list }}\n"
-      follower_time_ok: "{% set now_time = now().strftime('%H:%M') %} {% set ns =
-        namespace(ok=true, any_b=false) %} {% for val in follower_between %} {% set
-        p = val.split(':') %} {% set s = p[0]+':'+p[1] if (p|length==4 or (p|length==3
-        and p[2]=='-')) and p[0]!='-' else '-' %} {% set e = p[2]+':'+p[3] if p|length==4
-        else (p[1]+':'+p[2] if p|length==3 and p[0]=='-' else '-') %} {% set in_r
-        = ((s=='-' or now_time>=s) and (e=='-' or now_time<=e)) if (s=='-' or e=='-'
-        or s<=e) else (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.any_b
-        = true %}{% endif %} {% endfor %} {% if follower_between|length > 0 %}{%
-        set ns.ok = ns.any_b %}{% endif %} {% for val in follower_not_between %} {%
-        set p = val.split(':') %} {% set s = p[0]+':'+p[1] if (p|length==4 or (p|length==3
-        and p[2]=='-')) and p[0]!='-' else '-' %} {% set e = p[2]+':'+p[3] if p|length==4
-        else (p[1]+':'+p[2] if p|length==3 and p[0]=='-' else '-') %} {% set in_r
-        = ((s=='-' or now_time>=s) and (e=='-' or now_time<=e)) if (s=='-' or e=='-'
-        or s<=e) else (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.ok =
-        false %}{% endif %} {% endfor %} {{ ns.ok }}\n"
-      follower_should_act: >-
-        {%- set only = follower_only | trim | lower -%}
-        {%- if only == 'enable' and not leader_enabled -%}false
-        {%- elif only == 'disable' and leader_enabled -%}false
-        {%- elif only != '' and only not in ['enable', 'disable'] -%}false
-        {%- elif not follower_time_ok -%}false
-        {%- else -%}true
-        {%- endif -%}
+        = follower_labels\n               | select('match', '^' + only_label + '(Enable|Disable)$')\n
+        \              | first | default('') %}\n{{ match | regex_replace('^.+: ',
+        '') }}\n"
+      follower_between: "{{ follower_labels\n   | select('match', '^' + scoped_feature
+        + ' Between: .+')\n   | map('regex_replace', '^.+: ', '')\n   | list }}\n"
+      follower_not_between: "{{ follower_labels\n   | select('match', '^' + scoped_feature
+        + ' Not Between: .+')\n   | map('regex_replace', '^.+: ', '')\n   | list }}\n"
+      follower_time_ok: '{% set now_time = now().strftime(''%H:%M'') %} {% set ns
+        = namespace(ok=true, any_b=false) %} {% for val in follower_between %} {%
+        set p = val.split('':'') %} {% set s = p[0]+'':''+p[1] if (p|length==4 or
+        (p|length==3 and p[2]==''-'')) and p[0]!=''-'' else ''-'' %} {% set e = p[2]+'':''+p[3]
+        if p|length==4 else (p[1]+'':''+p[2] if p|length==3 and p[0]==''-'' else ''-'')
+        %} {% set in_r = ((s==''-'' or now_time>=s) and (e==''-'' or now_time<=e))
+        if (s==''-'' or e==''-'' or s<=e) else (now_time>=s or now_time<=e) %} {%
+        if in_r %}{% set ns.any_b = true %}{% endif %} {% endfor %} {% if follower_between|length
+        > 0 %}{% set ns.ok = ns.any_b %}{% endif %} {% for val in follower_not_between
+        %} {% set p = val.split('':'') %} {% set s = p[0]+'':''+p[1] if (p|length==4
+        or (p|length==3 and p[2]==''-'')) and p[0]!=''-'' else ''-'' %} {% set e =
+        p[2]+'':''+p[3] if p|length==4 else (p[1]+'':''+p[2] if p|length==3 and p[0]==''-''
+        else ''-'') %} {% set in_r = ((s==''-'' or now_time>=s) and (e==''-'' or now_time<=e))
+        if (s==''-'' or e==''-'' or s<=e) else (now_time>=s or now_time<=e) %} {%
+        if in_r %}{% set ns.ok = false %}{% endif %} {% endfor %} {{ ns.ok }}
+
+        '
+      follower_should_act: '{%- set only = follower_only | trim | lower -%} {%- if
+        only == ''enable'' and not leader_enabled -%}false {%- elif only == ''disable''
+        and leader_enabled -%}false {%- elif only != '''' and only not in [''enable'',
+        ''disable''] -%}false {%- elif not follower_time_ok -%}false {%- else -%}true
+        {%- endif -%}'
   - condition: template
     value_template: '{{ follower_should_act }}'
   - variables:
       follower_target_value: "{% set pfx = scoped_feature + (' Enable: ' if follower_enabled\n
-        \       else ' Disable: ') %} {% set match = follower_labels\n
-        \              |\n        select('match', '^' + pfx + '.+')\n               |
-        first | default('')\n        %} {% if match == '' %} {% set pfx2 = scoped_feature
-        + ': ' %} {% set match\n        = follower_labels | select('match',
-        '^' + pfx2 + '.+')\n        | first | default('') %} {% endif %} {{ match
-        | regex_replace('^.+: ',\n        '') | trim }}\n"
-      follower_enable_script: "{% set pfx = scoped_feature + ' Enable Script: ' %} {{
-        follower_labels\n   | select('match', '^' + pfx + '.+')\n  |
-        first | default('')\n   | regex_replace('^.+: ', '') }}\n"
-      follower_disable_script: "{% set pfx = scoped_feature + ' Disable Script: ' %}
-        {{ follower_labels\n   | select('match', '^' + pfx + '.+')\n
-        \  | first | default('')\n   | regex_replace('^.+: ', '') }}\n"
+        \       else ' Disable: ') %} {% set match = follower_labels\n               |\n
+        \       select('match', '^' + pfx + '.+')\n               | first | default('')\n
+        \       %} {% if match == '' %} {% set pfx2 = scoped_feature + ': ' %} {%
+        set match\n        = follower_labels | select('match', '^' + pfx2 + '.+')\n
+        \       | first | default('') %} {% endif %} {{ match | regex_replace('^.+:
+        ',\n        '') | trim }}\n"
+      follower_enable_script: "{% set pfx = scoped_feature + ' Enable Script: ' %}
+        {{ follower_labels\n   | select('match', '^' + pfx + '.+')\n  | first | default('')\n
+        \  | regex_replace('^.+: ', '') }}\n"
+      follower_disable_script: "{% set pfx = scoped_feature + ' Disable Script: '
+        %} {{ follower_labels\n   | select('match', '^' + pfx + '.+')\n   | first
+        | default('')\n   | regex_replace('^.+: ', '') }}\n"
       follower_default_script: "{% set pfx = scoped_feature + ' Script: ' %} {{ follower_labels\n
         \  | select('match', '^' + pfx + '.+')\n   | first | default('')\n   | regex_replace('^.+:
         ', '') }}\n"
-  # === Dynamic Arg Label System + Argument Substitutions ===
-  # Collects FEATURE (Enable|Disable) Arg FIELD: value labels from the follower entity.
-  # Values matching [root].[key].[field] are substituted from sensor.labeled_features_state.
-  # Without Arg labels the original synchronous call path (with error propagation) runs.
-  # With Arg labels scripts are called asynchronously via script.turn_on with variables
-  # (the only HA-native way to pass dynamic key names to a script at runtime).
   - variables:
-      _enable_script_args: >-
-        {% set ns = namespace(d={}) %}
-        {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
-        {% set lf_features = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
-        {% for lbl in follower_labels %}
-        {% if lbl | regex_search('^' + feature_name + ' Enable Arg [^:]+:') %}
-        {% set field = lbl | regex_replace('^.+ Enable Arg ([^:]+): .*$', '\\1') | trim %}
-        {% set raw = lbl | regex_replace('^[^:]*: ', '') | trim %}
-        {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
-        {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
-        {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
-        {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
-        {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_features.get(key, {}).get(fld, raw) | string}) %}
-        {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_leaders.get(key, {}).get(fld, raw) | string}) %}
-        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
-        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
-        {% endif %}{% endfor %}
-        {{ ns.d }}
-      _disable_script_args: >-
-        {% set ns = namespace(d={}) %}
-        {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
-        {% set lf_features = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
-        {% for lbl in follower_labels %}
-        {% if lbl | regex_search('^' + feature_name + ' Disable Arg [^:]+:') %}
-        {% set field = lbl | regex_replace('^.+ Disable Arg ([^:]+): .*$', '\\1') | trim %}
-        {% set raw = lbl | regex_replace('^[^:]*: ', '') | trim %}
-        {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
-        {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
-        {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
-        {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
-        {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_features.get(key, {}).get(fld, raw) | string}) %}
-        {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_leaders.get(key, {}).get(fld, raw) | string}) %}
-        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
-        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
-        {% endif %}{% endfor %}
-        {{ ns.d }}
-      _default_script_args: >-
-        {% set ns = namespace(d={}) %}
-        {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
-        {% set lf_features = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
-        {% for lbl in follower_labels %}
-        {% if lbl | regex_search('^' + feature_name + ' Arg [^:]+:')
-        and not lbl | regex_search('^' + feature_name + ' (Enable|Disable) Arg ') %}
-        {% set field = lbl | regex_replace('^.+ Arg ([^:]+): .*$', '\\1') | trim %}
-        {% set raw = lbl | regex_replace('^[^:]*: ', '') | trim %}
-        {% if raw | regex_search('^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$') %}
-        {% set root = raw | regex_replace('^\[([^\]]+)\].*$', '\\1') %}
-        {% set key = raw | regex_replace('^\[[^\]]+\]\.\[([^\]]+)\].*$', '\\1') %}
-        {% set fld = raw | regex_replace('^.*\.\[([^\]]+)\]$', '\\1') %}
-        {% if root == 'features' %}{% set ns.d = dict(ns.d, **{field: lf_features.get(key, {}).get(fld, raw) | string}) %}
-        {% elif root == 'leaders' %}{% set ns.d = dict(ns.d, **{field: lf_leaders.get(key, {}).get(fld, raw) | string}) %}
-        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
-        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %}
-        {% endif %}{% endfor %}
-        {{ ns.d }}
-  # === 3.1/3.2: Field-inspection helpers — validate Arg names + conditionally include std fields ===
-  # follower_toggle: true when toggle was passed in OR the follower has the Toggle label.
-  # When in toggle mode, Invert is ignored (we read the raw current state).
+      _enable_script_args: '{% set ns = namespace(d={}) %} {% set lf_leaders = state_attr(''sensor.labeled_features_state'',
+        ''leaders'') | default({}) %} {% set lf_features = state_attr(''sensor.labeled_features_state'',
+        ''features'') | default({}) %} {% for lbl in follower_labels %} {% if lbl
+        | regex_search(''^'' + feature_name + '' Enable Arg [^:]+:'') %} {% set field
+        = lbl | regex_replace(''^.+ Enable Arg ([^:]+): .*$'', ''\\1'') | trim %}
+        {% set raw = lbl | regex_replace(''^[^:]*: '', '''') | trim %} {% if raw |
+        regex_search(''^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$'') %} {% set root = raw
+        | regex_replace(''^\[([^\]]+)\].*$'', ''\\1'') %} {% set key = raw | regex_replace(''^\[[^\]]+\]\.\[([^\]]+)\].*$'',
+        ''\\1'') %} {% set fld = raw | regex_replace(''^.*\.\[([^\]]+)\]$'', ''\\1'')
+        %} {% if root == ''features'' %}{% set ns.d = dict(ns.d, **{field: lf_features.get(key,
+        {}).get(fld, raw) | string}) %} {% elif root == ''leaders'' %}{% set ns.d
+        = dict(ns.d, **{field: lf_leaders.get(key, {}).get(fld, raw) | string}) %}
+        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %} {% else %}{%
+        set ns.d = dict(ns.d, **{field: raw}) %}{% endif %} {% endif %}{% endfor %}
+        {{ ns.d }}'
+      _disable_script_args: '{% set ns = namespace(d={}) %} {% set lf_leaders = state_attr(''sensor.labeled_features_state'',
+        ''leaders'') | default({}) %} {% set lf_features = state_attr(''sensor.labeled_features_state'',
+        ''features'') | default({}) %} {% for lbl in follower_labels %} {% if lbl
+        | regex_search(''^'' + feature_name + '' Disable Arg [^:]+:'') %} {% set field
+        = lbl | regex_replace(''^.+ Disable Arg ([^:]+): .*$'', ''\\1'') | trim %}
+        {% set raw = lbl | regex_replace(''^[^:]*: '', '''') | trim %} {% if raw |
+        regex_search(''^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$'') %} {% set root = raw
+        | regex_replace(''^\[([^\]]+)\].*$'', ''\\1'') %} {% set key = raw | regex_replace(''^\[[^\]]+\]\.\[([^\]]+)\].*$'',
+        ''\\1'') %} {% set fld = raw | regex_replace(''^.*\.\[([^\]]+)\]$'', ''\\1'')
+        %} {% if root == ''features'' %}{% set ns.d = dict(ns.d, **{field: lf_features.get(key,
+        {}).get(fld, raw) | string}) %} {% elif root == ''leaders'' %}{% set ns.d
+        = dict(ns.d, **{field: lf_leaders.get(key, {}).get(fld, raw) | string}) %}
+        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %} {% else %}{%
+        set ns.d = dict(ns.d, **{field: raw}) %}{% endif %} {% endif %}{% endfor %}
+        {{ ns.d }}'
+      _default_script_args: '{% set ns = namespace(d={}) %} {% set lf_leaders = state_attr(''sensor.labeled_features_state'',
+        ''leaders'') | default({}) %} {% set lf_features = state_attr(''sensor.labeled_features_state'',
+        ''features'') | default({}) %} {% for lbl in follower_labels %} {% if lbl
+        | regex_search(''^'' + feature_name + '' Arg [^:]+:'') and not lbl | regex_search(''^''
+        + feature_name + '' (Enable|Disable) Arg '') %} {% set field = lbl | regex_replace(''^.+
+        Arg ([^:]+): .*$'', ''\\1'') | trim %} {% set raw = lbl | regex_replace(''^[^:]*:
+        '', '''') | trim %} {% if raw | regex_search(''^\[[^\]]+\]\.\[[^\]]+\]\.\[[^\]]+\]$'')
+        %} {% set root = raw | regex_replace(''^\[([^\]]+)\].*$'', ''\\1'') %} {%
+        set key = raw | regex_replace(''^\[[^\]]+\]\.\[([^\]]+)\].*$'', ''\\1'') %}
+        {% set fld = raw | regex_replace(''^.*\.\[([^\]]+)\]$'', ''\\1'') %} {% if
+        root == ''features'' %}{% set ns.d = dict(ns.d, **{field: lf_features.get(key,
+        {}).get(fld, raw) | string}) %} {% elif root == ''leaders'' %}{% set ns.d
+        = dict(ns.d, **{field: lf_leaders.get(key, {}).get(fld, raw) | string}) %}
+        {% else %}{% set ns.d = dict(ns.d, **{field: raw}) %}{% endif %} {% else %}{%
+        set ns.d = dict(ns.d, **{field: raw}) %}{% endif %} {% endif %}{% endfor %}
+        {{ ns.d }}'
   - variables:
-      follower_toggle: >-
-        {{ (toggle | default(false) | bool) or ((scoped_feature + ' Toggle: True') in follower_labels) }}
-      _std_fields_base: >-
-        {{ {'follower_entity_id': follower_entity_id, 'feature': feature, 'leader_entity_id': leader_entity_id, 'leader_enabled': leader_enabled, 'scope': scope, 'scope_id': scope_id, 'toggle': follower_toggle, 'error_mode': follower_error_mode} }}
-      _enable_script_fields: >-
-        {% if follower_enable_script | trim != "" %}{{ state_attr(follower_enable_script | trim, 'fields') | default({}) }}{% else %}{{ {} }}{% endif %}
-      _enable_script_std_fields: >-
-        {% set sf = _enable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _std_fields_base.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
-      _enable_script_invalid_args: >-
-        {% set sf = _enable_script_fields %}{% set ns = namespace(inv=[]) %}{% for k in _enable_script_args.keys() %}{% if k not in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}
-      _enable_script_valid_args: >-
-        {% set sf = _enable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _enable_script_args.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
-      _disable_script_fields: >-
-        {% if follower_disable_script | trim != "" %}{{ state_attr(follower_disable_script | trim, 'fields') | default({}) }}{% else %}{{ {} }}{% endif %}
-      _disable_script_std_fields: >-
-        {% set sf = _disable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _std_fields_base.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
-      _disable_script_invalid_args: >-
-        {% set sf = _disable_script_fields %}{% set ns = namespace(inv=[]) %}{% for k in _disable_script_args.keys() %}{% if k not in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}
-      _disable_script_valid_args: >-
-        {% set sf = _disable_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _disable_script_args.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
-      _default_script_fields: >-
-        {% if follower_default_script | trim != "" %}{{ state_attr(follower_default_script | trim, 'fields') | default({}) }}{% else %}{{ {} }}{% endif %}
-      _default_script_std_fields: >-
-        {% set sf = _default_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _std_fields_base.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
-      _default_script_invalid_args: >-
-        {% set sf = _default_script_fields %}{% set ns = namespace(inv=[]) %}{% for k in _default_script_args.keys() %}{% if k not in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}
-      _default_script_valid_args: >-
-        {% set sf = _default_script_fields %}{% set ns = namespace(d={}) %}{% for k, v in _default_script_args.items() %}{% if k in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}
-  # 1. Explicit Enable Script — runs when leader_enabled is true, regardless of value labels
+      follower_toggle: '{{ (toggle | default(false) | bool) or ((scoped_feature +
+        '' Toggle: True'') in follower_labels) }}'
+      _std_fields_base: '{{ {''follower_entity_id'': follower_entity_id, ''feature'':
+        feature, ''leader_entity_id'': leader_entity_id, ''leader_enabled'': leader_enabled,
+        ''scope'': scope, ''scope_id'': scope_id, ''toggle'': follower_toggle, ''error_mode'':
+        follower_error_mode} }}'
+      _enable_script_fields: '{% if follower_enable_script | trim != "" %}{{ state_attr(follower_enable_script
+        | trim, ''fields'') | default({}) }}{% else %}{{ {} }}{% endif %}'
+      _enable_script_std_fields: '{% set sf = _enable_script_fields %}{% set ns =
+        namespace(d={}) %}{% for k, v in _std_fields_base.items() %}{% if k in sf
+        %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}'
+      _enable_script_invalid_args: '{% set sf = _enable_script_fields %}{% set ns
+        = namespace(inv=[]) %}{% for k in _enable_script_args.keys() %}{% if k not
+        in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}'
+      _enable_script_valid_args: '{% set sf = _enable_script_fields %}{% set ns =
+        namespace(d={}) %}{% for k, v in _enable_script_args.items() %}{% if k in
+        sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}'
+      _disable_script_fields: '{% if follower_disable_script | trim != "" %}{{ state_attr(follower_disable_script
+        | trim, ''fields'') | default({}) }}{% else %}{{ {} }}{% endif %}'
+      _disable_script_std_fields: '{% set sf = _disable_script_fields %}{% set ns
+        = namespace(d={}) %}{% for k, v in _std_fields_base.items() %}{% if k in sf
+        %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}'
+      _disable_script_invalid_args: '{% set sf = _disable_script_fields %}{% set ns
+        = namespace(inv=[]) %}{% for k in _disable_script_args.keys() %}{% if k not
+        in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}'
+      _disable_script_valid_args: '{% set sf = _disable_script_fields %}{% set ns
+        = namespace(d={}) %}{% for k, v in _disable_script_args.items() %}{% if k
+        in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d
+        }}'
+      _default_script_fields: '{% if follower_default_script | trim != "" %}{{ state_attr(follower_default_script
+        | trim, ''fields'') | default({}) }}{% else %}{{ {} }}{% endif %}'
+      _default_script_std_fields: '{% set sf = _default_script_fields %}{% set ns
+        = namespace(d={}) %}{% for k, v in _std_fields_base.items() %}{% if k in sf
+        %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d }}'
+      _default_script_invalid_args: '{% set sf = _default_script_fields %}{% set ns
+        = namespace(inv=[]) %}{% for k in _default_script_args.keys() %}{% if k not
+        in sf %}{% set ns.inv = ns.inv + [k] %}{% endif %}{% endfor %}{{ ns.inv }}'
+      _default_script_valid_args: '{% set sf = _default_script_fields %}{% set ns
+        = namespace(d={}) %}{% for k, v in _default_script_args.items() %}{% if k
+        in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d
+        }}'
   - if:
     - condition: template
       value_template: '{{ follower_enable_script | trim != "" and leader_enabled |
@@ -3238,7 +2492,6 @@ labeled_feature_follower:
         data: {}
       else:
       - choose:
-        # No Arg labels: synchronous call preserving continue_on_error / error propagation
         - conditions:
           - condition: template
             value_template: '{{ _enable_script_args | length == 0 }}'
@@ -3248,8 +2501,9 @@ labeled_feature_follower:
               value_template: '{{ follower_error_mode != ''stop'' }}'
             then:
             - action: '{{ follower_enable_script | trim }}'
-              data: >
-                {{ _enable_script_std_fields }}
+              data: '{{ _enable_script_std_fields }}
+
+                '
               continue_on_error: true
             - if:
               - condition: template
@@ -3262,8 +2516,8 @@ labeled_feature_follower:
                 - action: system_log.write
                   data:
                     level: error
-                    message: 'Labeled Feature Follower: error calling enable script {{
-                      follower_enable_script }} for {{ follower_entity_id }} (feature:
+                    message: 'Labeled Feature Follower: error calling enable script
+                      {{ follower_enable_script }} for {{ follower_entity_id }} (feature:
                       {{ feature_name }}): {{ error }}'
               - if:
                 - condition: template
@@ -3277,40 +2531,50 @@ labeled_feature_follower:
                       }} (feature: {{ feature_name }}): {{ error }}'
             else:
             - action: '{{ follower_enable_script | trim }}'
-              data: >
-                {{ _enable_script_std_fields }}
-        # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
+              data: '{{ _enable_script_std_fields }}
+
+                '
         default:
         - if:
           - condition: template
-            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
+            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode
+              == "stop" }}'
           then:
-          - stop: 'Labeled Feature Follower: Arg field(s) {{ _enable_script_invalid_args }} not declared by {{ follower_enable_script }} (feature: {{ feature }})'
+          - stop: 'Labeled Feature Follower: Arg field(s) {{ _enable_script_invalid_args
+              }} not declared by {{ follower_enable_script }} (feature: {{ feature
+              }})'
             error: true
         - if:
           - condition: template
-            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
+            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode
+              == "log" }}'
           then:
           - action: system_log.write
             data:
               level: warning
-              message: 'Labeled Feature Follower: Arg field(s) {{ _enable_script_invalid_args }} not declared by {{ follower_enable_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
+              message: 'Labeled Feature Follower: Arg field(s) {{ _enable_script_invalid_args
+                }} not declared by {{ follower_enable_script }} for {{ follower_entity_id
+                }}. Proceeding with valid args only.'
         - if:
           - condition: template
-            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
+            value_template: '{{ _enable_script_invalid_args | length > 0 and follower_error_mode
+              == "alert" }}'
           then:
           - action: script.send_alert
             data:
               alert_severity: high
               alert_title: Labeled Feature Script Arg Error
-              alert_message: 'Arg field(s) {{ _enable_script_invalid_args }} not declared by {{ follower_enable_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
+              alert_message: 'Arg field(s) {{ _enable_script_invalid_args }} not declared
+                by {{ follower_enable_script }} for {{ follower_entity_id }} (feature:
+                {{ feature }})'
         - action: script.turn_on
           target:
             entity_id: '{{ follower_enable_script | trim }}'
           data:
-            variables: >
-              {{ _enable_script_std_fields | combine(_enable_script_valid_args) }}
-  # 2. Explicit Disable Script — runs when leader_enabled is false, regardless of value labels
+            variables: '{{ _enable_script_std_fields | combine(_enable_script_valid_args)
+              }}
+
+              '
   - if:
     - condition: template
       value_template: '{{ follower_disable_script | trim != "" and not (leader_enabled
@@ -3325,7 +2589,6 @@ labeled_feature_follower:
         data: {}
       else:
       - choose:
-        # No Arg labels: synchronous call preserving continue_on_error / error propagation
         - conditions:
           - condition: template
             value_template: '{{ _disable_script_args | length == 0 }}'
@@ -3335,8 +2598,9 @@ labeled_feature_follower:
               value_template: '{{ follower_error_mode != ''stop'' }}'
             then:
             - action: '{{ follower_disable_script | trim }}'
-              data: >
-                {{ _disable_script_std_fields }}
+              data: '{{ _disable_script_std_fields }}
+
+                '
               continue_on_error: true
             - if:
               - condition: template
@@ -3349,8 +2613,8 @@ labeled_feature_follower:
                 - action: system_log.write
                   data:
                     level: error
-                    message: 'Labeled Feature Follower: error calling disable script {{
-                      follower_disable_script }} for {{ follower_entity_id }} (feature:
+                    message: 'Labeled Feature Follower: error calling disable script
+                      {{ follower_disable_script }} for {{ follower_entity_id }} (feature:
                       {{ feature_name }}): {{ error }}'
               - if:
                 - condition: template
@@ -3364,40 +2628,50 @@ labeled_feature_follower:
                       }} (feature: {{ feature_name }}): {{ error }}'
             else:
             - action: '{{ follower_disable_script | trim }}'
-              data: >
-                {{ _disable_script_std_fields }}
-        # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
+              data: '{{ _disable_script_std_fields }}
+
+                '
         default:
         - if:
           - condition: template
-            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
+            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode
+              == "stop" }}'
           then:
-          - stop: 'Labeled Feature Follower: Arg field(s) {{ _disable_script_invalid_args }} not declared by {{ follower_disable_script }} (feature: {{ feature }})'
+          - stop: 'Labeled Feature Follower: Arg field(s) {{ _disable_script_invalid_args
+              }} not declared by {{ follower_disable_script }} (feature: {{ feature
+              }})'
             error: true
         - if:
           - condition: template
-            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
+            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode
+              == "log" }}'
           then:
           - action: system_log.write
             data:
               level: warning
-              message: 'Labeled Feature Follower: Arg field(s) {{ _disable_script_invalid_args }} not declared by {{ follower_disable_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
+              message: 'Labeled Feature Follower: Arg field(s) {{ _disable_script_invalid_args
+                }} not declared by {{ follower_disable_script }} for {{ follower_entity_id
+                }}. Proceeding with valid args only.'
         - if:
           - condition: template
-            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
+            value_template: '{{ _disable_script_invalid_args | length > 0 and follower_error_mode
+              == "alert" }}'
           then:
           - action: script.send_alert
             data:
               alert_severity: high
               alert_title: Labeled Feature Script Arg Error
-              alert_message: 'Arg field(s) {{ _disable_script_invalid_args }} not declared by {{ follower_disable_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
+              alert_message: 'Arg field(s) {{ _disable_script_invalid_args }} not
+                declared by {{ follower_disable_script }} for {{ follower_entity_id
+                }} (feature: {{ feature }})'
         - action: script.turn_on
           target:
             entity_id: '{{ follower_disable_script | trim }}'
           data:
-            variables: >
-              {{ _disable_script_std_fields | combine(_disable_script_valid_args) }}
-  # 3. Direct value — only when a value label was found AND not in toggle mode
+            variables: '{{ _disable_script_std_fields | combine(_disable_script_valid_args)
+              }}
+
+              '
   - if:
     - condition: template
       value_template: '{{ follower_target_value != "" and not follower_toggle }}'
@@ -3471,21 +2745,20 @@ labeled_feature_follower:
             entity_id: '{{ follower_entity_id }}'
           data:
             brightness_pct: '{{ [follower_target_value | int(0), 100] | min }}'
-  # 4. Default Script — only when no direct value label was found and not in toggle mode
   - if:
     - condition: template
-      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_default_script | trim != "" }}'
+      value_template: '{{ follower_target_value == "" and not follower_toggle and
+        follower_default_script | trim != "" }}'
     then:
     - if:
       - condition: template
-        value_template: '{{ follower_default_script.startswith(''automation.'')
-          or follower_default_script.startswith(''scene.'') }}'
+        value_template: '{{ follower_default_script.startswith(''automation.'') or
+          follower_default_script.startswith(''scene.'') }}'
       then:
       - action: '{{ follower_default_script | trim }}'
         data: {}
       else:
       - choose:
-        # No Arg labels: synchronous call preserving continue_on_error / error propagation
         - conditions:
           - condition: template
             value_template: '{{ _default_script_args | length == 0 }}'
@@ -3495,8 +2768,9 @@ labeled_feature_follower:
               value_template: '{{ follower_error_mode != ''stop'' }}'
             then:
             - action: '{{ follower_default_script | trim }}'
-              data: >
-                {{ _default_script_std_fields }}
+              data: '{{ _default_script_std_fields }}
+
+                '
               continue_on_error: true
             - if:
               - condition: template
@@ -3524,56 +2798,63 @@ labeled_feature_follower:
                       }} (feature: {{ feature_name }}): {{ error }}'
             else:
             - action: '{{ follower_default_script | trim }}'
-              data: >
-                {{ _default_script_std_fields }}
-        # Arg labels present: async call — 3.1 validate, 3.2 pass std+valid args
+              data: '{{ _default_script_std_fields }}
+
+                '
         default:
         - if:
           - condition: template
-            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "stop" }}'
+            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode
+              == "stop" }}'
           then:
-          - stop: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} (feature: {{ feature }})'
+          - stop: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args
+              }} not declared by {{ follower_default_script }} (feature: {{ feature
+              }})'
             error: true
         - if:
           - condition: template
-            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "log" }}'
+            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode
+              == "log" }}'
           then:
           - action: system_log.write
             data:
               level: warning
-              message: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }}. Proceeding with valid args only.'
+              message: 'Labeled Feature Follower: Arg field(s) {{ _default_script_invalid_args
+                }} not declared by {{ follower_default_script }} for {{ follower_entity_id
+                }}. Proceeding with valid args only.'
         - if:
           - condition: template
-            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode == "alert" }}'
+            value_template: '{{ _default_script_invalid_args | length > 0 and follower_error_mode
+              == "alert" }}'
           then:
           - action: script.send_alert
             data:
               alert_severity: high
               alert_title: Labeled Feature Script Arg Error
-              alert_message: 'Arg field(s) {{ _default_script_invalid_args }} not declared by {{ follower_default_script }} for {{ follower_entity_id }} (feature: {{ feature }})'
+              alert_message: 'Arg field(s) {{ _default_script_invalid_args }} not
+                declared by {{ follower_default_script }} for {{ follower_entity_id
+                }} (feature: {{ feature }})'
         - action: script.turn_on
           target:
             entity_id: '{{ follower_default_script | trim }}'
           data:
-            variables: >
-              {{ _default_script_std_fields | combine(_default_script_valid_args) }}
-  # 5. Toggle path — when follower_toggle is true (direct-value labels are skipped above)
+            variables: '{{ _default_script_std_fields | combine(_default_script_valid_args)
+              }}
+
+              '
   - if:
     - condition: template
       value_template: '{{ follower_toggle }}'
     then:
     - variables:
-        _toggle_current_on: >-
-          {{ states(follower_entity_id) | lower in
-             ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] }}
-        _toggle_supported_domains: >-
-          {{ ['light', 'switch', 'input_boolean', 'fan', 'cover',
-              'media_player', 'climate', 'humidifier', 'siren', 'remote',
-              'automation', 'script', 'lock'] }}
-        _toggle_unsupported_domains: >-
-          {{ ['select', 'input_select', 'number', 'input_number', 'text',
-              'input_text', 'scene', 'button', 'event', 'sensor',
-              'binary_sensor', 'vacuum'] }}
+        _toggle_current_on: "{{ states(follower_entity_id) | lower in\n   ['on', 'true',
+          'home', 'open', 'detected', 'active', 'unlocked'] }}"
+        _toggle_supported_domains: "{{ ['light', 'switch', 'input_boolean', 'fan',
+          'cover',\n    'media_player', 'climate', 'humidifier', 'siren', 'remote',\n
+          \   'automation', 'script', 'lock'] }}"
+        _toggle_unsupported_domains: "{{ ['select', 'input_select', 'number', 'input_number',
+          'text',\n    'input_text', 'scene', 'button', 'event', 'sensor',\n    'binary_sensor',
+          'vacuum'] }}"
     - if:
       - condition: template
         value_template: '{{ follower_domain in _toggle_unsupported_domains }}'
@@ -3582,7 +2863,8 @@ labeled_feature_follower:
         - condition: template
           value_template: '{{ follower_error_mode == "stop" }}'
         then:
-        - stop: 'Labeled Feature Follower: toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+        - stop: 'Labeled Feature Follower: toggle not supported for domain {{ follower_domain
+            }} on {{ follower_entity_id }} (feature: {{ feature }})'
           error: true
       - if:
         - condition: template
@@ -3591,7 +2873,9 @@ labeled_feature_follower:
         - action: system_log.write
           data:
             level: error
-            message: 'Labeled Feature Follower: toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+            message: 'Labeled Feature Follower: toggle not supported for domain {{
+              follower_domain }} on {{ follower_entity_id }} (feature: {{ feature
+              }})'
       - if:
         - condition: template
           value_template: '{{ follower_error_mode == "alert" }}'
@@ -3600,7 +2884,8 @@ labeled_feature_follower:
           data:
             alert_severity: high
             alert_title: Labeled Feature Toggle Error
-            alert_message: 'Toggle not supported for domain {{ follower_domain }} on {{ follower_entity_id }} (feature: {{ feature }})'
+            alert_message: 'Toggle not supported for domain {{ follower_domain }}
+              on {{ follower_entity_id }} (feature: {{ feature }})'
     - if:
       - condition: template
         value_template: '{{ follower_domain == "lock" }}'
@@ -3610,12 +2895,12 @@ labeled_feature_follower:
           entity_id: '{{ follower_entity_id }}'
     - if:
       - condition: template
-        value_template: >-
-          {{ follower_domain == 'media_player' and
-             follower_domain not in _toggle_unsupported_domains }}
+        value_template: "{{ follower_domain == 'media_player' and\n   follower_domain
+          not in _toggle_unsupported_domains }}"
       then:
       - variables:
-          _mp_supported: '{{ state_attr(follower_entity_id, "supported_features") | int(0) }}'
+          _mp_supported: '{{ state_attr(follower_entity_id, "supported_features")
+            | int(0) }}'
           _mp_supports_on_off: '{{ _mp_supported | bitwise_and(128) > 0 }}'
           _mp_supports_mute: '{{ _mp_supported | bitwise_and(4) > 0 }}'
       - if:
@@ -3634,13 +2919,15 @@ labeled_feature_follower:
             target:
               entity_id: '{{ follower_entity_id }}'
             data:
-              is_volume_muted: '{{ not (state_attr(follower_entity_id, "is_volume_muted") | bool(false)) }}'
+              is_volume_muted: '{{ not (state_attr(follower_entity_id, "is_volume_muted")
+                | bool(false)) }}'
           else:
           - if:
             - condition: template
               value_template: '{{ follower_error_mode == "stop" }}'
             then:
-            - stop: 'Labeled Feature Follower: media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
+            - stop: 'Labeled Feature Follower: media_player {{ follower_entity_id
+                }} supports neither on/off nor mute toggle (feature: {{ feature }})'
               error: true
           - if:
             - condition: template
@@ -3649,7 +2936,9 @@ labeled_feature_follower:
             - action: system_log.write
               data:
                 level: error
-                message: 'Labeled Feature Follower: media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
+                message: 'Labeled Feature Follower: media_player {{ follower_entity_id
+                  }} supports neither on/off nor mute toggle (feature: {{ feature
+                  }})'
           - if:
             - condition: template
               value_template: '{{ follower_error_mode == "alert" }}'
@@ -3658,25 +2947,24 @@ labeled_feature_follower:
               data:
                 alert_severity: high
                 alert_title: Labeled Feature Toggle Error
-                alert_message: 'media_player {{ follower_entity_id }} supports neither on/off nor mute toggle (feature: {{ feature }})'
+                alert_message: 'media_player {{ follower_entity_id }} supports neither
+                  on/off nor mute toggle (feature: {{ feature }})'
     - if:
       - condition: template
-        value_template: >-
-          {{ follower_domain in _toggle_supported_domains and
-             follower_domain not in ['lock', 'media_player'] }}
+        value_template: "{{ follower_domain in _toggle_supported_domains and\n   follower_domain
+          not in ['lock', 'media_player'] }}"
       then:
       - action: homeassistant.toggle
         target:
           entity_id: '{{ follower_entity_id }}'
-  # 6. Fallback: turn_on/turn_off based on follower_enabled (post-invert)
-  #    Only runs when no direct value, no toggle, and no default script handled it.
   - if:
     - condition: template
-      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain == ''light'' }}'
+      value_template: '{{ follower_target_value == "" and not follower_toggle and
+        follower_domain == ''light'' }}'
     then:
     - condition: template
-      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
-        if follower_enabled else ['off']) }}\n"
+      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on'] if
+        follower_enabled else ['off']) }}\n"
     - action: 'light.turn_{{ ''on'' if follower_enabled else ''off'' }}
 
         '
@@ -3684,13 +2972,14 @@ labeled_feature_follower:
         entity_id: '{{ follower_entity_id }}'
   - if:
     - condition: template
-      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain in [''switch'', ''input_boolean''] }}
+      value_template: '{{ follower_target_value == "" and not follower_toggle and
+        follower_domain in [''switch'', ''input_boolean''] }}
 
         '
     then:
     - condition: template
-      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on']
-        if follower_enabled else ['off']) }}\n"
+      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on'] if
+        follower_enabled else ['off']) }}\n"
     - action: '{{ follower_domain }}.turn_{{ ''on'' if follower_enabled else ''off''
         }}
 
@@ -3699,11 +2988,12 @@ labeled_feature_follower:
         entity_id: '{{ follower_entity_id }}'
   - if:
     - condition: template
-      value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain == ''media_player'' }}'
+      value_template: '{{ follower_target_value == "" and not follower_toggle and
+        follower_domain == ''media_player'' }}'
     then:
     - variables:
-        mp_supported: '{{ state_attr(follower_entity_id, ''supported_features'')
-          | int(0) }}
+        mp_supported: '{{ state_attr(follower_entity_id, ''supported_features'') |
+          int(0) }}
 
           '
         mp_supports_on_off: '{{ mp_supported | bitwise_and(128) > 0 }}
@@ -3720,8 +3010,7 @@ labeled_feature_follower:
         value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
           'playing', 'idle', 'paused', 'buffering']\n    if follower_enabled else
           ['off', 'unavailable', 'standby']) }}\n"
-      - action: 'media_player.turn_{{ ''on'' if follower_enabled else ''off''
-          }}
+      - action: 'media_player.turn_{{ ''on'' if follower_enabled else ''off'' }}
 
           '
         target:
@@ -3741,13 +3030,14 @@ labeled_feature_follower:
             is_volume_muted: '{{ not follower_enabled }}'
   - if:
     - condition: template
-      value_template: "{{ follower_target_value == '' and not follower_toggle and follower_domain not in ['light', 'switch', 'input_boolean',\n
-        \  'media_player', 'number', 'input_number', 'text',\n   'input_text',
-        'select', 'input_select'] }}\n"
+      value_template: "{{ follower_target_value == '' and not follower_toggle and
+        follower_domain not in ['light', 'switch', 'input_boolean',\n   'media_player',
+        'number', 'input_number', 'text',\n   'input_text', 'select', 'input_select']
+        }}\n"
     then:
     - condition: template
-      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on',
-        'true', 'home', 'open', 'detected', 'active', 'unlocked']\n    if follower_enabled
+      value_template: "{{ states(follower_entity_id) | lower not in\n   (['on', 'true',
+        'home', 'open', 'detected', 'active', 'unlocked']\n    if follower_enabled
         else\n    ['off', 'false', 'away', 'closed', 'clear', 'inactive', 'locked'])
         }}\n"
     - action: 'homeassistant.turn_{{ ''on'' if follower_enabled else ''off'' }}
@@ -3755,48 +3045,38 @@ labeled_feature_follower:
         '
       target:
         entity_id: '{{ follower_entity_id }}'
-
 labeled_feature_sleep_timeout:
   alias: Labeled Feature Sleep Timeout
-  description: >
-    Single-run sleep-timeout script for the Labeled Feature Button system.
+  description: "Single-run sleep-timeout script for the Labeled Feature Button system.
     Uses mode: restart so that calling it again (e.g. after any media interaction
-    in night mode) resets the full countdown from the beginning.
-
-    Sequence (per the Label Based Features documentation):
-      1. Wait sleep_timeout_minutes (default 15 min)
-      2. Halve the volume on each area media player
-      3. Wait 1 minute
-      4. Mute volume
-      5. Seek back 30 s every 30 s × 20 iterations (≈ 10 min) — keeps the
-         playback position from advancing so the content is still "live" on unmute
-      6. Unmute volume
-      7. Restore each player to its original volume level
-
-    Call script.turn_on (or homeassistant.turn_on) to start/restart the timer.
-    Call homeassistant.turn_off targeting this script to cancel and restore.
-
-    Note: Because mode is restart only one countdown runs at a time per HA instance.
-    Create separate label/blueprint configurations for each user who needs
-    independent sleep-timeout behaviour.
+    in night mode) resets the full countdown from the beginning.\nSequence (per the
+    Label Based Features documentation):\n  1. Wait sleep_timeout_minutes (default
+    15 min)\n  2. Halve the volume on each area media player\n  3. Wait 1 minute\n
+    \ 4. Mute volume\n  5. Seek back 30 s every 30 s × 20 iterations (≈ 10 min) —
+    keeps the\n     playback position from advancing so the content is still \"live\"
+    on unmute\n  6. Unmute volume\n  7. Restore each player to its original volume
+    level\n\nCall script.turn_on (or homeassistant.turn_on) to start/restart the timer.
+    Call homeassistant.turn_off targeting this script to cancel and restore.\nNote:
+    Because mode is restart only one countdown runs at a time per HA instance. Create
+    separate label/blueprint configurations for each user who needs independent sleep-timeout
+    behaviour.\n"
   mode: restart
   variables:
-    # Declared at script top-level so original_volumes is a persistent entity
-    # attribute while the script runs.  The Cancel Restore automation reads it
-    # from trigger.from_state.attributes.original_volumes on script turn-off.
     original_volumes: {}
   fields:
     area_media_players:
       name: Area Media Players
-      description: >
-        List of media player entity IDs in the resolved area to fade and mute.
-        Passed automatically by labeled_feature_button.
+      description: 'List of media player entity IDs in the resolved area to fade and
+        mute. Passed automatically by labeled_feature_button.
+
+        '
       required: true
       selector:
         object: {}
     sleep_timeout_minutes:
       name: Sleep Timeout Minutes
-      description: How long to wait before beginning the fade-out sequence (default 15).
+      description: How long to wait before beginning the fade-out sequence (default
+        15).
       required: false
       default: 15
       selector:
@@ -3804,91 +3084,67 @@ labeled_feature_sleep_timeout:
           min: 1
           max: 120
   sequence:
-    # ── Step 1: Capture original volumes ────────────────────────────────────
-    - variables:
-        original_volumes: >-
-          {% set ns = namespace(d={}) %}
-          {% for mp in area_media_players %}
-            {% set vol = state_attr(mp, 'volume_level') | float(0.5) %}
-            {% set ns.d = dict(ns.d, **{mp: vol}) %}
-          {% endfor %}
-          {{ ns.d }}
-
-    # ── Step 2: Wait the configured timeout ─────────────────────────────────
-    - delay:
-        minutes: '{{ sleep_timeout_minutes | default(15) | int }}'
-
-    # ── Step 3: Halve volume on every area media player ─────────────────────
-    - repeat:
-        for_each: '{{ area_media_players }}'
-        sequence:
-          - action: media_player.volume_set
-            target:
-              entity_id: '{{ repeat.item }}'
-            data:
-              volume_level: >-
-                {{ (original_volumes.get(repeat.item, 0.5) / 2) | round(2) }}
-
-    # ── Step 4: Wait 1 minute ────────────────────────────────────────────────
-    - delay:
-        minutes: 1
-
-    # ── Step 5: Mute ─────────────────────────────────────────────────────────
-    - action: media_player.volume_mute
-      target:
-        entity_id: '{{ area_media_players }}'
-      data:
-        is_volume_muted: true
-
-    - delay:
-        minutes: 1
-
-    # ── Step 6: Seek back 30 s every 30 s × 20 iterations (≈ 10 minutes) ───
-    # Keeps the playback position from advancing while muted so the content
-    # is still near where it was when the user unmutes / restores.
-    - repeat:
-        count: 20
-        sequence:
-          - delay:
-              seconds: 30
-          - if:
-              - condition: template
-                value_template: '{{ area_media_players | length > 0 }}'
-            then:
-              - action: media_player.media_seek
-                target:
-                  entity_id: '{{ area_media_players | first }}'
-                data:
-                  seek_position: >-
-                    {{ [state_attr(area_media_players | first,
-                        'media_position') | float(0) - 30, 0] | max }}
-
-    # ── Step 7: Unmute ────────────────────────────────────────────────────────
-    - action: media_player.volume_mute
-      target:
-        entity_id: '{{ area_media_players }}'
-      data:
-        is_volume_muted: false
-
-    # ── Step 8: Restore original volumes ─────────────────────────────────────
-    - repeat:
-        for_each: '{{ area_media_players }}'
-        sequence:
-          - action: media_player.volume_set
-            target:
-              entity_id: '{{ repeat.item }}'
-            data:
-              volume_level: '{{ original_volumes.get(repeat.item, 0.5) }}'
-
-
+  - variables:
+      original_volumes: "{% set ns = namespace(d={}) %} {% for mp in area_media_players
+        %}\n  {% set vol = state_attr(mp, 'volume_level') | float(0.5) %}\n  {% set
+        ns.d = dict(ns.d, **{mp: vol}) %}\n{% endfor %} {{ ns.d }}"
+  - delay:
+      minutes: '{{ sleep_timeout_minutes | default(15) | int }}'
+  - repeat:
+      for_each: '{{ area_media_players }}'
+      sequence:
+      - action: media_player.volume_set
+        target:
+          entity_id: '{{ repeat.item }}'
+        data:
+          volume_level: '{{ (original_volumes.get(repeat.item, 0.5) / 2) | round(2)
+            }}'
+  - delay:
+      minutes: 1
+  - action: media_player.volume_mute
+    target:
+      entity_id: '{{ area_media_players }}'
+    data:
+      is_volume_muted: true
+  - delay:
+      minutes: 1
+  - repeat:
+      count: 20
+      sequence:
+      - delay:
+          seconds: 30
+      - if:
+        - condition: template
+          value_template: '{{ area_media_players | length > 0 }}'
+        then:
+        - action: media_player.media_seek
+          target:
+            entity_id: '{{ area_media_players | first }}'
+          data:
+            seek_position: "{{ [state_attr(area_media_players | first,\n    'media_position')
+              | float(0) - 30, 0] | max }}"
+  - action: media_player.volume_mute
+    target:
+      entity_id: '{{ area_media_players }}'
+    data:
+      is_volume_muted: false
+  - repeat:
+      for_each: '{{ area_media_players }}'
+      sequence:
+      - action: media_player.volume_set
+        target:
+          entity_id: '{{ repeat.item }}'
+        data:
+          volume_level: '{{ original_volumes.get(repeat.item, 0.5) }}'
 labeled_feature_error_mode:
   alias: Labeled Feature Error Mode
-  description: >
-    Shared helper for the Labeled Feature system's Error Mode dispatch.
-    Handles the silent / log / alert tiers. The `stop` tier is intentionally
-    left to the caller: a `stop:` inside this script would only halt this
-    helper, not the parent — so callers should follow this call with their
-    own `stop: error: true` when `error_mode == "stop"`.
+  description: 'Shared helper for the Labeled Feature system''s Error Mode dispatch.
+    Handles the silent / log / alert tiers. The `stop` tier is intentionally left
+    to the caller: a `stop:` inside this script would only halt this helper, not the
+    parent — so callers should follow this call with their own `stop: error: true`
+    when `error_mode == "stop"`.
+
+    '
   mode: parallel
   max: 50
   fields:
@@ -3901,10 +3157,10 @@ labeled_feature_error_mode:
         select:
           custom_value: true
           options:
-            - silent
-            - log
-            - alert
-            - stop
+          - silent
+          - log
+          - alert
+          - stop
     message:
       name: Message
       description: Human-readable error message describing what went wrong.
@@ -3914,9 +3170,10 @@ labeled_feature_error_mode:
           multiline: true
     source:
       name: Source
-      description: >
-        Short label for the calling script, used as a prefix in logs/alerts.
-        Examples: 'Labeled Feature Generics', 'Labeled Feature Somrig'.
+      description: 'Short label for the calling script, used as a prefix in logs/alerts.
+        Examples: ''Labeled Feature Generics'', ''Labeled Feature Somrig''.
+
+        '
       required: false
       default: Labeled Feature
       selector:
@@ -3930,49 +3187,44 @@ labeled_feature_error_mode:
         select:
           custom_value: true
           options:
-            - low
-            - medium
-            - high
+          - low
+          - medium
+          - high
   sequence:
-    - variables:
-        _mode: '{{ (error_mode | default("log") | lower) }}'
-        _source: '{{ source | default("Labeled Feature") }}'
-        _severity: '{{ severity | default("medium") }}'
-    - choose:
-        - conditions:
-            - condition: template
-              value_template: '{{ _mode == "silent" }}'
-          sequence: []
-        - conditions:
-            - condition: template
-              value_template: '{{ _mode == "log" }}'
-          sequence:
-            - action: system_log.write
-              data:
-                level: warning
-                message: '{{ _source }}: {{ message }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ _mode == "alert" }}'
-          sequence:
-            - action: script.send_alert
-              data:
-                alert_severity: '{{ _severity }}'
-                alert_title: '{{ _source }}'
-                alert_message: '{{ message }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ _mode == "stop" }}'
-          sequence:
-            # Log the message as well so there's a record before the parent
-            # aborts. The caller is expected to follow up with its own
-            # `stop: error: true` to actually halt parent execution.
-            - action: system_log.write
-              data:
-                level: error
-                message: '{{ _source }}: {{ message }}'
-
-
+  - variables:
+      _mode: '{{ (error_mode | default("log") | lower) }}'
+      _source: '{{ source | default("Labeled Feature") }}'
+      _severity: '{{ severity | default("medium") }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ _mode == "silent" }}'
+      sequence: []
+    - conditions:
+      - condition: template
+        value_template: '{{ _mode == "log" }}'
+      sequence:
+      - action: system_log.write
+        data:
+          level: warning
+          message: '{{ _source }}: {{ message }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ _mode == "alert" }}'
+      sequence:
+      - action: script.send_alert
+        data:
+          alert_severity: '{{ _severity }}'
+          alert_title: '{{ _source }}'
+          alert_message: '{{ message }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ _mode == "stop" }}'
+      sequence:
+      - action: system_log.write
+        data:
+          level: error
+          message: '{{ _source }}: {{ message }}'
 labeled_feature_generics:
   alias: Labeled Feature Generics
   description: >
@@ -4010,34 +3262,35 @@ labeled_feature_generics:
   fields:
     feature:
       name: Feature
-      description: >
-        Generic feature name (case-sensitive). Examples: 'Lights Off',
-        'Volume Up', 'Media Pause', 'Fan On', 'Night'. See Labeled Feature
+      description: 'Generic feature name (case-sensitive). Examples: ''Lights Off'',
+        ''Volume Up'', ''Media Pause'', ''Fan On'', ''Night''. See Labeled Feature
         Generics docs for the full catalog.
+
+        '
       required: true
       selector:
         select:
           custom_value: true
           options:
-            - Media Toggle
-            - Media Play
-            - Media Pause
-            - Media Next
-            - Media Previous
-            - Media Seek Back
-            - Media Seek Forward
-            - Volume Up
-            - Volume Down
-            - Lights On
-            - Lights Off
-            - Lights Up
-            - Lights Down
-            - Fan On
-            - Fan Off
-            - Fan Up
-            - Fan Down
-            - Ads
-            - Night
+          - Media Toggle
+          - Media Play
+          - Media Pause
+          - Media Next
+          - Media Previous
+          - Media Seek Back
+          - Media Seek Forward
+          - Volume Up
+          - Volume Down
+          - Lights On
+          - Lights Off
+          - Lights Up
+          - Lights Down
+          - Fan On
+          - Fan Off
+          - Fan Up
+          - Fan Down
+          - Ads
+          - Night
     scope:
       name: Scope
       description: Scope of the feature (area, floor, or none).
@@ -4046,12 +3299,13 @@ labeled_feature_generics:
       selector:
         select:
           options:
-            - area
-            - floor
-            - none
+          - area
+          - floor
+          - none
     scope_id:
       name: Scope ID
-      description: The resolved area_id or floor_id. Falls back to follower/leader entity area.
+      description: The resolved area_id or floor_id. Falls back to follower/leader
+        entity area.
       required: false
       default: ''
       selector:
@@ -4079,11 +3333,11 @@ labeled_feature_generics:
         boolean: {}
     toggle:
       name: Toggle
-      description: >
-        When true, swap the per-feature action for a domain toggle where it
-        makes sense (light/fan/media toggle). For features where toggle is
-        not meaningful (Media Next, Volume Up, Seek, …) this triggers Error
-        Mode handling.
+      description: 'When true, swap the per-feature action for a domain toggle where
+        it makes sense (light/fan/media toggle). For features where toggle is not
+        meaningful (Media Next, Volume Up, Seek, …) this triggers Error Mode handling.
+
+        '
       required: false
       default: false
       selector:
@@ -4097,18 +3351,19 @@ labeled_feature_generics:
         select:
           custom_value: true
           options:
-            - silent
-            - log
-            - alert
-            - stop
+          - silent
+          - log
+          - alert
+          - stop
     exclude_feature:
       name: Exclude Feature Name
-      description: >
-        Optional. The feature name used to build the Exclude label
-        (`(Area |Floor |)<exclude_feature> Exclude: True`). When not supplied,
-        defaults to `feature`. Used by mapping scripts (e.g. labeled_feature_somrig)
-        to thread the leader's feature name through dispatched generic calls
-        so Exclude is keyed on the leader, not the generic action.
+      description: 'Optional. The feature name used to build the Exclude label (`(Area
+        |Floor |)<exclude_feature> Exclude: True`). When not supplied, defaults to
+        `feature`. Used by mapping scripts (e.g. labeled_feature_somrig) to thread
+        the leader''s feature name through dispatched generic calls so Exclude is
+        keyed on the leader, not the generic action.
+
+        '
       required: false
       default: ''
       selector:
@@ -4307,311 +3562,265 @@ labeled_feature_generics:
 
     # ── Step 5: Validate target set ─────────────────────────────────────────
     - if:
-        - condition: template
-          value_template: '{{ final_targets | length == 0 }}'
+      - condition: template
+        value_template: '{{ _err_mode == "stop" }}'
       then:
-        - action: script.labeled_feature_error_mode
-          data:
-            error_mode: '{{ _err_mode }}'
-            source: Labeled Feature Generics
-            message: >-
-              No target entities resolved for feature '{{ _feature }}' in
-              scope '{{ _scope }}' (scope_id={{ scope_id | default('') }}).
-        - if:
-            - condition: template
-              value_template: '{{ _err_mode == "stop" }}'
-          then:
-            - stop: >-
-                Labeled Feature Generics: no targets for '{{ _feature }}'.
-              error: true
-        - stop: 'No targets resolved (handled per error_mode).'
-
-    # ── Step 6: Toggle modifier — short-circuit per-domain ──────────────────
-    - if:
-        - condition: template
-          value_template: '{{ _toggle }}'
-      then:
-        - choose:
-            # Light domain → light.toggle
-            - conditions:
-                - condition: template
-                  value_template: '{{ feature_meta.domain == "light" }}'
-              sequence:
-                - action: light.toggle
-                  target:
-                    entity_id: '{{ final_targets }}'
-            # Fan domain → fan.toggle
-            - conditions:
-                - condition: template
-                  value_template: '{{ feature_meta.domain == "fan" }}'
-              sequence:
-                - action: fan.toggle
-                  target:
-                    entity_id: '{{ final_targets }}'
-            # Media play/pause family → media_player.media_play_pause
-            - conditions:
-                - condition: template
-                  value_template: >-
-                    {{ feature_meta.kind in ['media_toggle','media_play','media_pause'] }}
-              sequence:
-                - action: media_player.media_play_pause
-                  target:
-                    entity_id: '{{ final_targets }}'
-            # Ads / Night → homeassistant.toggle (toggle flag is a no-op)
-            - conditions:
-                - condition: template
-                  value_template: '{{ feature_meta.kind in ["ads","night"] }}'
-              sequence:
-                - action: homeassistant.toggle
-                  target:
-                    entity_id: '{{ final_targets }}'
-          default:
-            - action: script.labeled_feature_error_mode
-              data:
-                error_mode: '{{ _err_mode }}'
-                source: Labeled Feature Generics
-                message: >-
-                  Feature '{{ _feature }}' does not support the toggle modifier.
-            - if:
-                - condition: template
-                  value_template: '{{ _err_mode == "stop" }}'
-              then:
-                - stop: >-
-                    Labeled Feature Generics: invalid toggle for '{{ _feature }}'.
-                  error: true
-        - stop: 'Toggle path complete.'
-
-    # ── Step 7: Non-toggle dispatch by feature kind ─────────────────────────
+      - stop: 'Labeled Feature Generics: no targets for ''{{ _feature }}''.'
+        error: true
+    - stop: No targets resolved (handled per error_mode).
+  - if:
+    - condition: template
+      value_template: '{{ _toggle }}'
+    then:
     - choose:
-        # ── Media: simple service-call features ─────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "media_toggle" }}'
-          sequence:
-            - action: media_player.media_play_pause
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "media_play" }}'
-          sequence:
-            - action: media_player.media_play
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "media_pause" }}'
-          sequence:
-            - action: media_player.media_pause
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "media_next" }}'
-          sequence:
-            - action: media_player.media_next_track
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "media_previous" }}'
-          sequence:
-            - action: media_player.media_previous_track
-              target:
-                entity_id: '{{ final_targets }}'
-
-        # ── Media: seek (operates on first entity only) ─────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "media_seek_back" }}'
-          sequence:
-            - action: media_player.media_seek
-              target:
-                entity_id: '{{ final_targets | first }}'
-              data:
-                seek_position: >-
-                  {{ [state_attr(final_targets | first, 'media_position')
-                      | float(0) - 30, 0] | max }}
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "media_seek_forward" }}'
-          sequence:
-            - action: media_player.media_seek
-              target:
-                entity_id: '{{ final_targets | first }}'
-              data:
-                seek_position: >-
-                  {{ state_attr(final_targets | first, 'media_position')
-                     | float(0) + 30 }}
-
-        # ── Volume ──────────────────────────────────────────────────────────
-        # Use volume_set + per-entity current level so the step is deterministic
-        # at 5% regardless of the underlying media_player integration's defaults.
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "volume_up" }}'
-          sequence:
-            - repeat:
-                for_each: '{{ final_targets }}'
-                sequence:
-                  - action: media_player.volume_set
-                    target:
-                      entity_id: '{{ repeat.item }}'
-                    data:
-                      volume_level: >-
-                        {{ [(state_attr(repeat.item, 'volume_level') | float(0)) + 0.05, 1.0] | min }}
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "volume_down" }}'
-          sequence:
-            - repeat:
-                for_each: '{{ final_targets }}'
-                sequence:
-                  - action: media_player.volume_set
-                    target:
-                      entity_id: '{{ repeat.item }}'
-                    data:
-                      volume_level: >-
-                        {{ [(state_attr(repeat.item, 'volume_level') | float(0)) - 0.05, 0.0] | max }}
-
-        # ── Lights ──────────────────────────────────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "light_on" }}'
-          sequence:
-            - action: light.turn_on
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "light_off" }}'
-          sequence:
-            - action: light.turn_off
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "light_up" }}'
-          sequence:
-            - action: light.turn_on
-              target:
-                entity_id: '{{ final_targets }}'
-              data:
-                brightness_step_pct: 10
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "light_down" }}'
-          sequence:
-            - action: light.turn_on
-              target:
-                entity_id: '{{ final_targets }}'
-              data:
-                brightness_step_pct: -10
-
-        # ── Fan ─────────────────────────────────────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "fan_on" }}'
-          sequence:
-            - action: fan.turn_on
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "fan_off" }}'
-          sequence:
-            - action: fan.turn_off
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "fan_up" }}'
-          sequence:
-            - action: fan.increase_speed
-              target:
-                entity_id: '{{ final_targets }}'
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind == "fan_down" }}'
-          sequence:
-            - action: fan.decrease_speed
-              target:
-                entity_id: '{{ final_targets }}'
-
-        # ── Ads / Night ─────────────────────────────────────────────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ feature_meta.kind in ["ads","night"] }}'
-          sequence:
-            - action: homeassistant.toggle
-              target:
-                entity_id: '{{ final_targets }}'
-
+      - conditions:
+        - condition: template
+          value_template: '{{ feature_meta.domain == "light" }}'
+        sequence:
+        - action: light.toggle
+          target:
+            entity_id: '{{ final_targets }}'
+      - conditions:
+        - condition: template
+          value_template: '{{ feature_meta.domain == "fan" }}'
+        sequence:
+        - action: fan.toggle
+          target:
+            entity_id: '{{ final_targets }}'
+      - conditions:
+        - condition: template
+          value_template: '{{ feature_meta.kind in [''media_toggle'',''media_play'',''media_pause'']
+            }}'
+        sequence:
+        - action: media_player.media_play_pause
+          target:
+            entity_id: '{{ final_targets }}'
+      - conditions:
+        - condition: template
+          value_template: '{{ feature_meta.kind in ["ads","night"] }}'
+        sequence:
+        - action: homeassistant.toggle
+          target:
+            entity_id: '{{ final_targets }}'
       default:
-        # Unknown feature kind → helper + optional stop
-        - action: script.labeled_feature_error_mode
-          data:
-            error_mode: '{{ _err_mode }}'
-            source: Labeled Feature Generics
-            message: "Unknown feature '{{ _feature }}'."
-        - if:
-            - condition: template
-              value_template: '{{ _err_mode == "stop" }}'
-          then:
-            - stop: "Labeled Feature Generics: unknown feature '{{ _feature }}'."
-              error: true
-
-
+      - action: script.labeled_feature_error_mode
+        data:
+          error_mode: '{{ _err_mode }}'
+          source: Labeled Feature Generics
+          message: Feature '{{ _feature }}' does not support the toggle modifier.
+      - if:
+        - condition: template
+          value_template: '{{ _err_mode == "stop" }}'
+        then:
+        - stop: 'Labeled Feature Generics: invalid toggle for ''{{ _feature }}''.'
+          error: true
+    - stop: Toggle path complete.
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "media_toggle" }}'
+      sequence:
+      - action: media_player.media_play_pause
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "media_play" }}'
+      sequence:
+      - action: media_player.media_play
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "media_pause" }}'
+      sequence:
+      - action: media_player.media_pause
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "media_next" }}'
+      sequence:
+      - action: media_player.media_next_track
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "media_previous" }}'
+      sequence:
+      - action: media_player.media_previous_track
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "media_seek_back" }}'
+      sequence:
+      - action: media_player.media_seek
+        target:
+          entity_id: '{{ final_targets | first }}'
+        data:
+          seek_position: "{{ [state_attr(final_targets | first, 'media_position')\n
+            \   | float(0) - 30, 0] | max }}"
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "media_seek_forward" }}'
+      sequence:
+      - action: media_player.media_seek
+        target:
+          entity_id: '{{ final_targets | first }}'
+        data:
+          seek_position: "{{ state_attr(final_targets | first, 'media_position')\n
+            \  | float(0) + 30 }}"
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "volume_up" }}'
+      sequence:
+      - repeat:
+          for_each: '{{ final_targets }}'
+          sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              volume_level: '{{ [(state_attr(repeat.item, ''volume_level'') | float(0))
+                + 0.07, 1.0] | min }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "volume_down" }}'
+      sequence:
+      - repeat:
+          for_each: '{{ final_targets }}'
+          sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              volume_level: '{{ [(state_attr(repeat.item, ''volume_level'') | float(0))
+                - 0.07, 0.0] | max }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "light_on" }}'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "light_off" }}'
+      sequence:
+      - action: light.turn_off
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "light_up" }}'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: '{{ final_targets }}'
+        data:
+          brightness_step_pct: 10
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "light_down" }}'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: '{{ final_targets }}'
+        data:
+          brightness_step_pct: -10
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "fan_on" }}'
+      sequence:
+      - action: fan.turn_on
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "fan_off" }}'
+      sequence:
+      - action: fan.turn_off
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "fan_up" }}'
+      sequence:
+      - action: fan.increase_speed
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind == "fan_down" }}'
+      sequence:
+      - action: fan.decrease_speed
+        target:
+          entity_id: '{{ final_targets }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ feature_meta.kind in ["ads","night"] }}'
+      sequence:
+      - action: homeassistant.toggle
+        target:
+          entity_id: '{{ final_targets }}'
+    default:
+    - action: script.labeled_feature_error_mode
+      data:
+        error_mode: '{{ _err_mode }}'
+        source: Labeled Feature Generics
+        message: Unknown feature '{{ _feature }}'.
+    - if:
+      - condition: template
+        value_template: '{{ _err_mode == "stop" }}'
+      then:
+      - stop: 'Labeled Feature Generics: unknown feature ''{{ _feature }}''.'
+        error: true
 labeled_feature_somrig:
   alias: Labeled Feature Somrig
-  description: >
-    Maps IKEA Somrig (and other 2-button) device events into one or more calls
-    to `script.labeled_feature_generics`. Reads the raw button event from the
-    `feature` field (e.g. '1_short_release', '2_double_press'); also accepts
-    `dots_N_*` (IKEA E2123) variants by stripping the 'dots_' prefix.
-
-    Only canonical "user did the thing" events are tracked:
-      *_short_release, *_double_press, *_long_press
-    All other events (initial_press, long_release, etc.) are ignored.
-
-    Contextual state: only `media_playing` (computed by inspecting
-    media_player entities in the resolved area) is used to pick between the
-    Playing and Not-Playing branches of the mapping table. Night-mode and
-    sleep-timeout behavior live as their own generic features (`Night`).
-
-    Event → generic-feature mapping:
-      1_short_release  Playing: Lights Off + Media Pause   Not Playing: Lights Off
-      2_short_release  Playing: Media Pause                Not Playing: Media Play
-      1_double_press   Playing: Media Seek Back            Not Playing: Fan On (toggle:true)
-      2_double_press   Playing: Media Seek Forward         Not Playing: Night
-      1_long_press     Playing: Volume Up                  Not Playing: Lights Up
-      2_long_press     Playing: Volume Down                Not Playing: Ads
+  description: "Maps IKEA Somrig (and other 2-button) device events into one or more
+    calls to `script.labeled_feature_generics`. Reads the raw button event from the
+    `feature` field (e.g. '1_short_release', '2_double_press'); also accepts `dots_N_*`
+    (IKEA E2123) variants by stripping the 'dots_' prefix.\nOnly canonical \"user
+    did the thing\" events are tracked:\n  *_short_release, *_double_press, *_long_press\nAll
+    other events (initial_press, long_release, etc.) are ignored.\nContextual state:
+    only `media_playing` (computed by inspecting media_player entities in the resolved
+    area) is used to pick between the Playing and Not-Playing branches of the mapping
+    table. Night-mode and sleep-timeout behavior live as their own generic features
+    (`Night`).\nEvent → generic-feature mapping:\n  1_short_release  Playing: Lights
+    Off + Media Pause   Not Playing: Lights Off\n  2_short_release  Playing: Media
+    Pause                Not Playing: Media Play\n  1_double_press   Playing: Media
+    Seek Back            Not Playing: Fan On (toggle:true)\n  2_double_press   Playing:
+    Media Seek Forward         Not Playing: Night\n  1_long_press     Playing: Volume
+    Up                  Not Playing: Lights Up\n  2_long_press     Playing: Volume
+    Down                Not Playing: Ads\n"
   mode: parallel
   max: 50
   fields:
     feature:
       name: Feature (Button Event)
-      description: >
-        The raw button event string from the button entity, e.g.
-        '1_short_release', '2_double_press', '1_long_press', or the
-        'dots_'-prefixed variants for IKEA E2123.
+      description: 'The raw button event string from the button entity, e.g. ''1_short_release'',
+        ''2_double_press'', ''1_long_press'', or the ''dots_''-prefixed variants for
+        IKEA E2123.
+
+        '
       required: true
       selector:
         select:
           custom_value: true
           options:
-            - 1_short_release
-            - 1_double_press
-            - 1_long_press
-            - 2_short_release
-            - 2_double_press
-            - 2_long_press
-            - dots_1_short_release
-            - dots_1_double_press
-            - dots_1_long_press
-            - dots_2_short_release
-            - dots_2_double_press
-            - dots_2_long_press
+          - 1_short_release
+          - 1_double_press
+          - 1_long_press
+          - 2_short_release
+          - 2_double_press
+          - 2_long_press
+          - dots_1_short_release
+          - dots_1_double_press
+          - dots_1_long_press
+          - dots_2_short_release
+          - dots_2_double_press
+          - dots_2_long_press
     follower_entity_id:
       name: Follower Entity ID
       description: Used for area lookup. Passed automatically by labeled_feature_follower.
@@ -4635,22 +3844,24 @@ labeled_feature_somrig:
         boolean: {}
     leader_feature:
       name: Leader Feature Name
-      description: >
-        The leader's labeled feature name (e.g. 'Night Buttons'), passed by the
-        leader automation alongside `feature`. Used for Exclude resolution:
-        entities labeled `(Area |Floor |)<leader_feature> Exclude: True` are
-        excluded from both the `media_playing` evaluation and every downstream
-        labeled_feature_generics call dispatched from here.
+      description: 'The leader''s labeled feature name (e.g. ''Night Buttons''), passed
+        by the leader automation alongside `feature`. Used for Exclude resolution:
+        entities labeled `(Area |Floor |)<leader_feature> Exclude: True` are excluded
+        from both the `media_playing` evaluation and every downstream labeled_feature_generics
+        call dispatched from here.
+
+        '
       required: false
       default: ''
       selector:
         text: {}
     toggle:
       name: Toggle
-      description: >
-        Pass-through toggle flag from the leader. Forwarded to every
-        labeled_feature_generics call. The 1_double_press Not-Playing
-        branch always overrides this with toggle:true (fan toggle).
+      description: 'Pass-through toggle flag from the leader. Forwarded to every labeled_feature_generics
+        call. The 1_double_press Not-Playing branch always overrides this with toggle:true
+        (fan toggle).
+
+        '
       required: false
       default: false
       selector:
@@ -4663,9 +3874,9 @@ labeled_feature_somrig:
       selector:
         select:
           options:
-            - area
-            - floor
-            - none
+          - area
+          - floor
+          - none
     scope_id:
       name: Scope ID
       description: The resolved area_id or floor_id passed by the automation.
@@ -4682,10 +3893,10 @@ labeled_feature_somrig:
         select:
           custom_value: true
           options:
-            - silent
-            - log
-            - alert
-            - stop
+          - silent
+          - log
+          - alert
+          - stop
   sequence:
     # ── Step 1: Resolve scope + scope entity set + Exclude set ──────────────
     - variables:
@@ -4820,181 +4031,74 @@ labeled_feature_somrig:
         # ────────────── 1_short_release ──────────────
         - conditions:
             - condition: template
-              value_template: '{{ mapped_event == "1_short_release" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Lights Off
-                    exclude_feature: '{{ _leader_feature }}'
-                    # Lights Off is intentionally forced to the leader's floor
-                    # so a single button press clears every light on the floor,
-                    # regardless of which area the button itself lives in.
-                    scope: floor
-                    scope_id: '{{ _resolved_floor_id }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Media Pause
-                    exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
-              else:
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Lights Off
-                    exclude_feature: '{{ _leader_feature }}'
-                    # See note above: Lights Off always operates at the floor scope.
-                    scope: floor
-                    scope_id: '{{ _resolved_floor_id }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
-
-        # ────────────── 2_short_release ──────────────
-        - conditions:
+              value_template: '{{ states(leader_entity_id) == _leader_initial_state
+                }}'
             - condition: template
-              value_template: '{{ mapped_event == "2_short_release" }}'
-          sequence:
-            - action: script.labeled_feature_generics
-              data:
-                feature: '{{ "Media Pause" if media_playing else "Media Play" }}'
-                exclude_feature: '{{ _leader_feature }}'
-                scope: '{{ _scope }}'
-                scope_id: '{{ scope_id | default("") }}'
-                follower_entity_id: '{{ follower_entity_id | default("") }}'
-                leader_entity_id: '{{ leader_entity_id | default("") }}'
-                leader_enabled: '{{ leader_enabled | default(true) }}'
-                toggle: '{{ _toggle_in }}'
-                error_mode: '{{ _err_mode }}'
-
-        # ────────────── 1_double_press ──────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_event == "1_double_press" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Media Seek Back
-                    exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
-              else:
-                # Fan toggle: force toggle:true regardless of caller-passed value
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Fan On
-                    exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: true
-                    error_mode: '{{ _err_mode }}'
-
-        # ────────────── 2_double_press ──────────────
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_event == "2_double_press" }}'
-          sequence:
-            - action: script.labeled_feature_generics
-              data:
-                feature: '{{ "Media Seek Forward" if media_playing else "Night" }}'
-                exclude_feature: '{{ _leader_feature }}'
-                scope: '{{ _scope }}'
-                scope_id: '{{ scope_id | default("") }}'
-                follower_entity_id: '{{ follower_entity_id | default("") }}'
-                leader_entity_id: '{{ leader_entity_id | default("") }}'
-                leader_enabled: '{{ leader_enabled | default(true) }}'
-                toggle: '{{ _toggle_in }}'
-                error_mode: '{{ _err_mode }}'
-
-        # ────────────── 1_long_press ──────────────
-        # Repeats the stepping action every 300ms until the leader entity's
-        # state changes (i.e. user releases or presses something else), with a
-        # safety cap. If leader_entity_id is missing we fall back to a single
-        # dispatch so this still does something when called manually.
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_event == "1_long_press" }}'
-          sequence:
+              value_template: '{{ repeat.index <= 200 }}'
+            sequence:
             - variables:
-                _long_press_feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
-                _leader_initial_state: >-
-                  {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
-            - if:
-                - condition: template
-                  value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
-              then:
-                - repeat:
-                    # Safety cap: ~60s of held button at 300ms cadence.
-                    while:
-                      - condition: template
-                        value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
-                      - condition: template
-                        value_template: '{{ repeat.index <= 200 }}'
-                    sequence:
-                      # Self-correcting tick: budget 500ms wall-clock per
-                      # iteration. We measure how long the dispatch took and
-                      # subtract that from the delay (with a 50ms floor so the
-                      # while: still gets a real yield to re-check the leader
-                      # state). This makes the visible step cadence consistent
-                      # even when the underlying media_player / light service
-                      # call latency varies.
-                      # Fire-and-forget dispatch via script.turn_on: returns
-                      # immediately so the loop's wall-clock cadence is
-                      # independent of how long the underlying media_player /
-                      # light service call takes. Inner error handling inside
-                      # labeled_feature_generics (Error Mode logging/alerts)
-                      # still applies; only error *propagation* back to this
-                      # loop is dropped.
-                      - variables:
-                          _tick_start: '{{ as_timestamp(now()) }}'
-                      - action: script.turn_on
-                        target:
-                          entity_id: script.labeled_feature_generics
-                        data:
-                          variables:
-                            feature: '{{ _long_press_feature }}'
-                            exclude_feature: '{{ _leader_feature }}'
-                            scope: '{{ _scope }}'
-                            scope_id: '{{ scope_id | default("") }}'
-                            follower_entity_id: '{{ follower_entity_id | default("") }}'
-                            leader_entity_id: '{{ leader_entity_id | default("") }}'
-                            leader_enabled: '{{ leader_enabled | default(true) }}'
-                            toggle: '{{ _toggle_in }}'
-                            error_mode: '{{ _err_mode }}'
-                      - delay:
-                          milliseconds: >-
-                            {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
-              else:
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: '{{ _long_press_feature }}'
+                _tick_start: '{{ as_timestamp(now()) }}'
+            - action: script.turn_on
+              target:
+                entity_id: script.labeled_feature_generics
+              data:
+                variables:
+                  feature: '{{ _long_press_feature }}'
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
+            - delay:
+                milliseconds: '{{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000))
+                  | int, 50] | max }}'
+        else:
+        - action: script.labeled_feature_generics
+          data:
+            feature: '{{ _long_press_feature }}'
+            exclude_feature: '{{ _leader_feature }}'
+            scope: '{{ _scope }}'
+            scope_id: '{{ scope_id | default("") }}'
+            follower_entity_id: '{{ follower_entity_id | default("") }}'
+            leader_entity_id: '{{ leader_entity_id | default("") }}'
+            leader_enabled: '{{ leader_enabled | default(true) }}'
+            toggle: '{{ _toggle_in }}'
+            error_mode: '{{ _err_mode }}'
+    - conditions:
+      - condition: template
+        value_template: '{{ mapped_event == "2_long_press" }}'
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ media_playing }}'
+        then:
+        - variables:
+            _leader_initial_state: '{{ states(leader_entity_id) if (leader_entity_id
+              is defined and leader_entity_id != "") else "" }}'
+        - if:
+          - condition: template
+            value_template: '{{ leader_entity_id is defined and leader_entity_id !=
+              "" }}'
+          then:
+          - repeat:
+              while:
+              - condition: template
+                value_template: '{{ states(leader_entity_id) == _leader_initial_state
+                  }}'
+              - condition: template
+                value_template: '{{ repeat.index <= 200 }}'
+              sequence:
+              - variables:
+                  _tick_start: '{{ as_timestamp(now()) }}'
+              - action: script.turn_on
+                target:
+                  entity_id: script.labeled_feature_generics
+                data:
+                  variables:
+                    feature: Volume Down
                     exclude_feature: '{{ _leader_feature }}'
                     scope: '{{ _scope }}'
                     scope_id: '{{ scope_id | default("") }}'
@@ -5003,78 +4107,33 @@ labeled_feature_somrig:
                     leader_enabled: '{{ leader_enabled | default(true) }}'
                     toggle: '{{ _toggle_in }}'
                     error_mode: '{{ _err_mode }}'
-
-        # ────────────── 2_long_press ──────────────
-        # Playing (Volume Down) repeats every 300ms with the same safety guard
-        # described above. Not-Playing (Ads) is a toggle, fires once.
-        - conditions:
-            - condition: template
-              value_template: '{{ mapped_event == "2_long_press" }}'
-          sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - variables:
-                    _leader_initial_state: >-
-                      {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
-                - if:
-                    - condition: template
-                      value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
-                  then:
-                    - repeat:
-                        while:
-                          - condition: template
-                            value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
-                          - condition: template
-                            value_template: '{{ repeat.index <= 200 }}'
-                        sequence:
-                          # Fire-and-forget dispatch — see note in 1_long_press
-                          # branch. Targets 500ms wall-clock per step.
-                          - variables:
-                              _tick_start: '{{ as_timestamp(now()) }}'
-                          - action: script.turn_on
-                            target:
-                              entity_id: script.labeled_feature_generics
-                            data:
-                              variables:
-                                feature: Volume Down
-                                exclude_feature: '{{ _leader_feature }}'
-                                scope: '{{ _scope }}'
-                                scope_id: '{{ scope_id | default("") }}'
-                                follower_entity_id: '{{ follower_entity_id | default("") }}'
-                                leader_entity_id: '{{ leader_entity_id | default("") }}'
-                                leader_enabled: '{{ leader_enabled | default(true) }}'
-                                toggle: '{{ _toggle_in }}'
-                                error_mode: '{{ _err_mode }}'
-                          - delay:
-                              milliseconds: >-
-                                {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
-                  else:
-                    - action: script.labeled_feature_generics
-                      data:
-                        feature: Volume Down
-                        exclude_feature: '{{ _leader_feature }}'
-                        scope: '{{ _scope }}'
-                        scope_id: '{{ scope_id | default("") }}'
-                        follower_entity_id: '{{ follower_entity_id | default("") }}'
-                        leader_entity_id: '{{ leader_entity_id | default("") }}'
-                        leader_enabled: '{{ leader_enabled | default(true) }}'
-                        toggle: '{{ _toggle_in }}'
-                        error_mode: '{{ _err_mode }}'
-              else:
-                # Ads — toggle, fires once
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Ads
-                    exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
+              - delay:
+                  milliseconds: '{{ [(500 - ((as_timestamp(now()) - _tick_start) *
+                    1000)) | int, 50] | max }}'
+          else:
+          - action: script.labeled_feature_generics
+            data:
+              feature: Volume Down
+              exclude_feature: '{{ _leader_feature }}'
+              scope: '{{ _scope }}'
+              scope_id: '{{ scope_id | default("") }}'
+              follower_entity_id: '{{ follower_entity_id | default("") }}'
+              leader_entity_id: '{{ leader_entity_id | default("") }}'
+              leader_enabled: '{{ leader_enabled | default(true) }}'
+              toggle: '{{ _toggle_in }}'
+              error_mode: '{{ _err_mode }}'
+        else:
+        - action: script.labeled_feature_generics
+          data:
+            feature: Ads
+            exclude_feature: '{{ _leader_feature }}'
+            scope: '{{ _scope }}'
+            scope_id: '{{ scope_id | default("") }}'
+            follower_entity_id: '{{ follower_entity_id | default("") }}'
+            leader_entity_id: '{{ leader_entity_id | default("") }}'
+            leader_enabled: '{{ leader_enabled | default(true) }}'
+            toggle: '{{ _toggle_in }}'
+            error_mode: '{{ _err_mode }}'
 labeled_feature_entities:
   alias: Labeled Feature Entities
   description: >
