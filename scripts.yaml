@@ -4958,6 +4958,9 @@ labeled_feature_area:
                   name: '{{ _aname }} Area'
                   manufacturer: Home Assistant
                   model: Area Manifest
+                  # `suggested_area` accepts area_id (preferred — survives renames)
+                  # or area_name. We pass the id. Only honored on first creation.
+                  suggested_area: '{{ _aid }}'
                 state_topic: 'area_manifests/{{ _safe_aid }}/state'
                 json_attributes_topic: 'area_manifests/{{ _safe_aid }}/attributes'
                 initialize_mode: always
@@ -4984,7 +4987,9 @@ labeled_feature_area:
               data:
                 component: sensor
                 object_id: '{{ _obj }}'
-                name: VPD
+                # Friendly name prefixed with scope name so the entity is
+                # globally identifiable in pickers / voice / history.
+                name: '{{ _scope_name }} VPD'
                 icon: '{{ _fd.get("icon", "") }}'
                 device_class: '{{ _fd.get("device_class", "pressure") }}'
                 unit_of_measurement: '{{ _fd.get("unit_of_measurement", "kPa") }}'
@@ -4994,7 +4999,12 @@ labeled_feature_area:
                   name: '{{ _scope_name }}'
                   manufacturer: Labeled Feature Area
                   model: Shoot Zone
-                  suggested_area: '{{ _scope_name }}'
+                  # id-keyed (preferred — survives renames). Floor / none
+                  # scopes have no area_id of their own; fall back to the
+                  # declaring area's id, then to _scope_name as last resort.
+                  suggested_area: >-
+                    {{ _scope_id if _scope == 'area'
+                       else (_declared_area_id if _declared_area_id else _scope_name) }}
                 state_topic: 'tracked_area/{{ _safe_scope_id }}/vpd'
                 expire_after: '300'
                 suggested_display_precision: '2'
@@ -5044,7 +5054,8 @@ labeled_feature_area:
               data:
                 component: number
                 object_id: '{{ _obj }}'
-                name: Tracked PSI
+                # Scope-prefixed friendly name for global identifiability.
+                name: '{{ _scope_name }} Tracked PSI'
                 icon: '{{ _fd.get("icon", "") }}'
                 device_class: '{{ _fd.get("device_class", "pressure") }}'
                 unit_of_measurement: '{{ _fd.get("unit_of_measurement", "PSI") }}'
@@ -5054,7 +5065,10 @@ labeled_feature_area:
                   name: '{{ _scope_name }}'
                   manufacturer: Labeled Feature Area
                   model: Root Zone
-                  suggested_area: '{{ _scope_name }}'
+                  # id-keyed (preferred — survives renames).
+                  suggested_area: >-
+                    {{ _scope_id if _scope == 'area'
+                       else (_declared_area_id if _declared_area_id else _scope_name) }}
                 state_topic: 'tracked_area/{{ _safe_scope_id }}/tracked_psi'
                 command_topic: 'tracked_area/{{ _safe_scope_id }}/tracked_psi'
                 min: '{{ _min }}'
@@ -5153,14 +5167,18 @@ labeled_feature_area:
               data:
                 component: select
                 object_id: '{{ _obj }}'
-                name: '{{ _feature }}'
+                # Scope-prefixed friendly name for global identifiability.
+                name: '{{ _scope_name }} {{ _feature }}'
                 icon: '{{ _fd.get("icon", "") }}'
                 device:
                   identifiers: ['{{ _safe_scope_id }}_{{ _fslug }}']
                   name: '{{ _scope_name }} {{ _feature }}'
                   manufacturer: Labeled Feature Area
                   model: Generated Select
-                  suggested_area: '{{ _scope_name if _scope == "area" else (area_name(_declared_area_id) | default(_declared_area_id, true)) }}'
+                  # id-keyed (preferred — survives renames).
+                  suggested_area: >-
+                    {{ _scope_id if _scope == 'area'
+                       else (_declared_area_id if _declared_area_id else _scope_name) }}
                 state_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/state'
                 command_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/set'
                 options: '{{ _options_only_values }}'
@@ -5189,7 +5207,8 @@ labeled_feature_area:
               data:
                 component: '{{ _comp }}'
                 object_id: '{{ _obj }}'
-                name: '{{ _feature }}'
+                # Scope-prefixed friendly name for global identifiability.
+                name: '{{ _scope_name }} {{ _feature }}'
                 icon: '{{ _icon }}'
                 device_class: '{{ _dc }}'
                 unit_of_measurement: '{{ _unit }}'
@@ -5198,7 +5217,10 @@ labeled_feature_area:
                   name: '{{ _scope_name }} {{ _feature }}'
                   manufacturer: Labeled Feature Area
                   model: 'Generated {{ _comp }}'
-                  suggested_area: '{{ _scope_name if _scope == "area" else (area_name(_declared_area_id) | default(_declared_area_id, true)) }}'
+                  # id-keyed (preferred — survives renames).
+                  suggested_area: >-
+                    {{ _scope_id if _scope == 'area'
+                       else (_declared_area_id if _declared_area_id else _scope_name) }}
                 state_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/state'
                 command_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/set'
                 min: '{{ _min if _comp == "number" else "" }}'
