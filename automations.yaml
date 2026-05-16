@@ -2688,15 +2688,24 @@
             {% set ens.scopes = dict(ens.scopes, **{sid: dict(sdat, **{'expected': exp})}) %}
           {% endfor %}
           {{ ens.scopes }}
-        # No reliable "previous registry state" snapshot exists for registry
-        # events the way `trigger.from_state` exists for state triggers, so
-        # we treat every registry-driven run as a full re-publish (the MQTT
-        # discovery topics are retained → re-publishing identical payloads
-        # is a no-op for the broker and HA). Removes are computed against
-        # `this.attributes.last_now_map` carried forward via automation
-        # variables — see `_prev_map` below. The `homeassistant.start`
-        # branch deliberately publishes everything and removes nothing.
-        _prev_scopes: '{{ {} }}'
+        # Previous run's `_now_scopes`, carried forward via this.attributes.
+        # HA exposes any top-level `variables:` set during an automation
+        # run as attributes on the automation entity (see the final
+        # `variables:` step at the end of this automation that writes
+        # `last_now_scopes`). The shape mirrors `_now_scopes` so the diff
+        # logic below can iterate it identically.
+        #
+        # The `homeassistant.start` branch (`_is_start`) deliberately short-
+        # circuits `_removed` to `[]` so a restart only re-publishes; it
+        # never retracts. The first run after restart repopulates
+        # `last_now_scopes` for subsequent registry-event runs.
+        #
+        # Caveat: `this.attributes` is not persisted across HA restarts, so
+        # a label removed *while HA is down* won't be retracted on the next
+        # start (the entity will linger via its retained MQTT topic). If
+        # that becomes painful, persist `last_now_scopes` via an
+        # `input_text` or retained MQTT topic instead.
+        _prev_scopes: '{{ this.attributes.get("last_now_scopes", {}) }}'
     # Flatten both snapshots into <scope_id>||<feature> maps so the diff is
     # cheap and identity-stable (re-publishes for same key are a no-op when
     # component+object_id match).
@@ -2852,3 +2861,9 @@
                       Labeled Feature Areas: error creating
                       {{ repeat.item.feature }} for {{ repeat.item.scope_id }}
                     error: true
+    # Persist this run's snapshot as an attribute on the automation entity
+    # so the next run can diff against it (read in by the `_prev_scopes`
+    # variable at the top). HA promotes top-level `variables:` step
+    # values to entity attributes for the lifetime of the run / state.
+    - variables:
+        last_now_scopes: '{{ _now_scopes }}'
