@@ -2320,9 +2320,8 @@
                     variables: >
                       {{ {'leader_entity_id': leader_entity_id, 'feature': feature_name, 'leader_enabled': leader_enabled, 'scope': resolved_scope, 'scope_id': resolved_scope_id} | combine(leader_script_args) | combine({'leader_feature': feature_name}) }}
           - variables:
-              providers_catalog: >-
-                {{ state_attr('sensor.labeled_features_state', 'providers') | default({}) }}
               follower_label_name: >-
+
                 {%- if resolved_scope == 'area' -%}Area Follower: {{ feature_name }}{%- elif resolved_scope == 'floor' -%}Floor Follower: {{ feature_name }}{%- else -%}Follower: {{ feature_name }}{%- endif -%}
               scope_entity_set: >-
                 {% if resolved_scope == 'area' %}
