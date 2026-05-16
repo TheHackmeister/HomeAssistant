@@ -3987,8 +3987,16 @@ labeled_feature_generics:
       1. Build scope_entity_set from scope/scope_id (area/floor) or fall back
          to follower_entity_id / leader_entity_id area lookup.
       2. label_targets = entities labeled `(Area |Floor |)Follower: <Feature>`
-         that are in scope_entity_set.
-      3. excluded = entities labeled `<scope-prefix><Feature> Exclude: True`.
+         UNION entities labeled `(Area |Floor |)Provides: <Category>` where
+         <Category> is any provider in `sensor.labeled_features_state.providers`
+         whose `features` list contains <Feature>. The provider catalog is the
+         single source of truth for which features each `Provides:` category
+         opts an entity into (see configuration.yaml). The union is then
+         intersected with scope_entity_set.
+      3. excluded = entities labeled `<scope-prefix><Feature> Exclude: True`
+         OR `<scope-prefix>Provides <Category> Exclude: True` for any
+         matching <Category>. Exclude works against both Follower- and
+         Provides-derived membership.
       4. If (label_targets - excluded) is non-empty → use it.
       5. Else fallback to entities in scope_entity_set whose domain matches
          the feature's default domain, minus excluded.
@@ -4115,6 +4123,22 @@ labeled_feature_generics:
         _scope: '{{ (scope | default("area") | lower) }}'
         _toggle: '{{ (toggle | default(false)) | bool(false) }}'
         _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        # Entity-context provider catalog from sensor.labeled_features_state.
+        # Used to resolve which `(Area |Floor |)Provides: <Category>` labels
+        # implicitly opt an entity into this feature.
+        _providers: >-
+          {{ state_attr('sensor.labeled_features_state', 'providers') | default({}) }}
+        # All provider category names whose `features` list includes this
+        # feature.  An entity is a `Provides:`-derived target for this feature
+        # if it carries any matching `(scope-prefix)Provides: <Category>` label.
+        _matching_providers: >-
+          {% set ns = namespace(names=[]) %}
+          {% for pname, pdata in (state_attr('sensor.labeled_features_state', 'providers') | default({})).items() %}
+            {% if (feature | trim) in (pdata.get('features', []) | list) %}
+              {% set ns.names = ns.names + [pname] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.names }}
         _resolved_area_id: >-
           {%- if _scope == 'area' and scope_id is defined and scope_id != '' -%}
             {{ scope_id }}
@@ -4178,7 +4202,17 @@ labeled_feature_generics:
           {{ (('Area ' if _scope == 'area' else
                ('Floor ' if _scope == 'floor' else '')) ~ _exclude_feature) ~ " Exclude: True" }}
 
-    # ── Step 2: Label-based + Exclude resolution ────────────────────────────
+    # ── Step 2: Label-based + Provides-based + Exclude resolution ──────────
+    # `label_targets` is the union of two membership sources:
+    #   (a) explicit `(Area |Floor |)Follower: <Feature>` labels (precise opt-in)
+    #   (b) implicit `(Area |Floor |)Provides: <Category>` labels for every
+    #       provider category whose `features` list includes this feature
+    #       (catalog source: sensor.labeled_features_state.providers)
+    # Exclude is keyed on the (caller-overridable) feature name with both bare
+    # and scope-prefixed variants, AND on each matching provider category with
+    # both bare and scope-prefixed variants — so a single
+    # `Area Provides Media Player Exclude: True` label opts an entity out of
+    # every media-player generic feature dispatched into the area.
     - variables:
         _label_targets_raw: >-
           {% set all_f = label_entities(follower_label) | list %}
@@ -4187,12 +4221,44 @@ labeled_feature_generics:
           {% else %}
             {{ all_f }}
           {% endif %}
+        _provides_targets_raw: >-
+          {% set ns = namespace(ents=[]) %}
+          {% for pname in _matching_providers %}
+            {% set bare_lbl = 'Provides: ' ~ pname %}
+            {% set scoped_lbl = (('Area ' if _scope == 'area' else
+                                   ('Floor ' if _scope == 'floor' else ''))
+                                  ~ 'Provides: ' ~ pname) %}
+            {% set ns.ents = ns.ents
+                + (label_entities(bare_lbl) | list)
+                + (label_entities(scoped_lbl) | list) %}
+          {% endfor %}
+          {% set _uniq = ns.ents | unique | list %}
+          {% if scope_entity_set | length > 0 %}
+            {{ _uniq | select('in', scope_entity_set) | list }}
+          {% else %}
+            {{ _uniq }}
+          {% endif %}
+        _provides_excluded: >-
+          {% set ns = namespace(ents=[]) %}
+          {% for pname in _matching_providers %}
+            {% set bare_excl = 'Provides ' ~ pname ~ ' Exclude: True' %}
+            {% set scoped_excl = (('Area ' if _scope == 'area' else
+                                    ('Floor ' if _scope == 'floor' else ''))
+                                   ~ 'Provides ' ~ pname ~ ' Exclude: True') %}
+            {% set ns.ents = ns.ents
+                + (label_entities(bare_excl) | list)
+                + (label_entities(scoped_excl) | list) %}
+          {% endfor %}
+          {{ ns.ents | unique | list }}
         _excluded: >-
           {% set unscoped = label_entities(exclude_label) | list %}
           {% set scoped = label_entities(scoped_exclude_label) | list %}
-          {{ (unscoped + scoped) | unique | list }}
+          {{ (unscoped + scoped + _provides_excluded) | unique | list }}
         label_targets: >-
-          {{ _label_targets_raw | reject('in', _excluded) | list }}
+          {{ (_label_targets_raw + _provides_targets_raw)
+             | unique
+             | reject('in', _excluded)
+             | list }}
 
     # ── Step 3: Feature metadata (domain fallback + selected action) ────────
     - variables:
@@ -4705,18 +4771,40 @@ labeled_feature_somrig:
               {{ all_excl }}
             {% endif %}
           {% endif %}
+        # Media-player candidates for the `media_playing` evaluation. The set
+        # is the union of:
+        #   (a) media_player entities in scope_entity_set (area / floor)
+        #   (b) entities labeled `(Area |Floor |)Provides: Media Player`
+        #       intersected with scope_entity_set
+        # Excluded entities (per the leader's feature) are removed first. The
+        # provider-side union catches grouped speakers that may live outside
+        # the resolved area's entity set but are still wired in via Provides.
+        _media_provider_label_scoped: >-
+          {{ (('Area ' if _scope == 'area' else
+               ('Floor ' if _scope == 'floor' else ''))) ~ 'Provides: Media Player' }}
+        _media_provider_label_bare: 'Provides: Media Player'
+        _media_provider_entities: >-
+          {{ (label_entities(_media_provider_label_scoped) | list
+              + label_entities(_media_provider_label_bare) | list)
+             | unique | list }}
         media_playing: >-
           {% set mp_in_scope = states.media_player
                | rejectattr('entity_id', 'in', excluded_entities)
                | list %}
+          {% set mp_in_scope_ids = mp_in_scope | map(attribute='entity_id') | list %}
           {% if scope_entity_set | length > 0 %}
+            {% set candidate_ids = (mp_in_scope_ids | select('in', scope_entity_set) | list)
+                                   + (_media_provider_entities | select('in', scope_entity_set) | list) %}
             {{ mp_in_scope
-               | selectattr('entity_id', 'in', scope_entity_set)
+               | selectattr('entity_id', 'in', candidate_ids | unique | list)
                | selectattr('state', 'in', ['playing', 'buffering'])
                | list | count > 0 }}
           {% elif _resolved_area_id != '' %}
+            {% set area_ids = area_entities(_resolved_area_id) %}
+            {% set candidate_ids = (mp_in_scope_ids | select('in', area_ids) | list)
+                                   + (_media_provider_entities | select('in', area_ids) | list) %}
             {{ mp_in_scope
-               | selectattr('entity_id', 'in', area_entities(_resolved_area_id))
+               | selectattr('entity_id', 'in', candidate_ids | unique | list)
                | selectattr('state', 'in', ['playing', 'buffering'])
                | list | count > 0 }}
           {% else %}
@@ -5740,7 +5828,10 @@ labeled_feature_area:
                 initialize_mode: set_if_missing
                 error_mode: '{{ _err_mode }}'
 
-        # ────────────────────── Generic Gen: <F> (default → select) ──────────
+        # ────────────────────── Generic Provides: <F> (default → select) ─────
+        # Entity option-pool label keywords accept either `Provides` (preferred)
+        # or `Gen` (legacy) during the compat window — the regex group
+        # `(Gen|Provides)` covers both forms.
         - conditions:
             - condition: template
               value_template: '{{ _fd.get("component", "select") == "select" }}'
@@ -5748,17 +5839,32 @@ labeled_feature_area:
             - variables:
                 _fslug: '{{ _feature | lower | replace(" ", "_") | replace("-", "_") }}'
                 _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_" ~ _fslug) }}'
-                # Pool: entities labeled `<scope-prefix>Gen Option: <F>` in scope
-                _option_label_scoped: '{{ _scope_prefix ~ "Gen Option: " ~ _feature }}'
-                _option_label_bare: '{{ "Gen Option: " ~ _feature }}'
-                _exclude_label_scoped: '{{ _scope_prefix ~ "Gen " ~ _feature ~ " Exclude: True" }}'
-                _exclude_label_bare: '{{ "Gen " ~ _feature ~ " Exclude: True" }}'
-                _opt_ents_scoped: '{{ label_entities(_option_label_scoped) | list }}'
-                _opt_ents_bare: '{{ label_entities(_option_label_bare) | list }}'
+                # Pool: entities labeled
+                # `<scope-prefix>(Provides|Gen) Option: <F>` in scope.
+                # Both `Provides Option:` (preferred) and `Gen Option:` (legacy)
+                # are recognized during the compat window.
+                _opt_label_scoped_provides: '{{ _scope_prefix ~ "Provides Option: " ~ _feature }}'
+                _opt_label_bare_provides:   '{{ "Provides Option: " ~ _feature }}'
+                _opt_label_scoped_gen:      '{{ _scope_prefix ~ "Gen Option: " ~ _feature }}'
+                _opt_label_bare_gen:        '{{ "Gen Option: " ~ _feature }}'
+                _exclude_label_scoped_provides: '{{ _scope_prefix ~ "Provides " ~ _feature ~ " Exclude: True" }}'
+                _exclude_label_bare_provides:   '{{ "Provides " ~ _feature ~ " Exclude: True" }}'
+                _exclude_label_scoped_gen:      '{{ _scope_prefix ~ "Gen " ~ _feature ~ " Exclude: True" }}'
+                _exclude_label_bare_gen:        '{{ "Gen " ~ _feature ~ " Exclude: True" }}'
+                _opt_ents_scoped: >-
+                  {{ (label_entities(_opt_label_scoped_provides) | list
+                      + label_entities(_opt_label_scoped_gen) | list)
+                     | unique | list }}
+                _opt_ents_bare: >-
+                  {{ (label_entities(_opt_label_bare_provides) | list
+                      + label_entities(_opt_label_bare_gen) | list)
+                     | unique | list }}
                 _all_opt_ents_raw: '{{ (_opt_ents_scoped + (_opt_ents_bare if _scope == "none" else [])) | unique | list }}'
                 _excluded_ents: >-
-                  {{ (label_entities(_exclude_label_scoped) | list
-                      + label_entities(_exclude_label_bare) | list)
+                  {{ (label_entities(_exclude_label_scoped_provides) | list
+                      + label_entities(_exclude_label_bare_provides) | list
+                      + label_entities(_exclude_label_scoped_gen) | list
+                      + label_entities(_exclude_label_bare_gen) | list)
                      | unique | list }}
                 _opt_ents_in_scope: >-
                   {% if _scope == 'none' %}
@@ -5774,12 +5880,20 @@ labeled_feature_area:
                   {% set ns = namespace(items=[]) %}
                   {% for ent in _opt_ents_in_scope %}
                     {% set lbls = labels(ent) | map('label_name') | reject('none') | list %}
-                    {#- Per-entity custom dropdown label: `<scope-prefix>Gen Option <F>: <label>` -#}
-                    {% set scoped_pfx = _scope_prefix ~ 'Gen Option ' ~ _feature ~ ': ' %}
-                    {% set bare_pfx = 'Gen Option ' ~ _feature ~ ': ' %}
-                    {% set custom_scoped = lbls | select('match', '^' ~ scoped_pfx ~ '.+$') | first | default('') %}
-                    {% set custom_bare = lbls | select('match', '^' ~ bare_pfx ~ '.+$') | first | default('') %}
-                    {% set custom = custom_scoped if custom_scoped != '' else custom_bare %}
+                    {#- Per-entity custom dropdown label.  Accept both forms:
+                        `<scope-prefix>(Provides|Gen) Option <F>: <label>` -#}
+                    {% set scoped_pfx_pr = _scope_prefix ~ 'Provides Option ' ~ _feature ~ ': ' %}
+                    {% set bare_pfx_pr = 'Provides Option ' ~ _feature ~ ': ' %}
+                    {% set scoped_pfx_gen = _scope_prefix ~ 'Gen Option ' ~ _feature ~ ': ' %}
+                    {% set bare_pfx_gen = 'Gen Option ' ~ _feature ~ ': ' %}
+                    {% set custom_scoped_pr = lbls | select('match', '^' ~ scoped_pfx_pr ~ '.+$') | first | default('') %}
+                    {% set custom_bare_pr = lbls | select('match', '^' ~ bare_pfx_pr ~ '.+$') | first | default('') %}
+                    {% set custom_scoped_gen = lbls | select('match', '^' ~ scoped_pfx_gen ~ '.+$') | first | default('') %}
+                    {% set custom_bare_gen = lbls | select('match', '^' ~ bare_pfx_gen ~ '.+$') | first | default('') %}
+                    {% set custom = custom_scoped_pr if custom_scoped_pr != ''
+                                    else (custom_bare_pr if custom_bare_pr != ''
+                                    else (custom_scoped_gen if custom_scoped_gen != ''
+                                    else custom_bare_gen)) %}
                     {% set display_label = (custom | regex_replace('^.+: ', '') | trim) if custom != '' else (state_attr(ent, 'friendly_name') or ent) %}
                     {% set ns.items = ns.items + [{'value': ent, 'label': display_label}] %}
                   {% endfor %}
