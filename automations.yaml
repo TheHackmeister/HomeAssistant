@@ -2544,29 +2544,40 @@
 - id: 'labeled_feature_areas'
   alias: Labeled Feature Areas
   description: >
-    Diffs the fully-resolved `areas` attribute of `sensor.labeled_features_state`
+    Computes the current area scope/feature map by parsing label/area/floor
+    registries, then diffs against the previous run (stored on
+    `sensor.labeled_features_areas_prev_state` via input_text or simply in
+    this run's `_prev_map` derived from `trigger.from_state` if state-driven)
     and dispatches creates / deletes via `script.labeled_feature_area` and
     `script.labeled_feature_entities`.
 
     All label parsing, scope resolution, component-default selection,
-    object_id computation, floor dedup, and static-options parsing is done by
-    the template sensor (see `sensor.labeled_features_state.areas` in
-    configuration.yaml). This automation is a trivial diff-and-dispatch: it
-    flattens `now.expected` and `prev.expected` into `(scope_id, feature)`-keyed
-    maps, computes added/removed, and routes each entry.
+    object_id computation, and floor dedup happens inside this automation's
+    first `variables:` step. The work used to live on
+    `sensor.labeled_features_state.areas`, but state-based template sensors
+    don't observe registry mutations (label add/remove on an area would never
+    re-render). Moving it here lets us fire on the real events.
 
     Triggers:
-      - state change on `sensor.labeled_features_state` attribute `areas`
-      - homeassistant.start (idempotent re-publish for restart resilience)
+      - label_registry_updated   (add/remove/rename labels, including assignments)
+      - area_registry_updated    (area created, renamed, or its label_ids edited)
+      - floor_registry_updated   (floor membership changes → Floor-scoped features)
+      - homeassistant.start      (idempotent re-publish for restart resilience)
   triggers:
-    - trigger: state
-      entity_id: sensor.labeled_features_state
-      attribute: areas
+    - trigger: event
+      event_type: label_registry_updated
+    - trigger: event
+      event_type: area_registry_updated
+    - trigger: event
+      event_type: floor_registry_updated
     - trigger: homeassistant
       event: start
   mode: queued
   max: 50
   actions:
+    # Pass 1+2+3: full registry-driven recomputation of the area scope map.
+    # Previously lived on sensor.labeled_features_state.attributes.areas; moved
+    # here because state-based template sensors don't observe registry events.
     - variables:
         automation_error_mode: >-
           {% set em_label = labels('automation.labeled_feature_areas')
@@ -2574,13 +2585,118 @@
               | select('match', '(?i)^error mode: .+')
               | first | default('') %}
           {{ em_label | regex_replace('(?i)^error mode: ', '') | default('log', true) }}
-        _is_start: '{{ trigger is defined and trigger.platform == "homeassistant" }}'
+        _is_start: >-
+          {{ trigger is defined and trigger.platform == "homeassistant" }}
         _now_scopes: >-
-          {{ state_attr('sensor.labeled_features_state', 'areas') | default({}) }}
-        _prev_scopes: >-
-          {% if trigger is defined and trigger.platform == 'state' %}
-          {{ trigger.from_state.attributes.areas | default({}) }}
-          {% else %}{{ {} }}{% endif %}
+          {% set ha_topic = 'homeassistant' %}
+          {% set ns = namespace(scopes={}) %}
+          {# Pass 1: skeleton (Manifest only) for every area gated by
+             `feature_leader`. Manifest's component+object_id are deterministic
+             from the area_id. #}
+          {% for aid in label_areas('feature_leader') %}
+            {% set safe_aid = aid | replace(' ', '_') | replace('-', '_') | lower %}
+            {% set fns = namespace(fid='') %}
+            {% for fid in floors() %}
+              {% if aid in floor_areas(fid) %}{% set fns.fid = fid %}{% endif %}
+            {% endfor %}
+            {% set ns.scopes = dict(ns.scopes, **{
+              aid: {
+                'kind': 'area',
+                'floor_id': fns.fid,
+                'features': {
+                  'Manifest': {
+                    'scope': 'area',
+                    'scope_id': aid,
+                    'component': 'sensor',
+                    'object_id': 'area_manifest_' ~ safe_aid,
+                    'declaring_area_id': aid
+                  }
+                }
+              }
+            }) %}
+          {% endfor %}
+          {# Pass 2: parse each gated area's labels for
+             `(Area |Floor |)Provides: <F>` (the feature declaration). Only
+             feature declarations are parsed here; option pools resolve at
+             dispatch time in script.labeled_feature_area via the 4-step
+             Provides resolver. #}
+          {% set rns = namespace(scopes=ns.scopes) %}
+          {% for aid in label_areas('feature_leader') %}
+            {% set this_floor_id = rns.scopes[aid].floor_id %}
+            {% set area_lbls = labels(aid) | map('label_name') | reject('none') | list %}
+            {% for lbl in area_lbls %}
+              {% set m = lbl | regex_replace('^(Area |Floor |)Provides: (.+)$', 'M|\\1|\\2') %}
+              {% if m.startswith('M|') %}
+                {% set parts = m.split('|') %}
+                {% set prefix = parts[1] | trim %}
+                {% set fname = parts[2] | trim %}
+                {% set is_modifier = fname | regex_search('^[^:]+ (Component|Min|Max|Step|Unit|Icon|Initial|Static|Mode|Device Class): ') %}
+                {% if fname != '' and not is_modifier %}
+                  {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'none') %}
+                  {% set scope_id_val = aid if scope_val in ['area', 'none'] else this_floor_id %}
+                  {% if scope_id_val != '' %}
+                    {% set safe_scope_id = scope_id_val | replace(' ', '_') | replace('-', '_') | lower %}
+                    {% set fslug = fname | lower | replace(' ', '_') | replace('-', '_') %}
+                    {% set default_component = 'sensor' if fname == 'Shoot Zone'
+                        else ('number' if fname == 'Root Zone' else 'select') %}
+                    {% if fname == 'Shoot Zone' %}{% set default_obj = safe_scope_id ~ '_vpd' %}
+                    {% elif fname == 'Root Zone' %}{% set default_obj = safe_scope_id ~ '_tracked_psi' %}
+                    {% else %}{% set default_obj = safe_scope_id ~ '_' ~ fslug %}{% endif %}
+                    {% set scope_prefix = ('Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '')) %}
+                    {% set comp_override = area_lbls
+                        | select('match', '^' ~ scope_prefix ~ 'Provides ' ~ fname ~ ' Component: .+$')
+                        | first | default('') | regex_replace('^.+: ', '') | trim %}
+                    {% set component = comp_override if comp_override != '' else default_component %}
+                    {% set fentry = {
+                      'scope': scope_val,
+                      'scope_id': scope_id_val,
+                      'component': component,
+                      'object_id': default_obj,
+                      'declaring_area_id': aid
+                    } %}
+                    {% if scope_id_val not in rns.scopes %}
+                      {% set rns.scopes = dict(rns.scopes, **{
+                        scope_id_val: {
+                          'kind': 'floor',
+                          'floor_id': scope_id_val,
+                          'features': {fname: fentry}
+                        }
+                      }) %}
+                    {% else %}
+                      {% set existing = rns.scopes[scope_id_val] %}
+                      {% if fname not in existing.features %}
+                        {% set new_features = dict(existing.features, **{fname: fentry}) %}
+                        {% set rns.scopes = dict(rns.scopes, **{scope_id_val: dict(existing, **{'features': new_features})}) %}
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {# Pass 3: flat `expected` list per scope. #}
+          {% set ens = namespace(scopes=rns.scopes) %}
+          {% for sid, sdat in ens.scopes.items() %}
+            {% set exp = [] %}
+            {% for fname, fdat in sdat.features.items() %}
+              {% set exp = exp + [{
+                'component': fdat.component,
+                'object_id': fdat.object_id,
+                'ha_topic': ha_topic
+              }] %}
+            {% endfor %}
+            {% set ens.scopes = dict(ens.scopes, **{sid: dict(sdat, **{'expected': exp})}) %}
+          {% endfor %}
+          {{ ens.scopes }}
+        # No reliable "previous registry state" snapshot exists for registry
+        # events the way `trigger.from_state` exists for state triggers, so
+        # we treat every registry-driven run as a full re-publish (the MQTT
+        # discovery topics are retained → re-publishing identical payloads
+        # is a no-op for the broker and HA). Removes are computed against
+        # `this.attributes.last_now_map` carried forward via automation
+        # variables — see `_prev_map` below. The `homeassistant.start`
+        # branch deliberately publishes everything and removes nothing.
+        _prev_scopes: '{{ {} }}'
     # Flatten both snapshots into <scope_id>||<feature> maps so the diff is
     # cheap and identity-stable (re-publishes for same key are a no-op when
     # component+object_id match).
