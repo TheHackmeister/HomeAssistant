@@ -3562,265 +3562,292 @@ labeled_feature_generics:
 
     # ── Step 5: Validate target set ─────────────────────────────────────────
     - if:
-      - condition: template
-        value_template: '{{ _err_mode == "stop" }}'
+        - condition: template
+          value_template: '{{ final_targets | length == 0 }}'
       then:
-      - stop: 'Labeled Feature Generics: no targets for ''{{ _feature }}''.'
-        error: true
-    - stop: No targets resolved (handled per error_mode).
-  - if:
-    - condition: template
-      value_template: '{{ _toggle }}'
-    then:
-    - choose:
-      - conditions:
-        - condition: template
-          value_template: '{{ feature_meta.domain == "light" }}'
-        sequence:
-        - action: light.toggle
-          target:
-            entity_id: '{{ final_targets }}'
-      - conditions:
-        - condition: template
-          value_template: '{{ feature_meta.domain == "fan" }}'
-        sequence:
-        - action: fan.toggle
-          target:
-            entity_id: '{{ final_targets }}'
-      - conditions:
-        - condition: template
-          value_template: '{{ feature_meta.kind in [''media_toggle'',''media_play'',''media_pause'']
-            }}'
-        sequence:
-        - action: media_player.media_play_pause
-          target:
-            entity_id: '{{ final_targets }}'
-      - conditions:
-        - condition: template
-          value_template: '{{ feature_meta.kind in ["ads","night"] }}'
-        sequence:
-        - action: homeassistant.toggle
-          target:
-            entity_id: '{{ final_targets }}'
-      default:
-      - action: script.labeled_feature_error_mode
-        data:
-          error_mode: '{{ _err_mode }}'
-          source: Labeled Feature Generics
-          message: Feature '{{ _feature }}' does not support the toggle modifier.
-      - if:
-        - condition: template
-          value_template: '{{ _err_mode == "stop" }}'
-        then:
-        - stop: 'Labeled Feature Generics: invalid toggle for ''{{ _feature }}''.'
-          error: true
-    - stop: Toggle path complete.
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "media_toggle" }}'
-      sequence:
-      - action: media_player.media_play_pause
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "media_play" }}'
-      sequence:
-      - action: media_player.media_play
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "media_pause" }}'
-      sequence:
-      - action: media_player.media_pause
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "media_next" }}'
-      sequence:
-      - action: media_player.media_next_track
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "media_previous" }}'
-      sequence:
-      - action: media_player.media_previous_track
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "media_seek_back" }}'
-      sequence:
-      - action: media_player.media_seek
-        target:
-          entity_id: '{{ final_targets | first }}'
-        data:
-          seek_position: "{{ [state_attr(final_targets | first, 'media_position')\n
-            \   | float(0) - 30, 0] | max }}"
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "media_seek_forward" }}'
-      sequence:
-      - action: media_player.media_seek
-        target:
-          entity_id: '{{ final_targets | first }}'
-        data:
-          seek_position: "{{ state_attr(final_targets | first, 'media_position')\n
-            \  | float(0) + 30 }}"
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "volume_up" }}'
-      sequence:
-      - repeat:
-          for_each: '{{ final_targets }}'
-          sequence:
-          - action: media_player.volume_set
-            target:
-              entity_id: '{{ repeat.item }}'
-            data:
-              volume_level: '{{ [(state_attr(repeat.item, ''volume_level'') | float(0))
-                + 0.07, 1.0] | min }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "volume_down" }}'
-      sequence:
-      - repeat:
-          for_each: '{{ final_targets }}'
-          sequence:
-          - action: media_player.volume_set
-            target:
-              entity_id: '{{ repeat.item }}'
-            data:
-              volume_level: '{{ [(state_attr(repeat.item, ''volume_level'') | float(0))
-                - 0.07, 0.0] | max }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "light_on" }}'
-      sequence:
-      - action: light.turn_on
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "light_off" }}'
-      sequence:
-      - action: light.turn_off
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "light_up" }}'
-      sequence:
-      - action: light.turn_on
-        target:
-          entity_id: '{{ final_targets }}'
-        data:
-          brightness_step_pct: 10
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "light_down" }}'
-      sequence:
-      - action: light.turn_on
-        target:
-          entity_id: '{{ final_targets }}'
-        data:
-          brightness_step_pct: -10
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "fan_on" }}'
-      sequence:
-      - action: fan.turn_on
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "fan_off" }}'
-      sequence:
-      - action: fan.turn_off
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "fan_up" }}'
-      sequence:
-      - action: fan.increase_speed
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind == "fan_down" }}'
-      sequence:
-      - action: fan.decrease_speed
-        target:
-          entity_id: '{{ final_targets }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ feature_meta.kind in ["ads","night"] }}'
-      sequence:
-      - action: homeassistant.toggle
-        target:
-          entity_id: '{{ final_targets }}'
-    default:
-    - action: script.labeled_feature_error_mode
-      data:
-        error_mode: '{{ _err_mode }}'
-        source: Labeled Feature Generics
-        message: Unknown feature '{{ _feature }}'.
+        - action: script.labeled_feature_error_mode
+          data:
+            error_mode: '{{ _err_mode }}'
+            source: Labeled Feature Generics
+            message: >-
+              No target entities resolved for feature '{{ _feature }}' in
+              scope '{{ _scope }}' (scope_id={{ scope_id | default('') }}).
+        - if:
+            - condition: template
+              value_template: '{{ _err_mode == "stop" }}'
+          then:
+            - stop: >-
+                Labeled Feature Generics: no targets for '{{ _feature }}'.
+              error: true
+        - stop: 'No targets resolved (handled per error_mode).'
+
+    # ── Step 6: Toggle modifier — short-circuit per-domain ──────────────────
     - if:
-      - condition: template
-        value_template: '{{ _err_mode == "stop" }}'
+        - condition: template
+          value_template: '{{ _toggle }}'
       then:
-      - stop: 'Labeled Feature Generics: unknown feature ''{{ _feature }}''.'
-        error: true
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: '{{ feature_meta.domain == "light" }}'
+              sequence:
+                - action: light.toggle
+                  target:
+                    entity_id: '{{ final_targets }}'
+            - conditions:
+                - condition: template
+                  value_template: '{{ feature_meta.domain == "fan" }}'
+              sequence:
+                - action: fan.toggle
+                  target:
+                    entity_id: '{{ final_targets }}'
+            - conditions:
+                - condition: template
+                  value_template: >-
+                    {{ feature_meta.kind in ['media_toggle','media_play','media_pause'] }}
+              sequence:
+                - action: media_player.media_play_pause
+                  target:
+                    entity_id: '{{ final_targets }}'
+            - conditions:
+                - condition: template
+                  value_template: '{{ feature_meta.kind in ["ads","night"] }}'
+              sequence:
+                - action: homeassistant.toggle
+                  target:
+                    entity_id: '{{ final_targets }}'
+          default:
+            - action: script.labeled_feature_error_mode
+              data:
+                error_mode: '{{ _err_mode }}'
+                source: Labeled Feature Generics
+                message: >-
+                  Feature '{{ _feature }}' does not support the toggle modifier.
+            - if:
+                - condition: template
+                  value_template: '{{ _err_mode == "stop" }}'
+              then:
+                - stop: >-
+                    Labeled Feature Generics: invalid toggle for '{{ _feature }}'.
+                  error: true
+        - stop: 'Toggle path complete.'
+
+    # ── Step 7: Non-toggle dispatch by feature kind ─────────────────────────
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_toggle" }}'
+          sequence:
+            - action: media_player.media_play_pause
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_play" }}'
+          sequence:
+            - action: media_player.media_play
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_pause" }}'
+          sequence:
+            - action: media_player.media_pause
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_next" }}'
+          sequence:
+            - action: media_player.media_next_track
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_previous" }}'
+          sequence:
+            - action: media_player.media_previous_track
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_seek_back" }}'
+          sequence:
+            - action: media_player.media_seek
+              target:
+                entity_id: '{{ final_targets | first }}'
+              data:
+                seek_position: >-
+                  {{ [state_attr(final_targets | first, 'media_position')
+                       | float(0) - 30, 0] | max }}
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "media_seek_forward" }}'
+          sequence:
+            - action: media_player.media_seek
+              target:
+                entity_id: '{{ final_targets | first }}'
+              data:
+                seek_position: >-
+                  {{ state_attr(final_targets | first, 'media_position')
+                       | float(0) + 30 }}
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "volume_up" }}'
+          sequence:
+            - repeat:
+                for_each: '{{ final_targets }}'
+                sequence:
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: '{{ repeat.item }}'
+                    data:
+                      volume_level: >-
+                        {{ [(state_attr(repeat.item, 'volume_level') | float(0))
+                            + 0.07, 1.0] | min }}
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "volume_down" }}'
+          sequence:
+            - repeat:
+                for_each: '{{ final_targets }}'
+                sequence:
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: '{{ repeat.item }}'
+                    data:
+                      volume_level: >-
+                        {{ [(state_attr(repeat.item, 'volume_level') | float(0))
+                            - 0.07, 0.0] | max }}
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_on" }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_off" }}'
+          sequence:
+            - action: light.turn_off
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_up" }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+              data:
+                brightness_step_pct: 10
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "light_down" }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+              data:
+                brightness_step_pct: -10
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_on" }}'
+          sequence:
+            - action: fan.turn_on
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_off" }}'
+          sequence:
+            - action: fan.turn_off
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_up" }}'
+          sequence:
+            - action: fan.increase_speed
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind == "fan_down" }}'
+          sequence:
+            - action: fan.decrease_speed
+              target:
+                entity_id: '{{ final_targets }}'
+        - conditions:
+            - condition: template
+              value_template: '{{ feature_meta.kind in ["ads","night"] }}'
+          sequence:
+            - action: homeassistant.toggle
+              target:
+                entity_id: '{{ final_targets }}'
+      default:
+        - action: script.labeled_feature_error_mode
+          data:
+            error_mode: '{{ _err_mode }}'
+            source: Labeled Feature Generics
+            message: "Unknown feature '{{ _feature }}'."
+        - if:
+            - condition: template
+              value_template: '{{ _err_mode == "stop" }}'
+          then:
+            - stop: "Labeled Feature Generics: unknown feature '{{ _feature }}'."
+              error: true
 labeled_feature_somrig:
   alias: Labeled Feature Somrig
-  description: "Maps IKEA Somrig (and other 2-button) device events into one or more
-    calls to `script.labeled_feature_generics`. Reads the raw button event from the
-    `feature` field (e.g. '1_short_release', '2_double_press'); also accepts `dots_N_*`
-    (IKEA E2123) variants by stripping the 'dots_' prefix.\nOnly canonical \"user
-    did the thing\" events are tracked:\n  *_short_release, *_double_press, *_long_press\nAll
-    other events (initial_press, long_release, etc.) are ignored.\nContextual state:
-    only `media_playing` (computed by inspecting media_player entities in the resolved
-    area) is used to pick between the Playing and Not-Playing branches of the mapping
-    table. Night-mode and sleep-timeout behavior live as their own generic features
-    (`Night`).\nEvent → generic-feature mapping:\n  1_short_release  Playing: Lights
-    Off + Media Pause   Not Playing: Lights Off\n  2_short_release  Playing: Media
-    Pause                Not Playing: Media Play\n  1_double_press   Playing: Media
-    Seek Back            Not Playing: Fan On (toggle:true)\n  2_double_press   Playing:
-    Media Seek Forward         Not Playing: Night\n  1_long_press     Playing: Volume
-    Up                  Not Playing: Lights Up\n  2_long_press     Playing: Volume
-    Down                Not Playing: Ads\n"
+  description: >
+    Maps IKEA Somrig (and other 2-button) device events into one or more calls
+    to `script.labeled_feature_generics`. Reads the raw button event from the
+    `feature` field (e.g. '1_short_release', '2_double_press'); also accepts
+    `dots_N_*` (IKEA E2123) variants by stripping the 'dots_' prefix.
+
+    Only canonical "user did the thing" events are tracked:
+      *_short_release, *_double_press, *_long_press
+    All other events (initial_press, long_release, etc.) are ignored.
+
+    Contextual state: only `media_playing` (computed by inspecting
+    media_player entities in the resolved area) is used to pick between the
+    Playing and Not-Playing branches of the mapping table. Night-mode and
+    sleep-timeout behavior live as their own generic features (`Night`).
+
+    Event → generic-feature mapping:
+      1_short_release  Playing: Lights Off + Media Pause   Not Playing: Lights Off
+      2_short_release  Playing: Media Pause                Not Playing: Media Play
+      1_double_press   Playing: Media Seek Back            Not Playing: Fan On (toggle:true)
+      2_double_press   Playing: Media Seek Forward         Not Playing: Night
+      1_long_press     Playing: Volume Up                  Not Playing: Lights Up
+      2_long_press     Playing: Volume Down                Not Playing: Ads
   mode: parallel
   max: 50
   fields:
     feature:
       name: Feature (Button Event)
-      description: 'The raw button event string from the button entity, e.g. ''1_short_release'',
-        ''2_double_press'', ''1_long_press'', or the ''dots_''-prefixed variants for
-        IKEA E2123.
-
-        '
+      description: >
+        The raw button event string from the button entity, e.g.
+        '1_short_release', '2_double_press', '1_long_press', or the
+        'dots_'-prefixed variants for IKEA E2123.
       required: true
       selector:
         select:
           custom_value: true
           options:
-          - 1_short_release
-          - 1_double_press
-          - 1_long_press
-          - 2_short_release
-          - 2_double_press
-          - 2_long_press
-          - dots_1_short_release
-          - dots_1_double_press
-          - dots_1_long_press
-          - dots_2_short_release
-          - dots_2_double_press
-          - dots_2_long_press
+            - 1_short_release
+            - 1_double_press
+            - 1_long_press
+            - 2_short_release
+            - 2_double_press
+            - 2_long_press
+            - dots_1_short_release
+            - dots_1_double_press
+            - dots_1_long_press
+            - dots_2_short_release
+            - dots_2_double_press
+            - dots_2_long_press
     follower_entity_id:
       name: Follower Entity ID
       description: Used for area lookup. Passed automatically by labeled_feature_follower.
@@ -3844,24 +3871,22 @@ labeled_feature_somrig:
         boolean: {}
     leader_feature:
       name: Leader Feature Name
-      description: 'The leader''s labeled feature name (e.g. ''Night Buttons''), passed
-        by the leader automation alongside `feature`. Used for Exclude resolution:
-        entities labeled `(Area |Floor |)<leader_feature> Exclude: True` are excluded
-        from both the `media_playing` evaluation and every downstream labeled_feature_generics
-        call dispatched from here.
-
-        '
+      description: >
+        The leader's labeled feature name (e.g. 'Night Buttons'), passed by the
+        leader automation alongside `feature`. Used for Exclude resolution:
+        entities labeled `(Area |Floor |)<leader_feature> Exclude: True` are
+        excluded from both the `media_playing` evaluation and every downstream
+        labeled_feature_generics call dispatched from here.
       required: false
       default: ''
       selector:
         text: {}
     toggle:
       name: Toggle
-      description: 'Pass-through toggle flag from the leader. Forwarded to every labeled_feature_generics
-        call. The 1_double_press Not-Playing branch always overrides this with toggle:true
-        (fan toggle).
-
-        '
+      description: >
+        Pass-through toggle flag from the leader. Forwarded to every
+        labeled_feature_generics call. The 1_double_press Not-Playing
+        branch always overrides this with toggle:true (fan toggle).
       required: false
       default: false
       selector:
@@ -3874,9 +3899,9 @@ labeled_feature_somrig:
       selector:
         select:
           options:
-          - area
-          - floor
-          - none
+            - area
+            - floor
+            - none
     scope_id:
       name: Scope ID
       description: The resolved area_id or floor_id passed by the automation.
@@ -3893,10 +3918,10 @@ labeled_feature_somrig:
         select:
           custom_value: true
           options:
-          - silent
-          - log
-          - alert
-          - stop
+            - silent
+            - log
+            - alert
+            - stop
   sequence:
     # ── Step 1: Resolve scope + scope entity set + Exclude set ──────────────
     - variables:
@@ -4031,74 +4056,29 @@ labeled_feature_somrig:
         # ────────────── 1_short_release ──────────────
         - conditions:
             - condition: template
-              value_template: '{{ states(leader_entity_id) == _leader_initial_state
-                }}'
-            - condition: template
-              value_template: '{{ repeat.index <= 200 }}'
-            sequence:
-            - variables:
-                _tick_start: '{{ as_timestamp(now()) }}'
-            - action: script.turn_on
-              target:
-                entity_id: script.labeled_feature_generics
-              data:
-                variables:
-                  feature: '{{ _long_press_feature }}'
-                  exclude_feature: '{{ _leader_feature }}'
-                  scope: '{{ _scope }}'
-                  scope_id: '{{ scope_id | default("") }}'
-                  follower_entity_id: '{{ follower_entity_id | default("") }}'
-                  leader_entity_id: '{{ leader_entity_id | default("") }}'
-                  leader_enabled: '{{ leader_enabled | default(true) }}'
-                  toggle: '{{ _toggle_in }}'
-                  error_mode: '{{ _err_mode }}'
-            - delay:
-                milliseconds: '{{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000))
-                  | int, 50] | max }}'
-        else:
-        - action: script.labeled_feature_generics
-          data:
-            feature: '{{ _long_press_feature }}'
-            exclude_feature: '{{ _leader_feature }}'
-            scope: '{{ _scope }}'
-            scope_id: '{{ scope_id | default("") }}'
-            follower_entity_id: '{{ follower_entity_id | default("") }}'
-            leader_entity_id: '{{ leader_entity_id | default("") }}'
-            leader_enabled: '{{ leader_enabled | default(true) }}'
-            toggle: '{{ _toggle_in }}'
-            error_mode: '{{ _err_mode }}'
-    - conditions:
-      - condition: template
-        value_template: '{{ mapped_event == "2_long_press" }}'
-      sequence:
-      - if:
-        - condition: template
-          value_template: '{{ media_playing }}'
-        then:
-        - variables:
-            _leader_initial_state: '{{ states(leader_entity_id) if (leader_entity_id
-              is defined and leader_entity_id != "") else "" }}'
-        - if:
-          - condition: template
-            value_template: '{{ leader_entity_id is defined and leader_entity_id !=
-              "" }}'
-          then:
-          - repeat:
-              while:
-              - condition: template
-                value_template: '{{ states(leader_entity_id) == _leader_initial_state
-                  }}'
-              - condition: template
-                value_template: '{{ repeat.index <= 200 }}'
-              sequence:
-              - variables:
-                  _tick_start: '{{ as_timestamp(now()) }}'
-              - action: script.turn_on
-                target:
-                  entity_id: script.labeled_feature_generics
-                data:
-                  variables:
-                    feature: Volume Down
+              value_template: '{{ mapped_event == "1_short_release" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Lights Off
+                    exclude_feature: '{{ _leader_feature }}'
+                    # Lights Off is intentionally forced to the leader's floor
+                    # so a single button press clears every light on the floor,
+                    # regardless of which area the button itself lives in.
+                    scope: floor
+                    scope_id: '{{ _resolved_floor_id }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Media Pause
                     exclude_feature: '{{ _leader_feature }}'
                     scope: '{{ _scope }}'
                     scope_id: '{{ scope_id | default("") }}'
@@ -4107,33 +4087,230 @@ labeled_feature_somrig:
                     leader_enabled: '{{ leader_enabled | default(true) }}'
                     toggle: '{{ _toggle_in }}'
                     error_mode: '{{ _err_mode }}'
-              - delay:
-                  milliseconds: '{{ [(500 - ((as_timestamp(now()) - _tick_start) *
-                    1000)) | int, 50] | max }}'
-          else:
-          - action: script.labeled_feature_generics
-            data:
-              feature: Volume Down
-              exclude_feature: '{{ _leader_feature }}'
-              scope: '{{ _scope }}'
-              scope_id: '{{ scope_id | default("") }}'
-              follower_entity_id: '{{ follower_entity_id | default("") }}'
-              leader_entity_id: '{{ leader_entity_id | default("") }}'
-              leader_enabled: '{{ leader_enabled | default(true) }}'
-              toggle: '{{ _toggle_in }}'
-              error_mode: '{{ _err_mode }}'
-        else:
-        - action: script.labeled_feature_generics
-          data:
-            feature: Ads
-            exclude_feature: '{{ _leader_feature }}'
-            scope: '{{ _scope }}'
-            scope_id: '{{ scope_id | default("") }}'
-            follower_entity_id: '{{ follower_entity_id | default("") }}'
-            leader_entity_id: '{{ leader_entity_id | default("") }}'
-            leader_enabled: '{{ leader_enabled | default(true) }}'
-            toggle: '{{ _toggle_in }}'
-            error_mode: '{{ _err_mode }}'
+              else:
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Lights Off
+                    exclude_feature: '{{ _leader_feature }}'
+                    # See note above: Lights Off always operates at the floor scope.
+                    scope: floor
+                    scope_id: '{{ _resolved_floor_id }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
+
+        # ────────────── 2_short_release ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "2_short_release" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Media Pause" if media_playing else "Media Play" }}'
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── 1_double_press ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "1_double_press" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Media Seek Back
+                    exclude_feature: '{{ _leader_feature }}'
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
+              else:
+                # Fan toggle: force toggle:true regardless of caller-passed value
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Fan On
+                    exclude_feature: '{{ _leader_feature }}'
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: true
+                    error_mode: '{{ _err_mode }}'
+
+        # ────────────── 2_double_press ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "2_double_press" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Media Seek Forward" if media_playing else "Night" }}'
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── 1_long_press ──────────────
+        # Repeats the stepping action every 300ms until the leader entity's
+        # state changes (i.e. user releases or presses something else), with a
+        # safety cap. If leader_entity_id is missing we fall back to a single
+        # dispatch so this still does something when called manually.
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "1_long_press" }}'
+          sequence:
+            - variables:
+                _long_press_feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
+                _leader_initial_state: >-
+                  {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
+            - if:
+                - condition: template
+                  value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
+              then:
+                - repeat:
+                    # Safety cap: ~60s of held button at 300ms cadence.
+                    while:
+                      - condition: template
+                        value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
+                      - condition: template
+                        value_template: '{{ repeat.index <= 200 }}'
+                    sequence:
+                      # Self-correcting tick: budget 500ms wall-clock per
+                      # iteration. We measure how long the dispatch took and
+                      # subtract that from the delay (with a 50ms floor so the
+                      # while: still gets a real yield to re-check the leader
+                      # state). This makes the visible step cadence consistent
+                      # even when the underlying media_player / light service
+                      # call latency varies.
+                      # Fire-and-forget dispatch via script.turn_on: returns
+                      # immediately so the loop's wall-clock cadence is
+                      # independent of how long the underlying media_player /
+                      # light service call takes. Inner error handling inside
+                      # labeled_feature_generics (Error Mode logging/alerts)
+                      # still applies; only error *propagation* back to this
+                      # loop is dropped.
+                      - variables:
+                          _tick_start: '{{ as_timestamp(now()) }}'
+                      - action: script.turn_on
+                        target:
+                          entity_id: script.labeled_feature_generics
+                        data:
+                          variables:
+                            feature: '{{ _long_press_feature }}'
+                            exclude_feature: '{{ _leader_feature }}'
+                            scope: '{{ _scope }}'
+                            scope_id: '{{ scope_id | default("") }}'
+                            follower_entity_id: '{{ follower_entity_id | default("") }}'
+                            leader_entity_id: '{{ leader_entity_id | default("") }}'
+                            leader_enabled: '{{ leader_enabled | default(true) }}'
+                            toggle: '{{ _toggle_in }}'
+                            error_mode: '{{ _err_mode }}'
+                      - delay:
+                          milliseconds: >-
+                            {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
+              else:
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: '{{ _long_press_feature }}'
+                    exclude_feature: '{{ _leader_feature }}'
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
+
+        # ────────────── 2_long_press ──────────────
+        # Playing (Volume Down) repeats every 300ms with the same safety guard
+        # described above. Not-Playing (Ads) is a toggle, fires once.
+        - conditions:
+            - condition: template
+              value_template: '{{ mapped_event == "2_long_press" }}'
+          sequence:
+            - if:
+                - condition: template
+                  value_template: '{{ media_playing }}'
+              then:
+                - variables:
+                    _leader_initial_state: >-
+                      {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
+                - if:
+                    - condition: template
+                      value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
+                  then:
+                    - repeat:
+                        while:
+                          - condition: template
+                            value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
+                          - condition: template
+                            value_template: '{{ repeat.index <= 200 }}'
+                        sequence:
+                          # Fire-and-forget dispatch — see note in 1_long_press
+                          # branch. Targets 500ms wall-clock per step.
+                          - variables:
+                              _tick_start: '{{ as_timestamp(now()) }}'
+                          - action: script.turn_on
+                            target:
+                              entity_id: script.labeled_feature_generics
+                            data:
+                              variables:
+                                feature: Volume Down
+                                exclude_feature: '{{ _leader_feature }}'
+                                scope: '{{ _scope }}'
+                                scope_id: '{{ scope_id | default("") }}'
+                                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                                leader_enabled: '{{ leader_enabled | default(true) }}'
+                                toggle: '{{ _toggle_in }}'
+                                error_mode: '{{ _err_mode }}'
+                          - delay:
+                              milliseconds: >-
+                                {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
+                  else:
+                    - action: script.labeled_feature_generics
+                      data:
+                        feature: Volume Down
+                        exclude_feature: '{{ _leader_feature }}'
+                        scope: '{{ _scope }}'
+                        scope_id: '{{ scope_id | default("") }}'
+                        follower_entity_id: '{{ follower_entity_id | default("") }}'
+                        leader_entity_id: '{{ leader_entity_id | default("") }}'
+                        leader_enabled: '{{ leader_enabled | default(true) }}'
+                        toggle: '{{ _toggle_in }}'
+                        error_mode: '{{ _err_mode }}'
+              else:
+                # Ads — toggle, fires once
+                - action: script.labeled_feature_generics
+                  data:
+                    feature: Ads
+                    exclude_feature: '{{ _leader_feature }}'
+                    scope: '{{ _scope }}'
+                    scope_id: '{{ scope_id | default("") }}'
+                    follower_entity_id: '{{ follower_entity_id | default("") }}'
+                    leader_entity_id: '{{ leader_entity_id | default("") }}'
+                    leader_enabled: '{{ leader_enabled | default(true) }}'
+                    toggle: '{{ _toggle_in }}'
+                    error_mode: '{{ _err_mode }}'
 labeled_feature_entities:
   alias: Labeled Feature Entities
   description: >
