@@ -3238,17 +3238,27 @@ labeled_feature_generics:
     Per-feature resolution algorithm:
       1. Build scope_entity_set from scope/scope_id (area/floor) or fall back
          to follower_entity_id / leader_entity_id area lookup.
-      2. label_targets = entities labeled `(Area |Floor |)Follower: <Feature>`
-         UNION entities labeled `(Area |Floor |)Provides: <Category>` where
-         <Category> is any provider in `sensor.labeled_features_state.providers`
-         whose `features` list contains <Feature>. The provider catalog is the
-         single source of truth for which features each `Provides:` category
-         opts an entity into (see configuration.yaml). The union is then
-         intersected with scope_entity_set.
-      3. excluded = entities labeled `<scope-prefix><Feature> Exclude: True`
-         OR `<scope-prefix>Provides <Category> Exclude: True` for any
-         matching <Category>. Exclude works against both Follower- and
-         Provides-derived membership.
+      2. label_targets is the union of two `resolve_provides()` calls
+         intersected with scope_entity_set:
+           (a) resolve_provides(<Feature>, scope_prefix)
+           (b) resolve_provides(<domain_label>, scope_prefix) when the
+               feature has a `domain_label` in feature_meta (e.g.
+               `Media Player` for media_player-domain features, `Light` for
+               light, `Fan` for fan). This is what makes
+               `Area Provides: Media Player` opt every player in the area
+               into all media-player features without per-feature labels.
+         resolve_provides(label, scope_prefix) tries 4 candidates in order
+         and returns the first non-empty result:
+           1. label                                  (exact, global)
+           2. <scope_prefix>Provides: <label>        (scoped if prefixed)
+           3. <scope_prefix>Follower: <label>        (scoped if prefixed)
+           4. <scope_prefix>Leader: <label>          (scoped if prefixed)
+         The exact (step 1) match is never scope-filtered. The scoped
+         candidates (2-4) are filtered to scope_entity_set when
+         scope_prefix is non-empty.
+      3. excluded = entities labeled `<Feature> Exclude: True` OR
+         `<scope-prefix><Feature> Exclude: True` (and the same pair for
+         <domain_label> if defined).
       4. If (label_targets - excluded) is non-empty → use it.
       5. Else fallback to entities in scope_entity_set whose domain matches
          the feature's default domain, minus excluded.
@@ -3378,22 +3388,6 @@ labeled_feature_generics:
         _scope: '{{ (scope | default("area") | lower) }}'
         _toggle: '{{ (toggle | default(false)) | bool(false) }}'
         _err_mode: '{{ (error_mode | default("log") | lower) }}'
-        # Entity-context provider catalog from sensor.labeled_features_state.
-        # Used to resolve which `(Area |Floor |)Provides: <Category>` labels
-        # implicitly opt an entity into this feature.
-        _providers: >-
-          {{ state_attr('sensor.labeled_features_state', 'providers') | default({}) }}
-        # All provider category names whose `features` list includes this
-        # feature.  An entity is a `Provides:`-derived target for this feature
-        # if it carries any matching `(scope-prefix)Provides: <Category>` label.
-        _matching_providers: >-
-          {% set ns = namespace(names=[]) %}
-          {% for pname, pdata in (state_attr('sensor.labeled_features_state', 'providers') | default({})).items() %}
-            {% if (feature | trim) in (pdata.get('features', []) | list) %}
-              {% set ns.names = ns.names + [pname] %}
-            {% endif %}
-          {% endfor %}
-          {{ ns.names }}
         _resolved_area_id: >-
           {%- if _scope == 'area' and scope_id is defined and scope_id != '' -%}
             {{ scope_id }}
@@ -3449,97 +3443,109 @@ labeled_feature_generics:
           {% endif %}
         scope_prefix: >-
           {{ 'Area ' if _scope == 'area' else ('Floor ' if _scope == 'floor' else '') }}
-        follower_label: >-
-          {{ ('Area Follower: ' if _scope == 'area' else
-              ('Floor Follower: ' if _scope == 'floor' else 'Follower: ')) ~ _feature }}
         exclude_label: '{{ _exclude_feature ~ " Exclude: True" }}'
         scoped_exclude_label: >-
           {{ (('Area ' if _scope == 'area' else
                ('Floor ' if _scope == 'floor' else '')) ~ _exclude_feature) ~ " Exclude: True" }}
 
-    # ── Step 2: Label-based + Provides-based + Exclude resolution ──────────
-    # `label_targets` is the union of two membership sources:
-    #   (a) explicit `(Area |Floor |)Follower: <Feature>` labels (precise opt-in)
-    #   (b) implicit `(Area |Floor |)Provides: <Category>` labels for every
-    #       provider category whose `features` list includes this feature
-    #       (catalog source: sensor.labeled_features_state.providers)
-    # Exclude is keyed on the (caller-overridable) feature name with both bare
-    # and scope-prefixed variants, AND on each matching provider category with
-    # both bare and scope-prefixed variants — so a single
-    # `Area Provides Media Player Exclude: True` label opts an entity out of
-    # every media-player generic feature dispatched into the area.
-    - variables:
-        _label_targets_raw: >-
-          {% set all_f = label_entities(follower_label) | list %}
-          {% if scope_entity_set | length > 0 %}
-            {{ all_f | select('in', scope_entity_set) | list }}
-          {% else %}
-            {{ all_f }}
-          {% endif %}
-        _provides_targets_raw: >-
-          {% set ns = namespace(ents=[]) %}
-          {% for pname in _matching_providers %}
-            {% set bare_lbl = 'Provides: ' ~ pname %}
-            {% set scoped_lbl = (('Area ' if _scope == 'area' else
-                                   ('Floor ' if _scope == 'floor' else ''))
-                                  ~ 'Provides: ' ~ pname) %}
-            {% set ns.ents = ns.ents
-                + (label_entities(bare_lbl) | list)
-                + (label_entities(scoped_lbl) | list) %}
-          {% endfor %}
-          {% set _uniq = ns.ents | unique | list %}
-          {% if scope_entity_set | length > 0 %}
-            {{ _uniq | select('in', scope_entity_set) | list }}
-          {% else %}
-            {{ _uniq }}
-          {% endif %}
-        _provides_excluded: >-
-          {% set ns = namespace(ents=[]) %}
-          {% for pname in _matching_providers %}
-            {% set bare_excl = 'Provides ' ~ pname ~ ' Exclude: True' %}
-            {% set scoped_excl = (('Area ' if _scope == 'area' else
-                                    ('Floor ' if _scope == 'floor' else ''))
-                                   ~ 'Provides ' ~ pname ~ ' Exclude: True') %}
-            {% set ns.ents = ns.ents
-                + (label_entities(bare_excl) | list)
-                + (label_entities(scoped_excl) | list) %}
-          {% endfor %}
-          {{ ns.ents | unique | list }}
-        _excluded: >-
-          {% set unscoped = label_entities(exclude_label) | list %}
-          {% set scoped = label_entities(scoped_exclude_label) | list %}
-          {{ (unscoped + scoped + _provides_excluded) | unique | list }}
-        label_targets: >-
-          {{ (_label_targets_raw + _provides_targets_raw)
-             | unique
-             | reject('in', _excluded)
-             | list }}
-
     # ── Step 3: Feature metadata (domain fallback + selected action) ────────
+    # `domain_label` is the human-readable provider grouping for this
+    # feature's domain. Used by the resolver below to also union in
+    # `(scope_prefix)Provides: <domain_label>`-style declarations so a
+    # single area-level label opts every domain-matching entity in the
+    # scope into every feature for that domain.
     - variables:
         feature_meta: >-
           {% set m = {
-            'Media Toggle':         {'domain': 'media_player', 'kind': 'media_toggle'},
-            'Media Play':           {'domain': 'media_player', 'kind': 'media_play'},
-            'Media Pause':          {'domain': 'media_player', 'kind': 'media_pause'},
-            'Media Next':           {'domain': 'media_player', 'kind': 'media_next'},
-            'Media Previous':       {'domain': 'media_player', 'kind': 'media_previous'},
-            'Media Seek Back':      {'domain': 'media_player', 'kind': 'media_seek_back'},
-            'Media Seek Forward':   {'domain': 'media_player', 'kind': 'media_seek_forward'},
-            'Volume Up':            {'domain': 'media_player', 'kind': 'volume_up'},
-            'Volume Down':          {'domain': 'media_player', 'kind': 'volume_down'},
-            'Lights On':            {'domain': 'light',        'kind': 'light_on'},
-            'Lights Off':           {'domain': 'light',        'kind': 'light_off'},
-            'Lights Up':            {'domain': 'light',        'kind': 'light_up'},
-            'Lights Down':          {'domain': 'light',        'kind': 'light_down'},
-            'Fan On':               {'domain': 'fan',          'kind': 'fan_on'},
-            'Fan Off':              {'domain': 'fan',          'kind': 'fan_off'},
-            'Fan Up':               {'domain': 'fan',          'kind': 'fan_up'},
-            'Fan Down':             {'domain': 'fan',          'kind': 'fan_down'},
-            'Ads':                  {'domain': '',             'kind': 'ads'},
-            'Night':                {'domain': '',             'kind': 'night'}
+            'Media Toggle':         {'domain': 'media_player', 'kind': 'media_toggle',       'domain_label': 'Media Player'},
+            'Media Play':           {'domain': 'media_player', 'kind': 'media_play',         'domain_label': 'Media Player'},
+            'Media Pause':          {'domain': 'media_player', 'kind': 'media_pause',        'domain_label': 'Media Player'},
+            'Media Next':           {'domain': 'media_player', 'kind': 'media_next',         'domain_label': 'Media Player'},
+            'Media Previous':       {'domain': 'media_player', 'kind': 'media_previous',     'domain_label': 'Media Player'},
+            'Media Seek Back':      {'domain': 'media_player', 'kind': 'media_seek_back',    'domain_label': 'Media Player'},
+            'Media Seek Forward':   {'domain': 'media_player', 'kind': 'media_seek_forward', 'domain_label': 'Media Player'},
+            'Volume Up':            {'domain': 'media_player', 'kind': 'volume_up',          'domain_label': 'Media Player'},
+            'Volume Down':          {'domain': 'media_player', 'kind': 'volume_down',        'domain_label': 'Media Player'},
+            'Lights On':            {'domain': 'light',        'kind': 'light_on',           'domain_label': 'Light'},
+            'Lights Off':           {'domain': 'light',        'kind': 'light_off',          'domain_label': 'Light'},
+            'Lights Up':            {'domain': 'light',        'kind': 'light_up',           'domain_label': 'Light'},
+            'Lights Down':          {'domain': 'light',        'kind': 'light_down',         'domain_label': 'Light'},
+            'Fan On':               {'domain': 'fan',          'kind': 'fan_on',             'domain_label': 'Fan'},
+            'Fan Off':              {'domain': 'fan',          'kind': 'fan_off',            'domain_label': 'Fan'},
+            'Fan Up':               {'domain': 'fan',          'kind': 'fan_up',             'domain_label': 'Fan'},
+            'Fan Down':             {'domain': 'fan',          'kind': 'fan_down',           'domain_label': 'Fan'},
+            'Ads':                  {'domain': '',             'kind': 'ads',                'domain_label': ''},
+            'Night':                {'domain': '',             'kind': 'night',              'domain_label': ''}
           } %}
-          {{ m.get(_feature, {'domain': '', 'kind': 'unknown'}) }}
+          {{ m.get(_feature, {'domain': '', 'kind': 'unknown', 'domain_label': ''}) }}
+
+    # ── Step 2 (post-meta): Provides resolver — label-based target union ────
+    # For each label name (the feature itself, plus the feature's
+    # domain_label when defined) we try four candidates in order and use
+    # the first non-empty result:
+    #   1. <label>                              (exact, never scope-filtered)
+    #   2. <scope_prefix>Provides: <label>      (scope-filtered when prefixed)
+    #   3. <scope_prefix>Follower: <label>      (scope-filtered when prefixed)
+    #   4. <scope_prefix>Leader: <label>        (scope-filtered when prefixed)
+    # The results from the two resolver calls are unioned and de-excluded.
+    - variables:
+        _feature_resolved: >-
+          {% set ns = namespace(out=[]) %}
+          {% set candidates = [
+            _feature,
+            scope_prefix ~ 'Provides: ' ~ _feature,
+            scope_prefix ~ 'Follower: ' ~ _feature,
+            scope_prefix ~ 'Leader: '   ~ _feature
+          ] %}
+          {% for c in candidates %}
+            {% if ns.out | length == 0 %}
+              {% set ents = label_entities(c) | list %}
+              {% if scope_prefix != '' and c != _feature and scope_entity_set | length > 0 %}
+                {% set ents = ents | select('in', scope_entity_set) | list %}
+              {% endif %}
+              {% if ents | length > 0 %}{% set ns.out = ents %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.out }}
+        _domain_label_resolved: >-
+          {% set dl = feature_meta.domain_label | default('') %}
+          {% if dl == '' %}
+            {{ [] }}
+          {% else %}
+            {% set ns = namespace(out=[]) %}
+            {% set candidates = [
+              dl,
+              scope_prefix ~ 'Provides: ' ~ dl,
+              scope_prefix ~ 'Follower: ' ~ dl,
+              scope_prefix ~ 'Leader: '   ~ dl
+            ] %}
+            {% for c in candidates %}
+              {% if ns.out | length == 0 %}
+                {% set ents = label_entities(c) | list %}
+                {% if scope_prefix != '' and c != dl and scope_entity_set | length > 0 %}
+                  {% set ents = ents | select('in', scope_entity_set) | list %}
+                {% endif %}
+                {% if ents | length > 0 %}{% set ns.out = ents %}{% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.out }}
+          {% endif %}
+        _excluded: >-
+          {% set dl = feature_meta.domain_label | default('') %}
+          {% set unscoped_f = label_entities(exclude_label) | list %}
+          {% set scoped_f = label_entities(scoped_exclude_label) | list %}
+          {% set dl_excl = [] %}
+          {% if dl != '' %}
+            {% set bare_dl = dl ~ ' Exclude: True' %}
+            {% set scoped_dl = scope_prefix ~ dl ~ ' Exclude: True' %}
+            {% set dl_excl = (label_entities(bare_dl) | list) + (label_entities(scoped_dl) | list) %}
+          {% endif %}
+          {{ (unscoped_f + scoped_f + dl_excl) | unique | list }}
+        label_targets: >-
+          {{ (_feature_resolved + _domain_label_resolved)
+             | unique
+             | reject('in', _excluded)
+             | list }}
 
     # ── Step 4: Resolve final target set (label-first, then domain fallback) ─
     - variables:
@@ -4007,22 +4013,37 @@ labeled_feature_somrig:
               {{ all_excl }}
             {% endif %}
           {% endif %}
-        # Media-player candidates for the `media_playing` evaluation. The set
-        # is the union of:
-        #   (a) media_player entities in scope_entity_set (area / floor)
-        #   (b) entities labeled `(Area |Floor |)Provides: Media Player`
-        #       intersected with scope_entity_set
-        # Excluded entities (per the leader's feature) are removed first. The
-        # provider-side union catches grouped speakers that may live outside
-        # the resolved area's entity set but are still wired in via Provides.
-        _media_provider_label_scoped: >-
-          {{ (('Area ' if _scope == 'area' else
-               ('Floor ' if _scope == 'floor' else ''))) ~ 'Provides: Media Player' }}
-        _media_provider_label_bare: 'Provides: Media Player'
-        _media_provider_entities: >-
-          {{ (label_entities(_media_provider_label_scoped) | list
-              + label_entities(_media_provider_label_bare) | list)
-             | unique | list }}
+        # Media-player candidates for the `media_playing` evaluation. Uses
+        # the same 4-step Provides resolver as labeled_feature_generics with
+        # the literal label `Media Player`:
+        #   1. exact `Media Player` (global, no scope filter)
+        #   2. `<scope_prefix>Provides: Media Player` (scoped)
+        #   3. `<scope_prefix>Follower: Media Player` (scoped)
+        #   4. `<scope_prefix>Leader: Media Player`   (scoped)
+        # First non-empty result is used.  Then unioned with media_player-
+        # domain entities in scope_entity_set, minus excluded_entities, to
+        # form the final candidate set the playing-state check runs over.
+        _scope_prefix_str: >-
+          {{ 'Area ' if _scope == 'area' else ('Floor ' if _scope == 'floor' else '') }}
+        _media_provider_resolved: >-
+          {% set _label = 'Media Player' %}
+          {% set ns = namespace(out=[]) %}
+          {% set candidates = [
+            _label,
+            _scope_prefix_str ~ 'Provides: ' ~ _label,
+            _scope_prefix_str ~ 'Follower: ' ~ _label,
+            _scope_prefix_str ~ 'Leader: '   ~ _label
+          ] %}
+          {% for c in candidates %}
+            {% if ns.out | length == 0 %}
+              {% set ents = label_entities(c) | list %}
+              {% if _scope_prefix_str != '' and c != _label and scope_entity_set | length > 0 %}
+                {% set ents = ents | select('in', scope_entity_set) | list %}
+              {% endif %}
+              {% if ents | length > 0 %}{% set ns.out = ents %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.out }}
         media_playing: >-
           {% set mp_in_scope = states.media_player
                | rejectattr('entity_id', 'in', excluded_entities)
@@ -4030,7 +4051,7 @@ labeled_feature_somrig:
           {% set mp_in_scope_ids = mp_in_scope | map(attribute='entity_id') | list %}
           {% if scope_entity_set | length > 0 %}
             {% set candidate_ids = (mp_in_scope_ids | select('in', scope_entity_set) | list)
-                                   + (_media_provider_entities | select('in', scope_entity_set) | list) %}
+                                   + (_media_provider_resolved | select('in', scope_entity_set) | list) %}
             {{ mp_in_scope
                | selectattr('entity_id', 'in', candidate_ids | unique | list)
                | selectattr('state', 'in', ['playing', 'buffering'])
@@ -4038,7 +4059,7 @@ labeled_feature_somrig:
           {% elif _resolved_area_id != '' %}
             {% set area_ids = area_entities(_resolved_area_id) %}
             {% set candidate_ids = (mp_in_scope_ids | select('in', area_ids) | list)
-                                   + (_media_provider_entities | select('in', area_ids) | list) %}
+                                   + (_media_provider_resolved | select('in', area_ids) | list) %}
             {{ mp_in_scope
                | selectattr('entity_id', 'in', candidate_ids | unique | list)
                | selectattr('state', 'in', ['playing', 'buffering'])
@@ -5065,9 +5086,15 @@ labeled_feature_area:
                 error_mode: '{{ _err_mode }}'
 
         # ────────────────────── Generic Provides: <F> (default → select) ─────
-        # Entity option-pool label keywords accept either `Provides` (preferred)
-        # or `Gen` (legacy) during the compat window — the regex group
-        # `(Gen|Provides)` covers both forms.
+        # Pool resolution uses the same 4-step Provides resolver as
+        # labeled_feature_generics:
+        #   1. <_feature>                                  (exact, global)
+        #   2. <scope_prefix>Provides: <_feature>          (scoped)
+        #   3. <scope_prefix>Follower: <_feature>          (scoped)
+        #   4. <scope_prefix>Leader: <_feature>            (scoped)
+        # First non-empty candidate wins.  Excludes are `<_feature> Exclude: True`
+        # and `<scope_prefix><_feature> Exclude: True`.  Per-entity display-label
+        # override is `<scope_prefix>Provides Option <_feature>: <Custom>`.
         - conditions:
             - condition: template
               value_template: '{{ _fd.get("component", "select") == "select" }}'
@@ -5075,61 +5102,44 @@ labeled_feature_area:
             - variables:
                 _fslug: '{{ _feature | lower | replace(" ", "_") | replace("-", "_") }}'
                 _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_" ~ _fslug) }}'
-                # Pool: entities labeled
-                # `<scope-prefix>(Provides|Gen) Option: <F>` in scope.
-                # Both `Provides Option:` (preferred) and `Gen Option:` (legacy)
-                # are recognized during the compat window.
-                _opt_label_scoped_provides: '{{ _scope_prefix ~ "Provides Option: " ~ _feature }}'
-                _opt_label_bare_provides:   '{{ "Provides Option: " ~ _feature }}'
-                _opt_label_scoped_gen:      '{{ _scope_prefix ~ "Gen Option: " ~ _feature }}'
-                _opt_label_bare_gen:        '{{ "Gen Option: " ~ _feature }}'
-                _exclude_label_scoped_provides: '{{ _scope_prefix ~ "Provides " ~ _feature ~ " Exclude: True" }}'
-                _exclude_label_bare_provides:   '{{ "Provides " ~ _feature ~ " Exclude: True" }}'
-                _exclude_label_scoped_gen:      '{{ _scope_prefix ~ "Gen " ~ _feature ~ " Exclude: True" }}'
-                _exclude_label_bare_gen:        '{{ "Gen " ~ _feature ~ " Exclude: True" }}'
-                _opt_ents_scoped: >-
-                  {{ (label_entities(_opt_label_scoped_provides) | list
-                      + label_entities(_opt_label_scoped_gen) | list)
-                     | unique | list }}
-                _opt_ents_bare: >-
-                  {{ (label_entities(_opt_label_bare_provides) | list
-                      + label_entities(_opt_label_bare_gen) | list)
-                     | unique | list }}
-                _all_opt_ents_raw: '{{ (_opt_ents_scoped + (_opt_ents_bare if _scope == "none" else [])) | unique | list }}'
+                _exclude_label_bare:   '{{ _feature ~ " Exclude: True" }}'
+                _exclude_label_scoped: '{{ _scope_prefix ~ _feature ~ " Exclude: True" }}'
                 _excluded_ents: >-
-                  {{ (label_entities(_exclude_label_scoped_provides) | list
-                      + label_entities(_exclude_label_bare_provides) | list
-                      + label_entities(_exclude_label_scoped_gen) | list
-                      + label_entities(_exclude_label_bare_gen) | list)
+                  {{ (label_entities(_exclude_label_bare) | list
+                      + label_entities(_exclude_label_scoped) | list)
                      | unique | list }}
-                _opt_ents_in_scope: >-
-                  {% if _scope == 'none' %}
-                    {{ _all_opt_ents_raw | reject('in', _excluded_ents) | list }}
-                  {% else %}
-                    {{ _all_opt_ents_raw
-                       | select('in', scope_entity_set)
-                       | reject('in', _excluded_ents)
-                       | list }}
-                  {% endif %}
+                _resolved_pool: >-
+                  {% set ns = namespace(out=[]) %}
+                  {% set candidates = [
+                    _feature,
+                    _scope_prefix ~ 'Provides: ' ~ _feature,
+                    _scope_prefix ~ 'Follower: ' ~ _feature,
+                    _scope_prefix ~ 'Leader: '   ~ _feature
+                  ] %}
+                  {% for c in candidates %}
+                    {% if ns.out | length == 0 %}
+                      {% set ents = label_entities(c) | list %}
+                      {% if _scope_prefix != '' and c != _feature and scope_entity_set | length > 0 and _scope != 'none' %}
+                        {% set ents = ents | select('in', scope_entity_set) | list %}
+                      {% endif %}
+                      {% if ents | length > 0 %}{% set ns.out = ents %}{% endif %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ ns.out }}
+                _opt_ents_in_scope: '{{ _resolved_pool | reject("in", _excluded_ents) | list }}'
             - variables:
                 _dynamic_options: >-
                   {% set ns = namespace(items=[]) %}
                   {% for ent in _opt_ents_in_scope %}
                     {% set lbls = labels(ent) | map('label_name') | reject('none') | list %}
-                    {#- Per-entity custom dropdown label.  Accept both forms:
-                        `<scope-prefix>(Provides|Gen) Option <F>: <label>` -#}
-                    {% set scoped_pfx_pr = _scope_prefix ~ 'Provides Option ' ~ _feature ~ ': ' %}
-                    {% set bare_pfx_pr = 'Provides Option ' ~ _feature ~ ': ' %}
-                    {% set scoped_pfx_gen = _scope_prefix ~ 'Gen Option ' ~ _feature ~ ': ' %}
-                    {% set bare_pfx_gen = 'Gen Option ' ~ _feature ~ ': ' %}
-                    {% set custom_scoped_pr = lbls | select('match', '^' ~ scoped_pfx_pr ~ '.+$') | first | default('') %}
-                    {% set custom_bare_pr = lbls | select('match', '^' ~ bare_pfx_pr ~ '.+$') | first | default('') %}
-                    {% set custom_scoped_gen = lbls | select('match', '^' ~ scoped_pfx_gen ~ '.+$') | first | default('') %}
-                    {% set custom_bare_gen = lbls | select('match', '^' ~ bare_pfx_gen ~ '.+$') | first | default('') %}
-                    {% set custom = custom_scoped_pr if custom_scoped_pr != ''
-                                    else (custom_bare_pr if custom_bare_pr != ''
-                                    else (custom_scoped_gen if custom_scoped_gen != ''
-                                    else custom_bare_gen)) %}
+                    {#- Per-entity custom dropdown label:
+                        `<scope_prefix>Provides Option <_feature>: <Custom>`
+                        (with bare unscoped fallback). -#}
+                    {% set scoped_pfx = _scope_prefix ~ 'Provides Option ' ~ _feature ~ ': ' %}
+                    {% set bare_pfx   = 'Provides Option ' ~ _feature ~ ': ' %}
+                    {% set custom_scoped = lbls | select('match', '^' ~ scoped_pfx ~ '.+$') | first | default('') %}
+                    {% set custom_bare   = lbls | select('match', '^' ~ bare_pfx ~ '.+$') | first | default('') %}
+                    {% set custom = custom_scoped if custom_scoped != '' else custom_bare %}
                     {% set display_label = (custom | regex_replace('^.+: ', '') | trim) if custom != '' else (state_attr(ent, 'friendly_name') or ent) %}
                     {% set ns.items = ns.items + [{'value': ent, 'label': display_label}] %}
                   {% endfor %}

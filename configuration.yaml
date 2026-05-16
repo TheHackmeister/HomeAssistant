@@ -32,42 +32,6 @@ template:
       state: >
         {{ label_entities('feature_leader') | list | count }}
       attributes:
-        # ── Entity-context provider catalog ────────────────────────────────
-        # Single source of truth for the `Provides:` label (entity context).
-        # Each provider declares the HA domain it represents and the list of
-        # generic-feature names it implicitly opts an entity into.  Consumers
-        # (labeled_feature_generics, the Labeled Feature Leaders automation,
-        # and labeled_feature_somrig) union this with explicit `Follower:`
-        # labels when resolving follower target sets.
-        #
-        # Adding a new provider here makes `(Area |Floor |)Provides: <Name>`
-        # immediately wire that entity into every listed feature without
-        # needing per-feature `Follower:` labels.
-        providers: >
-          {{
-            {
-              'Media Player': {
-                'domain': 'media_player',
-                'features': [
-                  'Media Toggle', 'Media Play', 'Media Pause',
-                  'Media Next', 'Media Previous',
-                  'Media Seek Back', 'Media Seek Forward',
-                  'Volume Up', 'Volume Down'
-                ]
-              },
-              'Light': {
-                'domain': 'light',
-                'features': ['Lights On', 'Lights Off', 'Lights Up', 'Lights Down']
-              },
-              'Fan': {
-                'domain': 'fan',
-                'features': ['Fan On', 'Fan Off', 'Fan Up', 'Fan Down']
-              },
-              'Lock':    {'domain': 'lock',    'features': []},
-              'Climate': {'domain': 'climate', 'features': []},
-              'Cover':   {'domain': 'cover',   'features': []}
-            }
-          }}
         last_updated_at: >
           {% set entities = expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp')
@@ -236,14 +200,29 @@ template:
            {% endfor %}
            {{ ns.result }}
         areas: >
+          {# Area-context analog of `leaders`/`features`. Gated by the
+             `feature_leader` label on the AREA — only areas carrying that
+             label participate. Each opted-in area gets an implicit
+             `Manifest` feature plus one entry per `(Area |Floor |)Provides: <F>`
+             label parsed off the area itself. The right-hand side of
+             `Provides:` is the feature name; the resolution of follower
+             entities from that feature name (the 4-step resolver:
+             exact → Provides → Follower → Leader) lives in the consumer
+             scripts, not here.
+
+             Component defaults: Shoot Zone → sensor, Root Zone → number,
+             everything else → select. Override per feature with
+             `(Area |Floor |)Provides <F> Component: <comp>` on the area.
+
+             Floor-scoped features (declared with the `Floor` prefix) dedup
+             by floor_id, first-writer-wins.
+          #}
           {% set ha_topic = 'homeassistant' %}
-          {# Pass 1: per-area skeleton with the implicit Manifest feature.
-             Manifest's component+object_id are deterministic from the area_id,
-             so we resolve them here. Every other feature's metadata beyond
-             component+object_id is read by script.labeled_feature_area from
-             labels(declaring_area_id) at dispatch time. #}
           {% set ns = namespace(scopes={}) %}
-          {% for aid in areas() %}
+          {# Pass 1: skeleton (Manifest only) for every area gated by
+             `feature_leader`. Manifest's component+object_id are deterministic
+             from the area_id. #}
+          {% for aid in label_areas('feature_leader') %}
             {% set safe_aid = aid | replace(' ', '_') | replace('-', '_') | lower %}
             {% set fns = namespace(fid='') %}
             {% for fid in floors() %}
@@ -265,71 +244,67 @@ template:
               }
             }) %}
           {% endfor %}
-          {# Pass 2: walk each area's labels and register the bare
-             (scope, scope_id, component, object_id, declaring_area_id) tuple
-             for every `Provides:` / `Provides Options:` declaration on an area.
-             Component picks built-in defaults for Shoot Zone / Root Zone,
-             otherwise `select`. Floor-scoped features dedupe by scope_id. #}
+          {# Pass 2: parse each gated area's labels for
+             `(Area |Floor |)Provides: <F>` (the feature declaration). Only
+             feature declarations are parsed here; option pools resolve at
+             dispatch time in script.labeled_feature_area via the 4-step
+             Provides resolver. #}
           {% set rns = namespace(scopes=ns.scopes) %}
-          {% for aid in areas() %}
+          {% for aid in label_areas('feature_leader') %}
             {% set this_floor_id = rns.scopes[aid].floor_id %}
-            {% for lbl in labels(aid) | map('label_name') | reject('none') %}
-              {# Pull feature name from either declaration form #}
-              {% set fname = '' %}
-              {% set prefix = '' %}
-              {% set m = lbl | regex_replace('^(Area |Floor |)(Provides): (.+)$', 'MATCH|\\1|\\3') %}
-              {% if m.startswith('MATCH|') %}
+            {% set area_lbls = labels(aid) | map('label_name') | reject('none') | list %}
+            {% for lbl in area_lbls %}
+              {% set m = lbl | regex_replace('^(Area |Floor |)Provides: (.+)$', 'M|\\1|\\2') %}
+              {% if m.startswith('M|') %}
                 {% set parts = m.split('|') %}
                 {% set prefix = parts[1] | trim %}
                 {% set fname = parts[2] | trim %}
-              {% else %}
-                {% set m2 = lbl | regex_replace('^(Area |Floor |)(Provides) Options: ([^:]+): .+$', 'M2|\\1|\\3') %}
-                {% if m2.startswith('M2|') %}
-                  {% set parts = m2.split('|') %}
-                  {% set prefix = parts[1] | trim %}
-                  {% set fname = parts[2] | trim %}
-                {% endif %}
-              {% endif %}
-              {% if fname != '' %}
-                {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'none') %}
-                {% set scope_id_val = aid if scope_val in ['area', 'none'] else this_floor_id %}
-                {% if scope_id_val != '' %}
-                  {% set safe_scope_id = scope_id_val | replace(' ', '_') | replace('-', '_') | lower %}
-                  {% set fslug = fname | lower | replace(' ', '_') | replace('-', '_') %}
-                  {% set default_component = 'sensor' if fname == 'Shoot Zone'
-                      else ('number' if fname == 'Root Zone' else 'select') %}
-                  {% if fname == 'Shoot Zone' %}{% set default_obj = safe_scope_id ~ '_vpd' %}
-                  {% elif fname == 'Root Zone' %}{% set default_obj = safe_scope_id ~ '_tracked_psi' %}
-                  {% else %}{% set default_obj = safe_scope_id ~ '_' ~ fslug %}{% endif %}
-                  {# `(Provides) <F> Component:` is the one override the
-                     sensor has to see, because changing the component changes
-                     object_id / diff identity. Everything else lives in the
-                     script. #}
-                  {% set scope_prefix = ('Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '')) %}
-                  {% set comp_override = labels(aid) | map('label_name') | reject('none')
-                      | select('match', '^' ~ scope_prefix ~ '(Provides) ' ~ fname ~ ' Component: .+$')
-                      | first | default('') | regex_replace('^.+: ', '') | trim %}
-                  {% set component = comp_override if comp_override != '' else default_component %}
-                  {% set fentry = {
-                    'scope': scope_val,
-                    'scope_id': scope_id_val,
-                    'component': component,
-                    'object_id': default_obj,
-                    'declaring_area_id': aid
-                  } %}
-                  {% if scope_id_val not in rns.scopes %}
-                    {% set rns.scopes = dict(rns.scopes, **{
-                      scope_id_val: {
-                        'kind': 'floor',
-                        'floor_id': scope_id_val,
-                        'features': {fname: fentry}
-                      }
-                    }) %}
-                  {% else %}
-                    {% set existing = rns.scopes[scope_id_val] %}
-                    {% if fname not in existing.features %}
-                      {% set new_features = dict(existing.features, **{fname: fentry}) %}
-                      {% set rns.scopes = dict(rns.scopes, **{scope_id_val: dict(existing, **{'features': new_features})}) %}
+                {# Skip Provides-modifier labels (Component:, etc.) — they
+                   contain ': ' downstream of the feature name and are
+                   read by Pass-2 detail resolution, not declared as
+                   features themselves. #}
+                {% set is_modifier = fname | regex_search('^[^:]+ (Component|Min|Max|Step|Unit|Icon|Initial|Static|Mode|Device Class): ') %}
+                {% if fname != '' and not is_modifier %}
+                  {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'none') %}
+                  {% set scope_id_val = aid if scope_val in ['area', 'none'] else this_floor_id %}
+                  {% if scope_id_val != '' %}
+                    {% set safe_scope_id = scope_id_val | replace(' ', '_') | replace('-', '_') | lower %}
+                    {% set fslug = fname | lower | replace(' ', '_') | replace('-', '_') %}
+                    {% set default_component = 'sensor' if fname == 'Shoot Zone'
+                        else ('number' if fname == 'Root Zone' else 'select') %}
+                    {% if fname == 'Shoot Zone' %}{% set default_obj = safe_scope_id ~ '_vpd' %}
+                    {% elif fname == 'Root Zone' %}{% set default_obj = safe_scope_id ~ '_tracked_psi' %}
+                    {% else %}{% set default_obj = safe_scope_id ~ '_' ~ fslug %}{% endif %}
+                    {# `(scope_prefix)Provides <F> Component: <comp>` is the
+                       one override the sensor needs to see, because changing
+                       the component changes object_id / diff identity. All
+                       other detail lives in the script. #}
+                    {% set scope_prefix = ('Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '')) %}
+                    {% set comp_override = area_lbls
+                        | select('match', '^' ~ scope_prefix ~ 'Provides ' ~ fname ~ ' Component: .+$')
+                        | first | default('') | regex_replace('^.+: ', '') | trim %}
+                    {% set component = comp_override if comp_override != '' else default_component %}
+                    {% set fentry = {
+                      'scope': scope_val,
+                      'scope_id': scope_id_val,
+                      'component': component,
+                      'object_id': default_obj,
+                      'declaring_area_id': aid
+                    } %}
+                    {% if scope_id_val not in rns.scopes %}
+                      {% set rns.scopes = dict(rns.scopes, **{
+                        scope_id_val: {
+                          'kind': 'floor',
+                          'floor_id': scope_id_val,
+                          'features': {fname: fentry}
+                        }
+                      }) %}
+                    {% else %}
+                      {% set existing = rns.scopes[scope_id_val] %}
+                      {% if fname not in existing.features %}
+                        {% set new_features = dict(existing.features, **{fname: fentry}) %}
+                        {% set rns.scopes = dict(rns.scopes, **{scope_id_val: dict(existing, **{'features': new_features})}) %}
+                      {% endif %}
                     {% endif %}
                   {% endif %}
                 {% endif %}
