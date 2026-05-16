@@ -196,10 +196,124 @@ template:
                   }
                 }) %}
               {% endif %}
+             {% endfor %}
+           {% endfor %}
+           {{ ns.result }}
+        areas: >
+          {% set ha_topic = 'homeassistant' %}
+          {# Pass 1: per-area skeleton with the implicit Manifest feature.
+             Manifest's component+object_id are deterministic from the area_id,
+             so we resolve them here. Every other feature's metadata beyond
+             component+object_id is read by script.labeled_feature_area from
+             labels(declaring_area_id) at dispatch time. #}
+          {% set ns = namespace(scopes={}) %}
+          {% for aid in areas() %}
+            {% set safe_aid = aid | replace(' ', '_') | replace('-', '_') | lower %}
+            {% set fns = namespace(fid='') %}
+            {% for fid in floors() %}
+              {% if aid in floor_areas(fid) %}{% set fns.fid = fid %}{% endif %}
+            {% endfor %}
+            {% set ns.scopes = dict(ns.scopes, **{
+              aid: {
+                'kind': 'area',
+                'floor_id': fns.fid,
+                'features': {
+                  'Manifest': {
+                    'scope': 'area',
+                    'scope_id': aid,
+                    'component': 'sensor',
+                    'object_id': 'area_manifest_' ~ safe_aid,
+                    'declaring_area_id': aid
+                  }
+                }
+              }
+            }) %}
+          {% endfor %}
+          {# Pass 2: walk each area's labels and register the bare
+             (scope, scope_id, component, object_id, declaring_area_id) tuple
+             for every Gen: / Gen Options: declaration. Component picks built-in
+             defaults for Shoot Zone / Root Zone, otherwise `select`. Floor-scoped
+             features dedupe by scope_id. #}
+          {% set rns = namespace(scopes=ns.scopes) %}
+          {% for aid in areas() %}
+            {% set this_floor_id = rns.scopes[aid].floor_id %}
+            {% for lbl in labels(aid) | map('label_name') | reject('none') %}
+              {# Pull feature name from either declaration form #}
+              {% set fname = '' %}
+              {% set prefix = '' %}
+              {% set m = lbl | regex_replace('^(Area |Floor |)Gen: (.+)$', 'MATCH|\\1|\\2') %}
+              {% if m.startswith('MATCH|') %}
+                {% set parts = m.split('|') %}
+                {% set prefix = parts[1] | trim %}
+                {% set fname = parts[2] | trim %}
+              {% else %}
+                {% set m2 = lbl | regex_replace('^(Area |Floor |)Gen Options: ([^:]+): .+$', 'M2|\\1|\\2') %}
+                {% if m2.startswith('M2|') %}
+                  {% set parts = m2.split('|') %}
+                  {% set prefix = parts[1] | trim %}
+                  {% set fname = parts[2] | trim %}
+                {% endif %}
+              {% endif %}
+              {% if fname != '' %}
+                {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'none') %}
+                {% set scope_id_val = aid if scope_val in ['area', 'none'] else this_floor_id %}
+                {% if scope_id_val != '' %}
+                  {% set safe_scope_id = scope_id_val | replace(' ', '_') | replace('-', '_') | lower %}
+                  {% set fslug = fname | lower | replace(' ', '_') | replace('-', '_') %}
+                  {% set default_component = 'sensor' if fname == 'Shoot Zone'
+                      else ('number' if fname == 'Root Zone' else 'select') %}
+                  {% if fname == 'Shoot Zone' %}{% set default_obj = safe_scope_id ~ '_vpd' %}
+                  {% elif fname == 'Root Zone' %}{% set default_obj = safe_scope_id ~ '_tracked_psi' %}
+                  {% else %}{% set default_obj = safe_scope_id ~ '_' ~ fslug %}{% endif %}
+                  {# `Gen <F> Component:` is the one override the sensor has to
+                     see, because changing the component changes object_id /
+                     diff identity. Everything else lives in the script. #}
+                  {% set scope_prefix = ('Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '')) %}
+                  {% set comp_override = labels(aid) | map('label_name') | reject('none')
+                      | select('match', '^' ~ scope_prefix ~ 'Gen ' ~ fname ~ ' Component: .+$')
+                      | first | default('') | regex_replace('^.+: ', '') | trim %}
+                  {% set component = comp_override if comp_override != '' else default_component %}
+                  {% set fentry = {
+                    'scope': scope_val,
+                    'scope_id': scope_id_val,
+                    'component': component,
+                    'object_id': default_obj,
+                    'declaring_area_id': aid
+                  } %}
+                  {% if scope_id_val not in rns.scopes %}
+                    {% set rns.scopes = dict(rns.scopes, **{
+                      scope_id_val: {
+                        'kind': 'floor',
+                        'floor_id': scope_id_val,
+                        'features': {fname: fentry}
+                      }
+                    }) %}
+                  {% else %}
+                    {% set existing = rns.scopes[scope_id_val] %}
+                    {% if fname not in existing.features %}
+                      {% set new_features = dict(existing.features, **{fname: fentry}) %}
+                      {% set rns.scopes = dict(rns.scopes, **{scope_id_val: dict(existing, **{'features': new_features})}) %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
             {% endfor %}
           {% endfor %}
-          {{ ns.result }}
- 
+          {# Pass 3: flat `expected` list per scope for the automation's diff. #}
+          {% set ens = namespace(scopes=rns.scopes) %}
+          {% for sid, sdat in ens.scopes.items() %}
+            {% set exp = [] %}
+            {% for fname, fdat in sdat.features.items() %}
+              {% set exp = exp + [{
+                'component': fdat.component,
+                'object_id': fdat.object_id,
+                'ha_topic': ha_topic
+              }] %}
+            {% endfor %}
+            {% set ens.scopes = dict(ens.scopes, **{sid: dict(sdat, **{'expected': exp})}) %}
+          {% endfor %}
+          {{ ens.scopes }}
+
     - default_entity_id: sensor.house_home_count
       name: 'House: Home Count'
       state: '{{ dict((states.person)|groupby(''state''))[''home'']|count }}'

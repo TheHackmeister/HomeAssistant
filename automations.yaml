@@ -2500,3 +2500,198 @@
           entity_id: script.labeled_area_action
         data: {}
       helper_max_loops: 80
+- id: 'labeled_feature_areas'
+  alias: Labeled Feature Areas
+  description: >
+    Diffs the fully-resolved `areas` attribute of `sensor.labeled_features_state`
+    and dispatches creates / deletes via `script.labeled_feature_area` and
+    `script.labeled_feature_entities`.
+
+    All label parsing, scope resolution, component-default selection,
+    object_id computation, floor dedup, and static-options parsing is done by
+    the template sensor (see `sensor.labeled_features_state.areas` in
+    configuration.yaml). This automation is a trivial diff-and-dispatch: it
+    flattens `now.expected` and `prev.expected` into `(scope_id, feature)`-keyed
+    maps, computes added/removed, and routes each entry.
+
+    Triggers:
+      - state change on `sensor.labeled_features_state` attribute `areas`
+      - homeassistant.start (idempotent re-publish for restart resilience)
+  triggers:
+    - trigger: state
+      entity_id: sensor.labeled_features_state
+      attribute: areas
+    - trigger: homeassistant
+      event: start
+  mode: queued
+  max: 50
+  actions:
+    - variables:
+        automation_error_mode: >-
+          {% set em_label = labels('automation.labeled_feature_areas')
+              | map('label_name') | reject('none')
+              | select('match', '(?i)^error mode: .+')
+              | first | default('') %}
+          {{ em_label | regex_replace('(?i)^error mode: ', '') | default('log', true) }}
+        _is_start: '{{ trigger is defined and trigger.platform == "homeassistant" }}'
+        _now_scopes: >-
+          {{ state_attr('sensor.labeled_features_state', 'areas') | default({}) }}
+        _prev_scopes: >-
+          {% if trigger is defined and trigger.platform == 'state' %}
+          {{ trigger.from_state.attributes.areas | default({}) }}
+          {% else %}{{ {} }}{% endif %}
+    # Flatten both snapshots into <scope_id>||<feature> maps so the diff is
+    # cheap and identity-stable (re-publishes for same key are a no-op when
+    # component+object_id match).
+    - variables:
+        _now_map: >-
+          {% set ns = namespace(d={}) %}
+          {% for sid, sdat in _now_scopes.items() %}
+            {% for fname, fdat in sdat.get('features', {}).items() %}
+              {% set ns.d = dict(ns.d, **{sid ~ '||' ~ fname: {
+                'scope_id': sid,
+                'feature': fname,
+                'scope': fdat.get('scope', 'area'),
+                'component': fdat.get('component'),
+                'object_id': fdat.get('object_id'),
+                'feature_data': fdat
+              }}) %}
+            {% endfor %}
+          {% endfor %}
+          {{ ns.d }}
+        _prev_map: >-
+          {% set ns = namespace(d={}) %}
+          {% for sid, sdat in _prev_scopes.items() %}
+            {% for fname, fdat in sdat.get('features', {}).items() %}
+              {% set ns.d = dict(ns.d, **{sid ~ '||' ~ fname: {
+                'scope_id': sid,
+                'feature': fname,
+                'scope': fdat.get('scope', 'area'),
+                'component': fdat.get('component'),
+                'object_id': fdat.get('object_id'),
+                'feature_data': fdat
+              }}) %}
+            {% endfor %}
+          {% endfor %}
+          {{ ns.d }}
+    - variables:
+        _added: >-
+          {% if _is_start %}
+          {{ _now_map.values() | list }}
+          {% else %}
+          {% set ns = namespace(items=[]) %}
+          {% for k, v in _now_map.items() %}
+            {% if k not in _prev_map
+                or _prev_map[k].object_id != v.object_id
+                or _prev_map[k].component != v.component %}
+              {% set ns.items = ns.items + [v] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.items }}
+          {% endif %}
+        _removed: >-
+          {% if _is_start %}
+          {{ [] }}
+          {% else %}
+          {% set ns = namespace(items=[]) %}
+          {% for k, v in _prev_map.items() %}
+            {% if k not in _now_map
+                or _now_map[k].object_id != v.object_id
+                or _now_map[k].component != v.component %}
+              {% set ns.items = ns.items + [v] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.items }}
+          {% endif %}
+    # Removes first so renames / component swaps retract the stale topic before
+    # the new one publishes.
+    - repeat:
+        for_each: '{{ _removed }}'
+        sequence:
+          - action: script.labeled_feature_entities
+            data:
+              component: '{{ repeat.item.component }}'
+              object_id: '{{ repeat.item.object_id }}'
+              ha_topic: homeassistant
+              delete: true
+              error_mode: '{{ automation_error_mode }}'
+            continue_on_error: true
+          - if:
+              - condition: template
+                value_template: '{{ error is defined }}'
+            then:
+              - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == "log" }}'
+                then:
+                  - action: system_log.write
+                    data:
+                      level: error
+                      message: >-
+                        Labeled Feature Areas: error retracting
+                        {{ repeat.item.component }}.{{ repeat.item.object_id }}:
+                        {{ error }}
+              - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == "alert" }}'
+                then:
+                  - action: script.send_alert
+                    data:
+                      alert_severity: high
+                      alert_title: Labeled Feature Areas Error
+                      alert_message: >-
+                        Error retracting {{ repeat.item.component }}.{{ repeat.item.object_id }}:
+                        {{ error }}
+              - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == "stop" }}'
+                then:
+                  - stop: >-
+                      Labeled Feature Areas: error retracting
+                      {{ repeat.item.component }}.{{ repeat.item.object_id }}
+                    error: true
+    - repeat:
+        for_each: '{{ _added }}'
+        sequence:
+          - action: script.labeled_feature_area
+            data:
+              feature: '{{ repeat.item.feature }}'
+              scope_id: '{{ repeat.item.scope_id }}'
+              scope: '{{ repeat.item.scope }}'
+              feature_data: '{{ repeat.item.feature_data }}'
+              error_mode: '{{ automation_error_mode }}'
+            continue_on_error: true
+          - if:
+              - condition: template
+                value_template: '{{ error is defined }}'
+            then:
+              - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == "log" }}'
+                then:
+                  - action: system_log.write
+                    data:
+                      level: error
+                      message: >-
+                        Labeled Feature Areas: error creating
+                        {{ repeat.item.feature }} for {{ repeat.item.scope_id }}:
+                        {{ error }}
+              - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == "alert" }}'
+                then:
+                  - action: script.send_alert
+                    data:
+                      alert_severity: high
+                      alert_title: Labeled Feature Areas Error
+                      alert_message: >-
+                        Error creating {{ repeat.item.feature }} for
+                        {{ repeat.item.scope_id }}: {{ error }}
+              - if:
+                  - condition: template
+                    value_template: '{{ automation_error_mode == "stop" }}'
+                then:
+                  - stop: >-
+                      Labeled Feature Areas: error creating
+                      {{ repeat.item.feature }} for {{ repeat.item.scope_id }}
+                    error: true

@@ -4987,3 +4987,895 @@ labeled_feature_somrig:
                     leader_enabled: '{{ leader_enabled | default(true) }}'
                     toggle: '{{ _toggle_in }}'
                     error_mode: '{{ _err_mode }}'
+labeled_feature_entities:
+  alias: Labeled Feature Entities
+  description: >
+    Generic MQTT-discovery entity creator and retract helper for the Labeled
+    Feature Areas stack. Publishes (or, with `delete: true`, retracts) a
+    Home Assistant MQTT discovery payload for a single entity, with optional
+    state and attributes seeding controlled by `initialize_mode` /
+    `attributes_mode` and a `create_mode` enum.
+  mode: parallel
+  max: 100
+  fields:
+    component:
+      name: Component
+      description: >
+        MQTT discovery component. Limited to the set supported by HA's MQTT
+        discovery integration; see
+        https://www.home-assistant.io/integrations/mqtt/#discovery-topic.
+      required: true
+      selector:
+        select:
+          mode: dropdown
+          custom_value: false
+          options:
+            - alarm_control_panel
+            - binary_sensor
+            - button
+            - camera
+            - climate
+            - cover
+            - device_automation
+            - device_tracker
+            - event
+            - fan
+            - humidifier
+            - image
+            - lawn_mower
+            - light
+            - lock
+            - notify
+            - number
+            - scene
+            - select
+            - sensor
+            - siren
+            - switch
+            - tag
+            - text
+            - update
+            - vacuum
+            - valve
+            - water_heater
+    object_id:
+      name: Object ID
+      description: >
+        Unique object_id used to build the discovery topic and the entity's
+        unique_id (when one isn't supplied explicitly). The resulting HA
+        entity_id will be `<component>.<object_id>` unless overridden by the
+        device or user.
+      required: true
+      selector:
+        text: {}
+    delete:
+      name: Delete
+      description: >
+        When true, publish an empty retained payload to the discovery topic to
+        retract the entity. All other fields are ignored when delete is true.
+      required: false
+      default: false
+      selector:
+        boolean: {}
+    create_mode:
+      name: Create Mode
+      description: >
+        Controls when the discovery config is (re)published.
+        `always` (default) publishes every call — safe because retained MQTT
+        topics deduplicate. `if_missing` only publishes when the entity does
+        not already exist (resolved as `<component>.<object_id>` having a
+        state not in unknown/unavailable/none). `never` skips the discovery
+        publish entirely — useful for state/attribute-only top-ups against an
+        entity that was created on a previous call.
+      required: false
+      default: always
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - always
+            - if_missing
+            - never
+    initialize_mode:
+      name: Initialize Mode
+      description: >
+        How to publish the optional `initial_state`. `set_if_missing` (default)
+        only publishes when the current state is unknown/unavailable/none.
+        `always` publishes every call. `never` skips state publishing.
+      required: false
+      default: set_if_missing
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - set_if_missing
+            - always
+            - never
+    attributes_mode:
+      name: Attributes Mode
+      description: Same semantics as initialize_mode but for `initial_attributes`.
+      required: false
+      default: set_if_missing
+      selector:
+        select:
+          options:
+            - set_if_missing
+            - always
+            - never
+    initial_state:
+      name: Initial State
+      description: Optional. Payload to publish to the state topic on create.
+      required: false
+      default: ''
+      selector:
+        text:
+          multiline: true
+    initial_attributes:
+      name: Initial Attributes
+      description: Optional. Dict to publish as JSON to the attributes topic.
+      required: false
+      default: {}
+      selector:
+        object: {}
+    ha_topic:
+      name: HA Discovery Topic Prefix
+      description: Defaults to `homeassistant` (matches MQTT's discovery_prefix).
+      required: false
+      default: homeassistant
+      selector:
+        text: {}
+    device_topic:
+      name: Device Topic Base
+      description: >
+        Optional base topic the entity's state/command topics live under.
+        If empty, defaults to `<component>/<object_id>`.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    name:
+      name: Display Name
+      description: Friendly entity name (required when delete is false).
+      required: false
+      default: ''
+      selector:
+        text: {}
+    unique_id:
+      name: Unique ID
+      description: Overrides the default unique_id (= object_id).
+      required: false
+      default: ''
+      selector:
+        text: {}
+    device:
+      name: Device Block
+      description: >
+        Dict with at least `identifiers` plus any of `name`, `manufacturer`,
+        `model`, `suggested_area`. Combined into the discovery payload's
+        `device` field. Required when delete is false.
+      required: false
+      default: {}
+      selector:
+        object: {}
+    state_topic:
+      name: State Topic
+      description: Override; defaults to `<device_topic>/state`.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    command_topic:
+      name: Command Topic
+      description: Override; defaults to `<device_topic>/set`.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    availability_topic:
+      name: Availability Topic
+      required: false
+      default: ''
+      selector:
+        text: {}
+    value_template:
+      name: Value Template
+      required: false
+      default: ''
+      selector:
+        text:
+          multiline: true
+    command_template:
+      name: Command Template
+      required: false
+      default: ''
+      selector:
+        text:
+          multiline: true
+    json_attributes_topic:
+      name: JSON Attributes Topic
+      required: false
+      default: ''
+      selector:
+        text: {}
+    json_attributes_template:
+      name: JSON Attributes Template
+      required: false
+      default: ''
+      selector:
+        text:
+          multiline: true
+    payload_on:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    payload_off:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    state_on:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    state_off:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    payload_press:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    device_class:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    unit_of_measurement:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    state_class:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    icon:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    entity_category:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    suggested_display_precision:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    expire_after:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    optimistic:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    min:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    max:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    step:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    mode:
+      required: false
+      default: ''
+      selector:
+        text: {}
+    options:
+      name: Options
+      description: List of strings for select components.
+      required: false
+      default: []
+      selector:
+        object: {}
+    extra:
+      name: Extra Config Fields
+      description: >
+        Free-form dict merged into the final discovery payload. Use for fields
+        not enumerated above (e.g. `name_template`, `qos`, custom keys).
+      required: false
+      default: {}
+      selector:
+        object: {}
+    error_mode:
+      name: Error Mode
+      description: silent | log | alert | stop. Default 'log'.
+      required: false
+      default: log
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
+  sequence:
+    # ── Step 0: Normalize inputs ────────────────────────────────────────────
+    - variables:
+        _component: '{{ component | trim }}'
+        _object_id: '{{ object_id | trim }}'
+        _delete: '{{ (delete | default(false)) | bool(false) }}'
+        _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        _ha_topic: '{{ (ha_topic | default("homeassistant")) | trim or "homeassistant" }}'
+        _device_topic: >-
+          {%- set dt = device_topic | default("") | trim -%}
+          {{ dt if dt != "" else (_component ~ "/" ~ _object_id) }}
+        _initialize_mode: '{{ (initialize_mode | default("set_if_missing") | lower) }}'
+        _attributes_mode: '{{ (attributes_mode | default("set_if_missing") | lower) }}'
+        _ha_entity_id: '{{ _component ~ "." ~ _object_id }}'
+        _discovery_topic: '{{ _ha_topic ~ "/" ~ _component ~ "/" ~ _object_id ~ "/config" }}'
+
+    # ── Step 1: Delete path (publish empty retained payload, return) ────────
+    - if:
+        - condition: template
+          value_template: '{{ _delete }}'
+      then:
+        - action: mqtt.publish
+          data:
+            topic: '{{ _discovery_topic }}'
+            retain: true
+            payload: ''
+        - stop: 'labeled_feature_entities: delete dispatched.'
+
+    # ── Step 2: create_mode handling ────────────────────────────────────────
+    - variables:
+        _create_mode: '{{ (create_mode | default("always") | lower) }}'
+        _entity_exists: >-
+          {{ states(_ha_entity_id) not in ['unknown', 'unavailable', 'none', None] }}
+        _should_publish_config: >-
+          {%- if _create_mode == 'never' -%}false
+          {%- elif _create_mode == 'if_missing' -%}{{ not _entity_exists }}
+          {%- else -%}true
+          {%- endif -%}
+
+    # ── Step 3: Validate required fields for non-delete path ───────────────
+    - if:
+        - condition: template
+          value_template: '{{ (name | default("") | trim) == "" or (device | default({}) | length) == 0 }}'
+      then:
+        - action: script.labeled_feature_error_mode
+          data:
+            error_mode: '{{ _err_mode }}'
+            source: Labeled Feature Entities
+            message: >-
+              Missing required field(s) for {{ _component }}.{{ _object_id }}:
+              name={{ name | default('') }}, device={{ device | default({}) }}.
+        - if:
+            - condition: template
+              value_template: '{{ _err_mode == "stop" }}'
+          then:
+            - stop: 'labeled_feature_entities: missing required fields.'
+              error: true
+        - stop: 'labeled_feature_entities: validation failed (handled per error_mode).'
+
+    # ── Step 4: Build the discovery payload ─────────────────────────────────
+    - variables:
+        _payload_base: >-
+          {% set d = {} %}
+          {% set d = dict(d, **{'name': name}) %}
+          {% set d = dict(d, **{'unique_id': (unique_id | default('') | trim) or _object_id}) %}
+          {% set d = dict(d, **{'object_id': _object_id}) %}
+          {% set _st = (state_topic | default('') | trim) %}
+          {% set _ct = (command_topic | default('') | trim) %}
+          {% if _st != '' %}{% set d = dict(d, **{'state_topic': _st}) %}{% endif %}
+          {% if _ct != '' %}{% set d = dict(d, **{'command_topic': _ct}) %}{% endif %}
+          {% if availability_topic | default('') | trim != '' %}{% set d = dict(d, **{'availability_topic': availability_topic | trim}) %}{% endif %}
+          {% if value_template | default('') | trim != '' %}{% set d = dict(d, **{'value_template': value_template}) %}{% endif %}
+          {% if command_template | default('') | trim != '' %}{% set d = dict(d, **{'command_template': command_template}) %}{% endif %}
+          {% if json_attributes_topic | default('') | trim != '' %}{% set d = dict(d, **{'json_attributes_topic': json_attributes_topic | trim}) %}{% endif %}
+          {% if json_attributes_template | default('') | trim != '' %}{% set d = dict(d, **{'json_attributes_template': json_attributes_template}) %}{% endif %}
+          {% if payload_on | default('') | trim != '' %}{% set d = dict(d, **{'payload_on': payload_on}) %}{% endif %}
+          {% if payload_off | default('') | trim != '' %}{% set d = dict(d, **{'payload_off': payload_off}) %}{% endif %}
+          {% if state_on | default('') | trim != '' %}{% set d = dict(d, **{'state_on': state_on}) %}{% endif %}
+          {% if state_off | default('') | trim != '' %}{% set d = dict(d, **{'state_off': state_off}) %}{% endif %}
+          {% if payload_press | default('') | trim != '' %}{% set d = dict(d, **{'payload_press': payload_press}) %}{% endif %}
+          {% if device_class | default('') | trim != '' %}{% set d = dict(d, **{'device_class': device_class | trim}) %}{% endif %}
+          {% if unit_of_measurement | default('') | trim != '' %}{% set d = dict(d, **{'unit_of_measurement': unit_of_measurement | trim}) %}{% endif %}
+          {% if state_class | default('') | trim != '' %}{% set d = dict(d, **{'state_class': state_class | trim}) %}{% endif %}
+          {% if icon | default('') | trim != '' %}{% set d = dict(d, **{'icon': icon | trim}) %}{% endif %}
+          {% if entity_category | default('') | trim != '' %}{% set d = dict(d, **{'entity_category': entity_category | trim}) %}{% endif %}
+          {% if suggested_display_precision | default('') | trim != '' %}{% set d = dict(d, **{'suggested_display_precision': suggested_display_precision | int(0)}) %}{% endif %}
+          {% if expire_after | default('') | trim != '' %}{% set d = dict(d, **{'expire_after': expire_after | int(0)}) %}{% endif %}
+          {% if optimistic | default('') | trim != '' %}{% set d = dict(d, **{'optimistic': (optimistic | lower in ['true', '1', 'yes'])}) %}{% endif %}
+          {% if min | default('') | trim != '' %}{% set d = dict(d, **{'min': min | float(0)}) %}{% endif %}
+          {% if max | default('') | trim != '' %}{% set d = dict(d, **{'max': max | float(0)}) %}{% endif %}
+          {% if step | default('') | trim != '' %}{% set d = dict(d, **{'step': step | float(1)}) %}{% endif %}
+          {% if mode | default('') | trim != '' %}{% set d = dict(d, **{'mode': mode | trim}) %}{% endif %}
+          {% set _opts = options | default([]) %}
+          {% if _opts | length > 0 %}{% set d = dict(d, **{'options': _opts}) %}{% endif %}
+          {% set d = dict(d, **{'retain': true}) %}
+          {% set d = dict(d, **{'device': device}) %}
+          {% set _extra = extra | default({}) %}
+          {% if _extra | length > 0 %}{% set d = dict(d, **_extra) %}{% endif %}
+          {{ d }}
+
+    # ── Step 5: Publish discovery config (gated by create_mode) ─────────────
+    - if:
+        - condition: template
+          value_template: '{{ _should_publish_config }}'
+      then:
+        - action: mqtt.publish
+          data:
+            topic: '{{ _discovery_topic }}'
+            retain: true
+            payload: '{{ _payload_base | to_json }}'
+
+    # ── Step 6: Seed state per initialize_mode ──────────────────────────────
+    - variables:
+        _has_initial_state: '{{ (initial_state | default("") | string | trim) != "" }}'
+        _should_publish_state: >-
+          {% if not _has_initial_state %}false
+          {% elif _initialize_mode == 'never' %}false
+          {% elif _initialize_mode == 'always' %}true
+          {% else %}{{ not _entity_exists }}{% endif %}
+        _resolved_state_topic: >-
+          {{ (state_topic | default('') | trim) or (_device_topic ~ '/state') }}
+    - if:
+        - condition: template
+          value_template: '{{ _should_publish_state }}'
+      then:
+        - action: mqtt.publish
+          data:
+            topic: '{{ _resolved_state_topic }}'
+            retain: true
+            payload: '{{ initial_state }}'
+
+    # ── Step 7: Seed attributes per attributes_mode ────────────────────────
+    - variables:
+        _has_initial_attrs: '{{ (initial_attributes | default({}) | length) > 0 }}'
+        _attrs_existing: >-
+          {% set jat = state_attr(_ha_entity_id, 'attribution') %}
+          {{ state_attr(_ha_entity_id, 'friendly_name') is not none }}
+        _should_publish_attrs: >-
+          {% if not _has_initial_attrs %}false
+          {% elif _attributes_mode == 'never' %}false
+          {% elif _attributes_mode == 'always' %}true
+          {% else %}{{ not _entity_exists }}{% endif %}
+        _resolved_attrs_topic: >-
+          {{ (json_attributes_topic | default('') | trim) or (_device_topic ~ '/attributes') }}
+    - if:
+        - condition: template
+          value_template: '{{ _should_publish_attrs }}'
+      then:
+        - action: mqtt.publish
+          data:
+            topic: '{{ _resolved_attrs_topic }}'
+            retain: true
+            payload: '{{ initial_attributes | to_json }}'
+
+
+# ============================================================================
+# Labeled Feature Area — per-feature dispatcher
+# ============================================================================
+# Single-feature dispatcher for the Labeled Feature Areas stack. Shaped like
+# `labeled_feature_somrig` / `labeled_feature_generics`: a big `choose:` block
+# that branches on `feature` and dispatches one or more `labeled_feature_entities`
+# calls to create the underlying MQTT discovery entities.
+#
+# Built-in branches:
+#   - Manifest    → sensor.area_manifest_<area_id>
+#   - Shoot Zone  → sensor.<scope_id>_vpd  (Antoine-equation VPD value_template)
+#   - Root Zone   → number.<scope_id>_tracked_psi
+#
+# Generic branch (any other Gen: <FeatureName>):
+#   - select.<scope_id>_<slug(F)>  with options resolved from:
+#       * static_options (already pre-computed in feature_data from
+#         `(scope-prefix)Gen Options: <F>: a|b|c` labels)
+#       * dynamic entity pool from `(scope-prefix)Gen Option: <F>` labels in scope
+#       * minus `(scope-prefix)Gen <F> Exclude: True` labels
+labeled_feature_area:
+  alias: Labeled Feature Area
+  description: >
+    Per-feature dispatcher for the Labeled Feature Areas stack. Resolves
+    scope, builds the appropriate MQTT discovery payload (or payloads) and
+    delegates publishing to `script.labeled_feature_entities`.
+  mode: parallel
+  max: 100
+  fields:
+    feature:
+      name: Feature
+      description: >
+        Feature name as it appears in the `(Area |Floor |)Gen: <FeatureName>`
+        label. Examples: 'Manifest', 'Shoot Zone', 'Root Zone', or any user-
+        declared name like 'Audio Mode'.
+      required: true
+      selector:
+        text: {}
+    scope_id:
+      name: Scope ID
+      description: The resolved area_id or floor_id for this feature.
+      required: true
+      selector:
+        text: {}
+    scope:
+      name: Scope
+      description: Scope of the feature (area, floor, or none).
+      required: false
+      default: area
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - none
+    feature_data:
+      name: Feature Data
+      description: >
+        Pre-computed feature dict from
+        `sensor.labeled_features_state.areas[<scope_id>].features[<feature>]`.
+        Includes `component`, `object_id`, optional `icon`, `initial`, `min`,
+        `max`, `step`, `unit_of_measurement`, `device_class`, `static_options`,
+        and `declared_area_id`.
+      required: false
+      default: {}
+      selector:
+        object: {}
+    error_mode:
+      name: Error Mode
+      description: silent | log | alert | stop. Default 'log'.
+      required: false
+      default: log
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
+  sequence:
+    # ── Step 1: Normalize inputs ────────────────────────────────────────────
+    - variables:
+        _feature: '{{ feature | trim }}'
+        _scope: '{{ (scope | default("area") | lower) }}'
+        _scope_id: '{{ scope_id | trim }}'
+        _fd: '{{ feature_data | default({}) }}'
+        _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        _safe_scope_id: '{{ _scope_id | replace(" ", "_") | replace("-", "_") | lower }}'
+        _scope_prefix: >-
+          {{ 'Area ' if _scope == 'area' else ('Floor ' if _scope == 'floor' else '') }}
+        _declared_area_id: '{{ _fd.get("declared_area_id", "") }}'
+        _scope_name: >-
+          {%- if _scope == 'area' -%}{{ area_name(_scope_id) | default(_scope_id, true) }}
+          {%- elif _scope == 'floor' -%}{{ _scope_id }}
+          {%- else -%}{{ area_name(_declared_area_id) | default(_declared_area_id, true) }}
+          {%- endif -%}
+
+    # ── Step 2: Resolve scope entity set ────────────────────────────────────
+    - variables:
+        scope_entity_set: >-
+          {% if _scope == 'area' and _scope_id != '' %}
+            {% set area_ents = area_entities(_scope_id) | list %}
+            {% set area_devs = area_devices(_scope_id) %}
+            {% set ns = namespace(dev_ents=[]) %}
+            {% for d in area_devs %}
+              {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list %}
+            {% endfor %}
+            {{ (area_ents + ns.dev_ents) | unique | list }}
+          {% elif _scope == 'floor' and _scope_id != '' %}
+            {% set ns = namespace(ents=[]) %}
+            {% for a in floor_areas(_scope_id) %}
+              {% set ns.ents = ns.ents + area_entities(a) | list %}
+              {% for d in area_devices(a) %}
+                {% set ns.ents = ns.ents + device_entities(d) | list %}
+              {% endfor %}
+            {% endfor %}
+            {{ ns.ents | unique | list }}
+          {% else %}
+            {#- scope == 'none' → entire entity pool, no scope filter applied -#}
+            {{ states | map(attribute='entity_id') | list }}
+          {% endif %}
+
+    # ── Step 3: Branch by feature ───────────────────────────────────────────
+    - choose:
+        # ────────────────────── Manifest ─────────────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _feature == "Manifest" }}'
+          sequence:
+            - variables:
+                _aid: '{{ _scope_id }}'
+                _safe_aid: '{{ _safe_scope_id }}'
+                _ent_ids: '{{ _fd.get("entity_ids", area_entities(_aid) | list) }}'
+                _dev_ids: '{{ _fd.get("device_ids", area_devices(_aid) | list) }}'
+                _ent_count: '{{ _ent_ids | length }}'
+                _dev_count: '{{ _dev_ids | length }}'
+                _aname: '{{ area_name(_aid) | default(_aid, true) }}'
+                _label_map: >-
+                  {% set ns = namespace(data={}) %}
+                  {% for lbl_id in labels() %}
+                    {% set match_ents = label_entities(lbl_id) | select('in', _ent_ids) | list %}
+                    {% if match_ents | length > 0 %}
+                      {% set ns.data = dict(ns.data, **{lbl_id: match_ents}) %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ ns.data }}
+            - action: script.labeled_feature_entities
+              data:
+                component: sensor
+                object_id: 'area_manifest_{{ _safe_aid }}'
+                name: '{{ _aname }} Area Manifest'
+                icon: mdi:format-list-bulleted-square
+                device:
+                  identifiers: ['area_manifest_{{ _safe_aid }}']
+                  name: '{{ _aname }} Area'
+                  manufacturer: Home Assistant
+                  model: Area Manifest
+                state_topic: 'area_manifests/{{ _safe_aid }}/state'
+                json_attributes_topic: 'area_manifests/{{ _safe_aid }}/attributes'
+                initialize_mode: always
+                attributes_mode: always
+                initial_state: '{{ _ent_count }}'
+                initial_attributes:
+                  area_id: '{{ _aid }}'
+                  area_name: '{{ _aname }}'
+                  entity_ids: '{{ _ent_ids }}'
+                  device_ids: '{{ _dev_ids }}'
+                  entity_count: '{{ _ent_count }}'
+                  device_count: '{{ _dev_count }}'
+                  labels: '{{ _label_map }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────────────── Shoot Zone (VPD) ─────────────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _feature == "Shoot Zone" }}'
+          sequence:
+            - variables:
+                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_vpd") }}'
+            - action: script.labeled_feature_entities
+              data:
+                component: sensor
+                object_id: '{{ _obj }}'
+                name: VPD
+                icon: '{{ _fd.get("icon", "") }}'
+                device_class: '{{ _fd.get("device_class", "pressure") }}'
+                unit_of_measurement: '{{ _fd.get("unit_of_measurement", "kPa") }}'
+                state_class: measurement
+                device:
+                  identifiers: ['{{ _safe_scope_id }}']
+                  name: '{{ _scope_name }}'
+                  manufacturer: Labeled Feature Area
+                  model: Shoot Zone
+                  suggested_area: '{{ _scope_name }}'
+                state_topic: 'tracked_area/{{ _safe_scope_id }}/vpd'
+                expire_after: '300'
+                suggested_display_precision: '2'
+                value_template: >-
+                  {% set temp_sensors = states.sensor
+                       | selectattr('entity_id', 'in', scope_entity_set)
+                       | selectattr('attributes.device_class', 'defined')
+                       | selectattr('attributes.device_class', 'match', 'temperature')
+                       | list %}
+                  {% set humidity_sensors = states.sensor
+                       | selectattr('entity_id', 'in', scope_entity_set)
+                       | selectattr('attributes.device_class', 'defined')
+                       | selectattr('attributes.device_class', 'match', 'humidity')
+                       | list %}
+                  {% if temp_sensors | length > 0 and humidity_sensors | length > 0 %}
+                    {% set ns = namespace(celsius_temps=[]) %}
+                    {% for sensor in temp_sensors %}
+                      {% set temp = sensor.state | float %}
+                      {% set unit = sensor.attributes.unit_of_measurement %}
+                      {% if unit == '°F' %}{% set celsius_temp = (temp - 32) * 5/9 %}
+                      {% else %}{% set celsius_temp = temp %}{% endif %}
+                      {% set ns.celsius_temps = ns.celsius_temps + [celsius_temp] %}
+                    {% endfor %}
+                    {% set avg_temp = ns.celsius_temps | average %}
+                    {% set avg_humidity = humidity_sensors
+                         | map(attribute='state')
+                         | map('float', 0)
+                         | average %}
+                    {% set svp = 0.61078 * (10 ** ((7.5 * avg_temp) / (237.3 + avg_temp))) %}
+                    {% set avp = svp * (avg_humidity / 100) %}
+                    {{ (svp - avp) | round(2) }}
+                  {% else %}unavailable{% endif %}
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────────────── Root Zone (Tracked PSI) ──────────────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _feature == "Root Zone" }}'
+          sequence:
+            - variables:
+                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_tracked_psi") }}'
+                _initial: '{{ _fd.get("initial", "0") | default("0", true) }}'
+                _min: '{{ _fd.get("min", "0") | default("0", true) }}'
+                _max: '{{ _fd.get("max", "2000") | default("2000", true) }}'
+                _step: '{{ _fd.get("step", "0.1") | default("0.1", true) }}'
+            - action: script.labeled_feature_entities
+              data:
+                component: number
+                object_id: '{{ _obj }}'
+                name: Tracked PSI
+                icon: '{{ _fd.get("icon", "") }}'
+                device_class: '{{ _fd.get("device_class", "pressure") }}'
+                unit_of_measurement: '{{ _fd.get("unit_of_measurement", "PSI") }}'
+                state_class: total_increasing
+                device:
+                  identifiers: ['{{ _safe_scope_id }}']
+                  name: '{{ _scope_name }}'
+                  manufacturer: Labeled Feature Area
+                  model: Root Zone
+                  suggested_area: '{{ _scope_name }}'
+                state_topic: 'tracked_area/{{ _safe_scope_id }}/tracked_psi'
+                command_topic: 'tracked_area/{{ _safe_scope_id }}/tracked_psi'
+                min: '{{ _min }}'
+                max: '{{ _max }}'
+                step: '{{ _step }}'
+                mode: box
+                optimistic: 'true'
+                expire_after: '0'
+                suggested_display_precision: '2'
+                initial_state: '{{ _initial }}'
+                initialize_mode: set_if_missing
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────────────── Generic Gen: <F> (default → select) ──────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _fd.get("component", "select") == "select" }}'
+          sequence:
+            - variables:
+                _fslug: '{{ _feature | lower | replace(" ", "_") | replace("-", "_") }}'
+                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_" ~ _fslug) }}'
+                # Pool: entities labeled `<scope-prefix>Gen Option: <F>` in scope
+                _option_label_scoped: '{{ _scope_prefix ~ "Gen Option: " ~ _feature }}'
+                _option_label_bare: '{{ "Gen Option: " ~ _feature }}'
+                _exclude_label_scoped: '{{ _scope_prefix ~ "Gen " ~ _feature ~ " Exclude: True" }}'
+                _exclude_label_bare: '{{ "Gen " ~ _feature ~ " Exclude: True" }}'
+                _opt_ents_scoped: '{{ label_entities(_option_label_scoped) | list }}'
+                _opt_ents_bare: '{{ label_entities(_option_label_bare) | list }}'
+                _all_opt_ents_raw: '{{ (_opt_ents_scoped + (_opt_ents_bare if _scope == "none" else [])) | unique | list }}'
+                _excluded_ents: >-
+                  {{ (label_entities(_exclude_label_scoped) | list
+                      + label_entities(_exclude_label_bare) | list)
+                     | unique | list }}
+                _opt_ents_in_scope: >-
+                  {% if _scope == 'none' %}
+                    {{ _all_opt_ents_raw | reject('in', _excluded_ents) | list }}
+                  {% else %}
+                    {{ _all_opt_ents_raw
+                       | select('in', scope_entity_set)
+                       | reject('in', _excluded_ents)
+                       | list }}
+                  {% endif %}
+            - variables:
+                _dynamic_options: >-
+                  {% set ns = namespace(items=[]) %}
+                  {% for ent in _opt_ents_in_scope %}
+                    {% set lbls = labels(ent) | map('label_name') | reject('none') | list %}
+                    {#- Per-entity custom dropdown label: `<scope-prefix>Gen Option <F>: <label>` -#}
+                    {% set scoped_pfx = _scope_prefix ~ 'Gen Option ' ~ _feature ~ ': ' %}
+                    {% set bare_pfx = 'Gen Option ' ~ _feature ~ ': ' %}
+                    {% set custom_scoped = lbls | select('match', '^' ~ scoped_pfx ~ '.+$') | first | default('') %}
+                    {% set custom_bare = lbls | select('match', '^' ~ bare_pfx ~ '.+$') | first | default('') %}
+                    {% set custom = custom_scoped if custom_scoped != '' else custom_bare %}
+                    {% set display_label = (custom | regex_replace('^.+: ', '') | trim) if custom != '' else (state_attr(ent, 'friendly_name') or ent) %}
+                    {% set ns.items = ns.items + [{'value': ent, 'label': display_label}] %}
+                  {% endfor %}
+                  {{ ns.items }}
+                _static_options: '{{ _fd.get("static_options", []) }}'
+                _combined_options: '{{ (_static_options + _dynamic_options) | list }}'
+                _options_only_values: '{{ _combined_options | map(attribute="value") | list }}'
+                _initial: '{{ _fd.get("initial", "") | default("", true) }}'
+            - if:
+                - condition: template
+                  value_template: '{{ _options_only_values | length == 0 }}'
+              then:
+                - action: script.labeled_feature_error_mode
+                  data:
+                    error_mode: '{{ _err_mode }}'
+                    source: Labeled Feature Area
+                    message: >-
+                      No options resolved for select '{{ _feature }}' in scope
+                      '{{ _scope }}' (scope_id={{ _scope_id }}).
+                - if:
+                    - condition: template
+                      value_template: '{{ _err_mode == "stop" }}'
+                  then:
+                    - stop: 'No options resolved.'
+                      error: true
+                - stop: 'No options resolved (handled per error_mode).'
+            - action: script.labeled_feature_entities
+              data:
+                component: select
+                object_id: '{{ _obj }}'
+                name: '{{ _feature }}'
+                icon: '{{ _fd.get("icon", "") }}'
+                device:
+                  identifiers: ['{{ _safe_scope_id }}_{{ _fslug }}']
+                  name: '{{ _scope_name }} {{ _feature }}'
+                  manufacturer: Labeled Feature Area
+                  model: Generated Select
+                  suggested_area: '{{ _scope_name if _scope == "area" else (area_name(_declared_area_id) | default(_declared_area_id, true)) }}'
+                state_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/state'
+                command_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/set'
+                options: '{{ _options_only_values }}'
+                initial_state: '{{ _initial if _initial != "" else _options_only_values[0] }}'
+                initialize_mode: set_if_missing
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────────────── Generic Gen: <F> with Component override ────
+        # (e.g. Component: number, Component: switch, Component: sensor)
+        - conditions:
+            - condition: template
+              value_template: '{{ _fd.get("component", "") not in ["", "select"] }}'
+          sequence:
+            - variables:
+                _fslug: '{{ _feature | lower | replace(" ", "_") | replace("-", "_") }}'
+                _comp: '{{ _fd.get("component") }}'
+                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_" ~ _fslug) }}'
+                _initial: '{{ _fd.get("initial", "") | default("", true) }}'
+                _min: '{{ _fd.get("min", "0") | default("0", true) }}'
+                _max: '{{ _fd.get("max", "100") | default("100", true) }}'
+                _step: '{{ _fd.get("step", "1") | default("1", true) }}'
+                _unit: '{{ _fd.get("unit_of_measurement", "") }}'
+                _dc: '{{ _fd.get("device_class", "") }}'
+                _icon: '{{ _fd.get("icon", "") }}'
+            - action: script.labeled_feature_entities
+              data:
+                component: '{{ _comp }}'
+                object_id: '{{ _obj }}'
+                name: '{{ _feature }}'
+                icon: '{{ _icon }}'
+                device_class: '{{ _dc }}'
+                unit_of_measurement: '{{ _unit }}'
+                device:
+                  identifiers: ['{{ _safe_scope_id }}_{{ _fslug }}']
+                  name: '{{ _scope_name }} {{ _feature }}'
+                  manufacturer: Labeled Feature Area
+                  model: 'Generated {{ _comp }}'
+                  suggested_area: '{{ _scope_name if _scope == "area" else (area_name(_declared_area_id) | default(_declared_area_id, true)) }}'
+                state_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/state'
+                command_topic: 'labeled_feature/areas/{{ _safe_scope_id }}/{{ _fslug }}/set'
+                min: '{{ _min if _comp == "number" else "" }}'
+                max: '{{ _max if _comp == "number" else "" }}'
+                step: '{{ _step if _comp == "number" else "" }}'
+                mode: '{{ "box" if _comp == "number" else "" }}'
+                optimistic: 'true'
+                initial_state: '{{ _initial }}'
+                initialize_mode: set_if_missing
+                error_mode: '{{ _err_mode }}'
+
+      default:
+        - action: script.labeled_feature_error_mode
+          data:
+            error_mode: '{{ _err_mode }}'
+            source: Labeled Feature Area
+            message: "Unknown feature '{{ _feature }}' in scope '{{ _scope }}' (scope_id={{ _scope_id }})."
+        - if:
+            - condition: template
+              value_template: '{{ _err_mode == "stop" }}'
+          then:
+            - stop: "Labeled Feature Area: unknown feature '{{ _feature }}'."
+              error: true
