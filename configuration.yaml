@@ -32,7 +32,48 @@ template:
       state: >
         {{ label_entities('feature_leader') | list | count }}
       attributes:
+        # ── feature_meta ────────────────────────────────────────────────
+        # Single source of truth for the generic-feature catalog. Each
+        # entry is keyed by the canonical Feature Name (matches Follower/
+        # Leader labels and labeled_feature_generics' choose: branches)
+        # and carries:
+        #   - domain: the HA domain used as a fallback target pool when
+        #     no explicit Follower/Provides label is found
+        #     (e.g. 'media_player', 'light', 'fan'). '' = no fallback.
+        #   - kind: the internal action key used by labeled_feature_generics'
+        #     choose: block (stable string, never user-facing).
+        #   - domain_label: the human-readable provider grouping used by
+        #     `Provides: <DomainLabel>` entity-context shorthand. Multiple
+        #     features share the same domain_label so that a single
+        #     `Area Provides: Media Player` opts an entity into all 9 media
+        #     features at once. Empty string = no grouping shorthand.
+        # Adding a new domain grouping (e.g. Cover, Climate, Lock, Vacuum)
+        # is a one-line edit: add the entries here and the Provides:
+        # shorthand starts working everywhere.
+        feature_meta: >
+          {{ {
+            'Media Toggle':       {'domain': 'media_player', 'kind': 'media_toggle',       'domain_label': 'Media Player'},
+            'Media Play':         {'domain': 'media_player', 'kind': 'media_play',         'domain_label': 'Media Player'},
+            'Media Pause':        {'domain': 'media_player', 'kind': 'media_pause',        'domain_label': 'Media Player'},
+            'Media Next':         {'domain': 'media_player', 'kind': 'media_next',         'domain_label': 'Media Player'},
+            'Media Previous':     {'domain': 'media_player', 'kind': 'media_previous',     'domain_label': 'Media Player'},
+            'Media Seek Back':    {'domain': 'media_player', 'kind': 'media_seek_back',    'domain_label': 'Media Player'},
+            'Media Seek Forward': {'domain': 'media_player', 'kind': 'media_seek_forward', 'domain_label': 'Media Player'},
+            'Volume Up':          {'domain': 'media_player', 'kind': 'volume_up',          'domain_label': 'Media Player'},
+            'Volume Down':        {'domain': 'media_player', 'kind': 'volume_down',        'domain_label': 'Media Player'},
+            'Lights On':          {'domain': 'light',        'kind': 'light_on',           'domain_label': 'Light'},
+            'Lights Off':         {'domain': 'light',        'kind': 'light_off',          'domain_label': 'Light'},
+            'Lights Up':          {'domain': 'light',        'kind': 'light_up',           'domain_label': 'Light'},
+            'Lights Down':        {'domain': 'light',        'kind': 'light_down',         'domain_label': 'Light'},
+            'Fan On':             {'domain': 'fan',          'kind': 'fan_on',             'domain_label': 'Fan'},
+            'Fan Off':            {'domain': 'fan',          'kind': 'fan_off',            'domain_label': 'Fan'},
+            'Fan Up':             {'domain': 'fan',          'kind': 'fan_up',             'domain_label': 'Fan'},
+            'Fan Down':           {'domain': 'fan',          'kind': 'fan_down',           'domain_label': 'Fan'},
+            'Ads':                {'domain': '',             'kind': 'ads',                'domain_label': ''},
+            'Night':              {'domain': '',             'kind': 'night',              'domain_label': ''}
+          } }}
         last_updated_at: >
+
           {% set entities = expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp')
               | rejectattr('state', 'in', ['unknown', 'unavailable'])

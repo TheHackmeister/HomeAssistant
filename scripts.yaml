@@ -3449,35 +3449,18 @@ labeled_feature_generics:
                ('Floor ' if _scope == 'floor' else '')) ~ _exclude_feature) ~ " Exclude: True" }}
 
     # ── Step 3: Feature metadata (domain fallback + selected action) ────────
-    # `domain_label` is the human-readable provider grouping for this
-    # feature's domain. Used by the resolver below to also union in
-    # `(scope_prefix)Provides: <domain_label>`-style declarations so a
-    # single area-level label opts every domain-matching entity in the
-    # scope into every feature for that domain.
+    # Pulled from `sensor.labeled_features_state.feature_meta` — the single
+    # source of truth for the generic-feature catalog. See the comment block
+    # on that attribute in configuration.yaml for the schema. `domain_label`
+    # is the human-readable provider grouping; the resolver below unions in
+    # `(scope_prefix)Provides: <domain_label>`-style declarations so a single
+    # area-level label opts every domain-matching entity in the scope into
+    # every feature for that domain.
     - variables:
         feature_meta: >-
-          {% set m = {
-            'Media Toggle':         {'domain': 'media_player', 'kind': 'media_toggle',       'domain_label': 'Media Player'},
-            'Media Play':           {'domain': 'media_player', 'kind': 'media_play',         'domain_label': 'Media Player'},
-            'Media Pause':          {'domain': 'media_player', 'kind': 'media_pause',        'domain_label': 'Media Player'},
-            'Media Next':           {'domain': 'media_player', 'kind': 'media_next',         'domain_label': 'Media Player'},
-            'Media Previous':       {'domain': 'media_player', 'kind': 'media_previous',     'domain_label': 'Media Player'},
-            'Media Seek Back':      {'domain': 'media_player', 'kind': 'media_seek_back',    'domain_label': 'Media Player'},
-            'Media Seek Forward':   {'domain': 'media_player', 'kind': 'media_seek_forward', 'domain_label': 'Media Player'},
-            'Volume Up':            {'domain': 'media_player', 'kind': 'volume_up',          'domain_label': 'Media Player'},
-            'Volume Down':          {'domain': 'media_player', 'kind': 'volume_down',        'domain_label': 'Media Player'},
-            'Lights On':            {'domain': 'light',        'kind': 'light_on',           'domain_label': 'Light'},
-            'Lights Off':           {'domain': 'light',        'kind': 'light_off',          'domain_label': 'Light'},
-            'Lights Up':            {'domain': 'light',        'kind': 'light_up',           'domain_label': 'Light'},
-            'Lights Down':          {'domain': 'light',        'kind': 'light_down',         'domain_label': 'Light'},
-            'Fan On':               {'domain': 'fan',          'kind': 'fan_on',             'domain_label': 'Fan'},
-            'Fan Off':              {'domain': 'fan',          'kind': 'fan_off',            'domain_label': 'Fan'},
-            'Fan Up':               {'domain': 'fan',          'kind': 'fan_up',             'domain_label': 'Fan'},
-            'Fan Down':             {'domain': 'fan',          'kind': 'fan_down',           'domain_label': 'Fan'},
-            'Ads':                  {'domain': '',             'kind': 'ads',                'domain_label': ''},
-            'Night':                {'domain': '',             'kind': 'night',              'domain_label': ''}
-          } %}
-          {{ m.get(_feature, {'domain': '', 'kind': 'unknown', 'domain_label': ''}) }}
+          {% set catalog = state_attr('sensor.labeled_features_state', 'feature_meta') | default({}) %}
+          {{ catalog.get(_feature, {'domain': '', 'kind': 'unknown', 'domain_label': ''}) }}
+
 
     # ── Step 2 (post-meta): Provides resolver — label-based target union ────
     # For each label name (the feature itself, plus the feature's

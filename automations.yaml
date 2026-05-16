@@ -2349,24 +2349,29 @@
                 {% endif %}
               _scope_pfx: >-
                 {{ 'Area ' if resolved_scope == 'area' else ('Floor ' if resolved_scope == 'floor' else '') }}
-              _matching_providers_main: >-
-                {% set ns = namespace(names=[]) %}
-                {% for pname, pdata in providers_catalog.items() %}
-                  {% if feature_name in (pdata.get('features', []) | list) %}
-                    {% set ns.names = ns.names + [pname] %}
-                  {% endif %}
-                {% endfor %}
-                {{ ns.names }}
+              # Provider grouping (domain_label) for this feature comes from
+              # `sensor.labeled_features_state.feature_meta` — the single
+              # source of truth shared with `script.labeled_feature_generics`.
+              # Empty string here means the feature has no domain-level
+              # Provides shorthand and we only resolve the feature name itself.
+              _feature_domain_label: >-
+                {% set catalog = state_attr('sensor.labeled_features_state', 'feature_meta') | default({}) %}
+                {{ catalog.get(feature_name, {}).get('domain_label', '') }}
+              # Provides-followers: union of bare and scope-prefixed Provides
+              # labels for the feature's domain_label (if defined). With the
+                # entity-context `<scope_pfx>Provides: <DomainLabel>` shorthand
+                # a single label opts an entity into every feature for that
+                # domain — see Label Based Features.md → "Provides: <Domain>".
               _provides_followers: >-
-                {% set ns = namespace(ents=[]) %}
-                {% for pname in _matching_providers_main %}
-                  {% set bare_lbl = 'Provides: ' ~ pname %}
-                  {% set scoped_lbl = _scope_pfx ~ 'Provides: ' ~ pname %}
-                  {% set ns.ents = ns.ents
-                      + (label_entities(bare_lbl) | list)
-                      + (label_entities(scoped_lbl) | list) %}
-                {% endfor %}
-                {{ ns.ents | unique | list }}
+                {% if _feature_domain_label == '' %}
+                  {{ [] }}
+                {% else %}
+                  {% set bare_lbl = 'Provides: ' ~ _feature_domain_label %}
+                  {% set scoped_lbl = _scope_pfx ~ 'Provides: ' ~ _feature_domain_label %}
+                  {{ ((label_entities(bare_lbl) | list)
+                      + (label_entities(scoped_lbl) | list)) | unique | list }}
+                {% endif %}
+
               followers: >-
                 {% set all_f = (label_entities(follower_label_name) | list
                                 + _provides_followers) | unique | list %}
@@ -2383,25 +2388,22 @@
                     {% set eff_en = false if inverted else true %}
                     {% set ovr_toggle = (ovr + ' Toggle: True') in all_leader_labels %}
                     {% set ovr_lbl = 'Area Follower: ' + ovr if resolved_scope == 'area' else ('Floor Follower: ' + ovr if resolved_scope == 'floor' else 'Follower: ' + ovr) %}
-                    {# Per-override provider union — match providers whose
-                       features list includes the override feature name. #}
-                    {% set pns = namespace(names=[]) %}
-                    {% for pname, pdata in providers_catalog.items() %}
-                      {% if ovr in (pdata.get('features', []) | list) %}
-                        {% set pns.names = pns.names + [pname] %}
-                      {% endif %}
-                    {% endfor %}
-                    {% set ovr_provides_ns = namespace(ents=[]) %}
-                    {% for pname in pns.names %}
-                      {% set bare_lbl = 'Provides: ' ~ pname %}
-                      {% set scoped_lbl = _scope_pfx ~ 'Provides: ' ~ pname %}
-                      {% set ovr_provides_ns.ents = ovr_provides_ns.ents
-                          + (label_entities(bare_lbl) | list)
-                          + (label_entities(scoped_lbl) | list) %}
-                    {% endfor %}
+                    {# Per-override provider union — same single-source-of-truth
+                       lookup as the main block, but keyed on the override
+                       feature name instead of the leader's feature_name. #}
+                    {% set ovr_catalog = state_attr('sensor.labeled_features_state', 'feature_meta') | default({}) %}
+                    {% set ovr_domain_label = ovr_catalog.get(ovr, {}).get('domain_label', '') %}
+                    {% set ovr_provides_ents = [] %}
+                    {% if ovr_domain_label != '' %}
+                      {% set bare_lbl = 'Provides: ' ~ ovr_domain_label %}
+                      {% set scoped_lbl = _scope_pfx ~ 'Provides: ' ~ ovr_domain_label %}
+                      {% set ovr_provides_ents = ((label_entities(bare_lbl) | list)
+                                                  + (label_entities(scoped_lbl) | list)) | unique | list %}
+                    {% endif %}
                     {% set all_ovr_f = (label_entities(ovr_lbl) | list
-                                        + (ovr_provides_ns.ents | unique | list)) | unique | list %}
+                                        + ovr_provides_ents) | unique | list %}
                     {% set ovr_followers = all_ovr_f | select('in', scope_entity_set) | list if scope_entity_set | length > 0 else all_ovr_f %}
+
                     {% for f in ovr_followers %}
                       {% set ns.items = ns.items + [{'f': f, 'feat': ovr, 'en': eff_en, 'toggle': ovr_toggle}] %}
                     {% endfor %}
