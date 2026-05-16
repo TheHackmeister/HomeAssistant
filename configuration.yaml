@@ -43,42 +43,31 @@ template:
         # Adding a new provider here makes `(Area |Floor |)Provides: <Name>`
         # immediately wire that entity into every listed feature without
         # needing per-feature `Follower:` labels.
-        providers:
-          Media Player:
-            domain: media_player
-            features:
-              - Media Toggle
-              - Media Play
-              - Media Pause
-              - Media Next
-              - Media Previous
-              - Media Seek Back
-              - Media Seek Forward
-              - Volume Up
-              - Volume Down
-          Light:
-            domain: light
-            features:
-              - Lights On
-              - Lights Off
-              - Lights Up
-              - Lights Down
-          Fan:
-            domain: fan
-            features:
-              - Fan On
-              - Fan Off
-              - Fan Up
-              - Fan Down
-          Lock:
-            domain: lock
-            features: []
-          Climate:
-            domain: climate
-            features: []
-          Cover:
-            domain: cover
-            features: []
+        providers: >
+          {{
+            {
+              'Media Player': {
+                'domain': 'media_player',
+                'features': [
+                  'Media Toggle', 'Media Play', 'Media Pause',
+                  'Media Next', 'Media Previous',
+                  'Media Seek Back', 'Media Seek Forward',
+                  'Volume Up', 'Volume Down'
+                ]
+              },
+              'Light': {
+                'domain': 'light',
+                'features': ['Lights On', 'Lights Off', 'Lights Up', 'Lights Down']
+              },
+              'Fan': {
+                'domain': 'fan',
+                'features': ['Fan On', 'Fan Off', 'Fan Up', 'Fan Down']
+              },
+              'Lock':    {'domain': 'lock',    'features': []},
+              'Climate': {'domain': 'climate', 'features': []},
+              'Cover':   {'domain': 'cover',   'features': []}
+            }
+          }}
         last_updated_at: >
           {% set entities = expand(label_entities('feature_leader'))
               | sort(attribute='last_changed_timestamp')
