@@ -2389,6 +2389,85 @@ labeled_feature_follower:
       follower_default_script: "{% set pfx = scoped_feature + ' Script: ' %} {{ follower_labels\n
         \  | select('match', '^' + pfx + '.+')\n   | first | default('')\n   | regex_replace('^.+:
         ', '') }}\n"
+      # ── Pre/Post Script chain resolution (Follower) ─────────────────
+      # Mirrors the Leader's Pre/Post resolution. Each phase resolves
+      # to an ordered list of script refs in declaration order (` N`
+      # suffix; missing suffix = 0). Pre and Post wrap the main
+      # action — Pre runs unconditional + the matching enable/disable
+      # variant, then the existing main flow (script chain OR target-
+      # value OR toggle OR direct domain action) runs, then Post runs.
+      _follower_pre_unconditional: >-
+        {% set pfx = scoped_feature ~ ' Pre Script' %}
+        {% set ns = namespace(items=[]) %}
+        {% for lbl in follower_labels %}
+          {% if lbl | regex_search('^' ~ pfx ~ '( \\d+)?: .+$') %}
+            {% set idx = (lbl | regex_replace('^' ~ pfx ~ '( (\\d+))?:.*$', '\\2') | int(0)) %}
+            {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
+            {% set ns.items = ns.items + [{'idx': idx, 'ref': ref}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items | sort(attribute='idx') | map(attribute='ref') | list }}
+      _follower_pre_enable: >-
+        {% set pfx = scoped_feature ~ ' Enable Pre Script' %}
+        {% set ns = namespace(items=[]) %}
+        {% for lbl in follower_labels %}
+          {% if lbl | regex_search('^' ~ pfx ~ '( \\d+)?: .+$') %}
+            {% set idx = (lbl | regex_replace('^' ~ pfx ~ '( (\\d+))?:.*$', '\\2') | int(0)) %}
+            {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
+            {% set ns.items = ns.items + [{'idx': idx, 'ref': ref}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items | sort(attribute='idx') | map(attribute='ref') | list }}
+      _follower_pre_disable: >-
+        {% set pfx = scoped_feature ~ ' Disable Pre Script' %}
+        {% set ns = namespace(items=[]) %}
+        {% for lbl in follower_labels %}
+          {% if lbl | regex_search('^' ~ pfx ~ '( \\d+)?: .+$') %}
+            {% set idx = (lbl | regex_replace('^' ~ pfx ~ '( (\\d+))?:.*$', '\\2') | int(0)) %}
+            {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
+            {% set ns.items = ns.items + [{'idx': idx, 'ref': ref}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items | sort(attribute='idx') | map(attribute='ref') | list }}
+      _follower_post_unconditional: >-
+        {% set pfx = scoped_feature ~ ' Post Script' %}
+        {% set ns = namespace(items=[]) %}
+        {% for lbl in follower_labels %}
+          {% if lbl | regex_search('^' ~ pfx ~ '( \\d+)?: .+$') %}
+            {% set idx = (lbl | regex_replace('^' ~ pfx ~ '( (\\d+))?:.*$', '\\2') | int(0)) %}
+            {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
+            {% set ns.items = ns.items + [{'idx': idx, 'ref': ref}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items | sort(attribute='idx') | map(attribute='ref') | list }}
+      _follower_post_enable: >-
+        {% set pfx = scoped_feature ~ ' Enable Post Script' %}
+        {% set ns = namespace(items=[]) %}
+        {% for lbl in follower_labels %}
+          {% if lbl | regex_search('^' ~ pfx ~ '( \\d+)?: .+$') %}
+            {% set idx = (lbl | regex_replace('^' ~ pfx ~ '( (\\d+))?:.*$', '\\2') | int(0)) %}
+            {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
+            {% set ns.items = ns.items + [{'idx': idx, 'ref': ref}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items | sort(attribute='idx') | map(attribute='ref') | list }}
+      _follower_post_disable: >-
+        {% set pfx = scoped_feature ~ ' Disable Post Script' %}
+        {% set ns = namespace(items=[]) %}
+        {% for lbl in follower_labels %}
+          {% if lbl | regex_search('^' ~ pfx ~ '( \\d+)?: .+$') %}
+            {% set idx = (lbl | regex_replace('^' ~ pfx ~ '( (\\d+))?:.*$', '\\2') | int(0)) %}
+            {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
+            {% set ns.items = ns.items + [{'idx': idx, 'ref': ref}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items | sort(attribute='idx') | map(attribute='ref') | list }}
+      pre_script_chain: >-
+        {{ _follower_pre_unconditional
+           + (_follower_pre_enable if (follower_enabled | bool) else _follower_pre_disable) }}
+      post_script_chain: >-
+        {{ _follower_post_unconditional
+           + (_follower_post_enable if (follower_enabled | bool) else _follower_post_disable) }}
   - variables:
       _enable_script_args: '{% set ns = namespace(d={}) %} {% set lf_leaders = state_attr(''sensor.labeled_features_state'',
         ''leaders'') | default({}) %} {% set lf_features = state_attr(''sensor.labeled_features_state'',
@@ -2478,9 +2557,73 @@ labeled_feature_follower:
         = namespace(d={}) %}{% for k, v in _default_script_args.items() %}{% if k
         in sf %}{% set ns.d = dict(ns.d, **{k: v}) %}{% endif %}{% endfor %}{{ ns.d
         }}'
+  # ── Pre Script chain dispatch (Follower) ───────────────────────────
+  # Runs before the existing main flow (script chain / target-value /
+  # toggle / direct domain action). Each entry in pre_script_chain is
+  # dispatched in order. Errors are routed through
+  # `script.labeled_feature_error_mode`. If error_mode == 'stop' on any
+  # entry, the main + post phases are skipped via `_phase_pre_failed`.
+  - variables:
+      _phase_pre_failed: false
+      _follower_std_fields_base: >-
+        {{ {'follower_entity_id': follower_entity_id,
+            'feature': feature,
+            'leader_entity_id': leader_entity_id,
+            'leader_enabled': leader_enabled,
+            'scope': scope,
+            'scope_id': scope_id,
+            'toggle': (toggle | default(false)),
+            'error_mode': follower_error_mode} }}
+  - repeat:
+      for_each: '{{ pre_script_chain }}'
+      sequence:
+      - variables:
+          _ps_ref: '{{ repeat.item }}'
+          _ps_idx: '{{ repeat.index }}'
+          _ps_std: '{{ _follower_std_fields_base | combine({"phase": "pre"}) }}'
+      - if:
+        - condition: template
+          value_template: '{{ _ps_ref.startswith("automation.") or _ps_ref.startswith("scene.") }}'
+        then:
+        - action: '{{ _ps_ref }}'
+          data: {}
+          continue_on_error: true
+        else:
+        - action: '{{ _ps_ref }}'
+          data: '{{ _ps_std }}'
+          continue_on_error: true
+      - if:
+        - condition: template
+          value_template: '{{ error is defined }}'
+        then:
+        - if:
+          - condition: template
+            value_template: '{{ follower_error_mode == "log" }}'
+          then:
+          - action: system_log.write
+            data:
+              level: error
+              message: 'Labeled Feature Follower: Pre Script error {{ _ps_ref }} ({{ follower_entity_id }}, feature: {{ feature_name }}, idx: {{ _ps_idx }}): {{ error }}'
+        - if:
+          - condition: template
+            value_template: '{{ follower_error_mode == "alert" }}'
+          then:
+          - action: script.send_alert
+            data:
+              alert_severity: high
+              alert_title: Labeled Feature Follower Pre Script Error
+              alert_message: 'Pre Script {{ _ps_ref }} (idx {{ _ps_idx }}) error for {{ follower_entity_id }} (feature: {{ feature_name }}): {{ error }}'
+        - if:
+          - condition: template
+            value_template: '{{ follower_error_mode == "stop" }}'
+          then:
+          - variables:
+              _phase_pre_failed: true
+          - stop: 'Labeled Feature Follower: Pre Script halted on {{ _ps_ref }} (feature: {{ feature_name }})'
+            error: true
   - if:
     - condition: template
-      value_template: '{{ follower_enable_script | trim != "" and leader_enabled |
+      value_template: '{{ not _phase_pre_failed and follower_enable_script | trim != "" and leader_enabled |
         bool }}'
     then:
     - if:
@@ -3045,6 +3188,58 @@ labeled_feature_follower:
         '
       target:
         entity_id: '{{ follower_entity_id }}'
+  # ── Post Script chain dispatch (Follower) ──────────────────────────
+  # Runs after the main flow. Skipped if Pre Script halted with
+  # follower_error_mode == 'stop' (consistent with leader sequencing).
+  - if:
+    - condition: template
+      value_template: '{{ not _phase_pre_failed }}'
+    then:
+    - repeat:
+        for_each: '{{ post_script_chain }}'
+        sequence:
+        - variables:
+            _ps_ref: '{{ repeat.item }}'
+            _ps_idx: '{{ repeat.index }}'
+            _ps_std: '{{ _follower_std_fields_base | combine({"phase": "post"}) }}'
+        - if:
+          - condition: template
+            value_template: '{{ _ps_ref.startswith("automation.") or _ps_ref.startswith("scene.") }}'
+          then:
+          - action: '{{ _ps_ref }}'
+            data: {}
+            continue_on_error: true
+          else:
+          - action: '{{ _ps_ref }}'
+            data: '{{ _ps_std }}'
+            continue_on_error: true
+        - if:
+          - condition: template
+            value_template: '{{ error is defined }}'
+          then:
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode == "log" }}'
+            then:
+            - action: system_log.write
+              data:
+                level: error
+                message: 'Labeled Feature Follower: Post Script error {{ _ps_ref }} ({{ follower_entity_id }}, feature: {{ feature_name }}, idx: {{ _ps_idx }}): {{ error }}'
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode == "alert" }}'
+            then:
+            - action: script.send_alert
+              data:
+                alert_severity: high
+                alert_title: Labeled Feature Follower Post Script Error
+                alert_message: 'Post Script {{ _ps_ref }} (idx {{ _ps_idx }}) error for {{ follower_entity_id }} (feature: {{ feature_name }}): {{ error }}'
+          - if:
+            - condition: template
+              value_template: '{{ follower_error_mode == "stop" }}'
+            then:
+            - stop: 'Labeled Feature Follower: Post Script halted on {{ _ps_ref }} (feature: {{ feature_name }})'
+              error: true
 labeled_feature_sleep_timeout:
   alias: Labeled Feature Sleep Timeout
   description: "Single-run sleep-timeout script for the Labeled Feature Button system.
