@@ -2544,40 +2544,37 @@
 - id: 'labeled_feature_areas'
   alias: Labeled Feature Areas
   description: >
-    Computes the current area scope/feature map by parsing label/area/floor
-    registries, then diffs against the previous run (stored on
-    `sensor.labeled_features_areas_prev_state` via input_text or simply in
-    this run's `_prev_map` derived from `trigger.from_state` if state-driven)
-    and dispatches creates / deletes via `script.labeled_feature_area` and
+    Reacts to changes in `sensor.labeled_feature_areas_state.label_map`
+    (a flat `<scope_id>||<label>` → label_data map computed in
+    configuration.yaml's trigger-based template sensor) and dispatches
+    creates / deletes via `script.labeled_feature_area` and
     `script.labeled_feature_entities`.
 
     All label parsing, scope resolution, component-default selection,
-    object_id computation, and floor dedup happens inside this automation's
-    first `variables:` step. The work used to live on
-    `sensor.labeled_features_state.areas`, but state-based template sensors
-    don't observe registry mutations (label add/remove on an area would never
-    re-render). Moving it here lets us fire on the real events.
+    object_id computation, and floor dedup now lives in the sensor so
+    we can rely on HA's native state-change machinery for the diff:
+    `trigger.from_state.attributes.label_map` is the previous snapshot,
+    `trigger.to_state.attributes.label_map` is the new one. Removes
+    fire first so renames / component swaps retract the stale topic
+    before the new one publishes.
 
-    Triggers:
-      - label_registry_updated   (add/remove/rename labels, including assignments)
-      - area_registry_updated    (area created, renamed, or its label_ids edited)
-      - floor_registry_updated   (floor membership changes → Floor-scoped features)
-      - homeassistant.start      (idempotent re-publish for restart resilience)
+    Restart behavior: trigger-based template sensors restore state +
+    attributes from the recorder, so on boot `from_state` already has
+    the prior `label_map`. If the sensor's value actually changed
+    during downtime (e.g. labels removed while HA was off) the diff
+    catches it. If it didn't change, no work is needed — retained MQTT
+    discovery topics already hold the entities.
   triggers:
-    - trigger: event
-      event_type: label_registry_updated
-    - trigger: event
-      event_type: area_registry_updated
-    - trigger: event
-      event_type: floor_registry_updated
-    - trigger: homeassistant
-      event: start
+    - trigger: state
+      entity_id: sensor.labeled_feature_areas_state
+      attribute: label_map
   mode: queued
   max: 50
   actions:
-    # Pass 1+2+3: full registry-driven recomputation of the area scope map.
-    # Previously lived on sensor.labeled_features_state.attributes.areas; moved
-    # here because state-based template sensors don't observe registry events.
+    # The heavy registry parsing now lives in
+    # `sensor.labeled_feature_areas_state` (configuration.yaml). The
+    # automation just diffs the sensor's `label_map` attribute between
+    # the previous and current snapshots.
     - variables:
         automation_error_mode: >-
           {% set em_label = labels('automation.labeled_feature_areas')
@@ -2585,161 +2582,17 @@
               | select('match', '(?i)^error mode: .+')
               | first | default('') %}
           {{ em_label | regex_replace('(?i)^error mode: ', '') | default('log', true) }}
+        _now_map: '{{ trigger.to_state.attributes.label_map | default({}, true) }}'
+        _prev_map: '{{ trigger.from_state.attributes.label_map | default({}, true) }}'
+        # `_is_start` is true when there is no prior snapshot to diff
+        # against (sensor was never populated, e.g. brand new install or
+        # cleared recorder). On a normal HA restart the trigger-based
+        # template sensor restores its attributes from history, so we
+        # *will* have a prior `label_map` and can diff normally. The
+        # short-circuit below only fires in the genuinely-no-history case.
         _is_start: >-
-          {{ trigger is defined and trigger.platform == "homeassistant" }}
-        _now_scopes: >-
-          {% set ha_topic = 'homeassistant' %}
-          {% set ns = namespace(scopes={}) %}
-          {# Pass 1: skeleton (Manifest only) for every area gated by
-             `feature_leader`. Manifest's component+object_id are deterministic
-             from the area_id. #}
-          {% for aid in label_areas('feature_leader') %}
-            {% set safe_aid = aid | replace(' ', '_') | replace('-', '_') | lower %}
-            {% set fns = namespace(fid='') %}
-            {% for fid in floors() %}
-              {% if aid in floor_areas(fid) %}{% set fns.fid = fid %}{% endif %}
-            {% endfor %}
-            {% set ns.scopes = dict(ns.scopes, **{
-              aid: {
-                'kind': 'area',
-                'floor_id': fns.fid,
-                'features': {
-                  'Manifest': {
-                    'scope': 'area',
-                    'scope_id': aid,
-                    'component': 'sensor',
-                    'object_id': 'area_manifest_' ~ safe_aid,
-                    'declaring_area_id': aid
-                  }
-                }
-              }
-            }) %}
-          {% endfor %}
-          {# Pass 2: parse each gated area's labels for
-             `(Area |Floor |)Provides: <F>` (the feature declaration). Only
-             feature declarations are parsed here; option pools resolve at
-             dispatch time in script.labeled_feature_area via the 4-step
-             Provides resolver. #}
-          {% set rns = namespace(scopes=ns.scopes) %}
-          {% for aid in label_areas('feature_leader') %}
-            {% set this_floor_id = rns.scopes[aid].floor_id %}
-            {% set area_lbls = labels(aid) | map('label_name') | reject('none') | list %}
-            {% for lbl in area_lbls %}
-              {% set m = lbl | regex_replace('^(Area |Floor |)Provides: (.+)$', 'M|\\1|\\2') %}
-              {% if m.startswith('M|') %}
-                {% set parts = m.split('|') %}
-                {% set prefix = parts[1] | trim %}
-                {% set fname = parts[2] | trim %}
-                {% set is_modifier = fname | regex_search('^[^:]+ (Component|Min|Max|Step|Unit|Icon|Initial|Static|Mode|Device Class): ') %}
-                {% if fname != '' and not is_modifier %}
-                  {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'none') %}
-                  {% set scope_id_val = aid if scope_val in ['area', 'none'] else this_floor_id %}
-                  {% if scope_id_val != '' %}
-                    {% set safe_scope_id = scope_id_val | replace(' ', '_') | replace('-', '_') | lower %}
-                    {% set fslug = fname | lower | replace(' ', '_') | replace('-', '_') %}
-                    {% set default_component = 'sensor' if fname == 'Shoot Zone'
-                        else ('number' if fname == 'Root Zone' else 'select') %}
-                    {% if fname == 'Shoot Zone' %}{% set default_obj = safe_scope_id ~ '_vpd' %}
-                    {% elif fname == 'Root Zone' %}{% set default_obj = safe_scope_id ~ '_tracked_psi' %}
-                    {% else %}{% set default_obj = safe_scope_id ~ '_' ~ fslug %}{% endif %}
-                    {% set scope_prefix = ('Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '')) %}
-                    {% set comp_override = area_lbls
-                        | select('match', '^' ~ scope_prefix ~ 'Provides ' ~ fname ~ ' Component: .+$')
-                        | first | default('') | regex_replace('^.+: ', '') | trim %}
-                    {% set component = comp_override if comp_override != '' else default_component %}
-                    {% set fentry = {
-                      'scope': scope_val,
-                      'scope_id': scope_id_val,
-                      'component': component,
-                      'object_id': default_obj,
-                      'declaring_area_id': aid
-                    } %}
-                    {% if scope_id_val not in rns.scopes %}
-                      {% set rns.scopes = dict(rns.scopes, **{
-                        scope_id_val: {
-                          'kind': 'floor',
-                          'floor_id': scope_id_val,
-                          'features': {fname: fentry}
-                        }
-                      }) %}
-                    {% else %}
-                      {% set existing = rns.scopes[scope_id_val] %}
-                      {% if fname not in existing.features %}
-                        {% set new_features = dict(existing.features, **{fname: fentry}) %}
-                        {% set rns.scopes = dict(rns.scopes, **{scope_id_val: dict(existing, **{'features': new_features})}) %}
-                      {% endif %}
-                    {% endif %}
-                  {% endif %}
-                {% endif %}
-              {% endif %}
-            {% endfor %}
-          {% endfor %}
-          {# Pass 3: flat `expected` list per scope. #}
-          {% set ens = namespace(scopes=rns.scopes) %}
-          {% for sid, sdat in ens.scopes.items() %}
-            {% set exp = [] %}
-            {% for fname, fdat in sdat.features.items() %}
-              {% set exp = exp + [{
-                'component': fdat.component,
-                'object_id': fdat.object_id,
-                'ha_topic': ha_topic
-              }] %}
-            {% endfor %}
-            {% set ens.scopes = dict(ens.scopes, **{sid: dict(sdat, **{'expected': exp})}) %}
-          {% endfor %}
-          {{ ens.scopes }}
-        # Previous run's `_now_scopes`, carried forward via this.attributes.
-        # HA exposes any top-level `variables:` set during an automation
-        # run as attributes on the automation entity (see the final
-        # `variables:` step at the end of this automation that writes
-        # `last_now_scopes`). The shape mirrors `_now_scopes` so the diff
-        # logic below can iterate it identically.
-        #
-        # The `homeassistant.start` branch (`_is_start`) deliberately short-
-        # circuits `_removed` to `[]` so a restart only re-publishes; it
-        # never retracts. The first run after restart repopulates
-        # `last_now_scopes` for subsequent registry-event runs.
-        #
-        # Caveat: `this.attributes` is not persisted across HA restarts, so
-        # a label removed *while HA is down* won't be retracted on the next
-        # start (the entity will linger via its retained MQTT topic). If
-        # that becomes painful, persist `last_now_scopes` via an
-        # `input_text` or retained MQTT topic instead.
-        _prev_scopes: '{{ this.attributes.get("last_now_scopes", {}) }}'
-    # Flatten both snapshots into <scope_id>||<feature> maps so the diff is
-    # cheap and identity-stable (re-publishes for same key are a no-op when
-    # component+object_id match).
-    - variables:
-        _now_map: >-
-          {% set ns = namespace(d={}) %}
-          {% for sid, sdat in _now_scopes.items() %}
-            {% for fname, fdat in sdat.get('features', {}).items() %}
-              {% set ns.d = dict(ns.d, **{sid ~ '||' ~ fname: {
-                'scope_id': sid,
-                'feature': fname,
-                'scope': fdat.get('scope', 'area'),
-                'component': fdat.get('component'),
-                'object_id': fdat.get('object_id'),
-                'feature_data': fdat
-              }}) %}
-            {% endfor %}
-          {% endfor %}
-          {{ ns.d }}
-        _prev_map: >-
-          {% set ns = namespace(d={}) %}
-          {% for sid, sdat in _prev_scopes.items() %}
-            {% for fname, fdat in sdat.get('features', {}).items() %}
-              {% set ns.d = dict(ns.d, **{sid ~ '||' ~ fname: {
-                'scope_id': sid,
-                'feature': fname,
-                'scope': fdat.get('scope', 'area'),
-                'component': fdat.get('component'),
-                'object_id': fdat.get('object_id'),
-                'feature_data': fdat
-              }}) %}
-            {% endfor %}
-          {% endfor %}
-          {{ ns.d }}
+          {{ trigger.from_state is none
+             or (trigger.from_state.attributes.label_map | default({}, true)) | length == 0 }}
     - variables:
         _added: >-
           {% if _is_start %}
@@ -2819,12 +2672,17 @@
     - repeat:
         for_each: '{{ _added }}'
         sequence:
+          # `feature` / `feature_data` parameter names on
+          # `script.labeled_feature_area` are unchanged for backward
+          # compatibility — the script and downstream callers still
+          # speak in "feature" terms. The sensor publishes the value
+          # under `label`/`label_data`; we map them here.
           - action: script.labeled_feature_area
             data:
-              feature: '{{ repeat.item.feature }}'
+              feature: '{{ repeat.item.label }}'
               scope_id: '{{ repeat.item.scope_id }}'
               scope: '{{ repeat.item.scope }}'
-              feature_data: '{{ repeat.item.feature_data }}'
+              feature_data: '{{ repeat.item.label_data }}'
               error_mode: '{{ automation_error_mode }}'
             continue_on_error: true
           - if:
@@ -2840,7 +2698,7 @@
                       level: error
                       message: >-
                         Labeled Feature Areas: error creating
-                        {{ repeat.item.feature }} for {{ repeat.item.scope_id }}:
+                        {{ repeat.item.label }} for {{ repeat.item.scope_id }}:
                         {{ error }}
               - if:
                   - condition: template
@@ -2851,7 +2709,7 @@
                       alert_severity: high
                       alert_title: Labeled Feature Areas Error
                       alert_message: >-
-                        Error creating {{ repeat.item.feature }} for
+                        Error creating {{ repeat.item.label }} for
                         {{ repeat.item.scope_id }}: {{ error }}
               - if:
                   - condition: template
@@ -2859,11 +2717,5 @@
                 then:
                   - stop: >-
                       Labeled Feature Areas: error creating
-                      {{ repeat.item.feature }} for {{ repeat.item.scope_id }}
+                      {{ repeat.item.label }} for {{ repeat.item.scope_id }}
                     error: true
-    # Persist this run's snapshot as an attribute on the automation entity
-    # so the next run can diff against it (read in by the `_prev_scopes`
-    # variable at the top). HA promotes top-level `variables:` step
-    # values to entity attributes for the lifetime of the run / state.
-    - variables:
-        last_now_scopes: '{{ _now_scopes }}'

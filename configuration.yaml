@@ -22,6 +22,151 @@ notify:
     tts_service: tts.picotts_say
     media_player: media_player.home_tts
 template:
+  # ─────────────────────────────────────────────────────────────────────
+  # sensor.labeled_feature_areas_state
+  #
+  # Source of truth for which (scope_id, label) pairs SHOULD have a
+  # discovered MQTT entity published. Trigger-based so it re-evaluates
+  # only on the registry mutations that can change the answer.
+  #
+  # State    : count of areas carrying the `feature_leader` label.
+  # scopes   : rich nested map { scope_id: { kind, floor_id, labels: {
+  #              <Label Name>: { scope, scope_id, component,
+  #                              object_id, declaring_area_id } } } }
+  #            (was previously called `features` inside the
+  #            `labeled_feature_areas` automation; renamed to `labels`
+  #            since the keys are literal label names parsed from
+  #            `(Area |Floor |)Provides: <Label>` declarations.)
+  # label_map: flat <scope_id>||<label> → label_data, used by
+  #            automation.labeled_feature_areas for cheap diffing via
+  #            `trigger.from_state.attributes.label_map` vs
+  #            `trigger.to_state.attributes.label_map`.
+  #
+  # Triggers mirror the registry events that used to fire the
+  # automation directly. `homeassistant.start` ensures restored state
+  # is reconciled against the live registry on boot.
+  # ─────────────────────────────────────────────────────────────────────
+  - trigger:
+      - trigger: event
+        event_type: label_registry_updated
+      - trigger: event
+        event_type: area_registry_updated
+      - trigger: event
+        event_type: floor_registry_updated
+      - trigger: homeassistant
+        event: start
+    sensor:
+      - name: "Labeled Feature Areas State"
+        unique_id: labeled_feature_areas_state
+        state_class: measurement
+        unit_of_measurement: areas
+        state: >
+          {{ label_areas('feature_leader') | list | count }}
+        attributes:
+          scopes: >
+            {% set ha_topic = 'homeassistant' %}
+            {% set ns = namespace(scopes={}) %}
+            {# Pass 1: skeleton (Manifest only) for every area gated by
+               `feature_leader`. Manifest's component+object_id are
+               deterministic from the area_id. #}
+            {% for aid in label_areas('feature_leader') %}
+              {% set safe_aid = aid | replace(' ', '_') | replace('-', '_') | lower %}
+              {% set fns = namespace(fid='') %}
+              {% for fid in floors() %}
+                {% if aid in floor_areas(fid) %}{% set fns.fid = fid %}{% endif %}
+              {% endfor %}
+              {% set ns.scopes = dict(ns.scopes, **{
+                aid: {
+                  'kind': 'area',
+                  'floor_id': fns.fid,
+                  'labels': {
+                    'Manifest': {
+                      'scope': 'area',
+                      'scope_id': aid,
+                      'component': 'sensor',
+                      'object_id': 'area_manifest_' ~ safe_aid,
+                      'declaring_area_id': aid
+                    }
+                  }
+                }
+              }) %}
+            {% endfor %}
+            {# Pass 2: parse each gated area's labels for
+               `(Area |Floor |)Provides: <Label>`. Option pools and
+               modifiers (Component/Min/Max/…) resolve at dispatch
+               time in script.labeled_feature_area. #}
+            {% set rns = namespace(scopes=ns.scopes) %}
+            {% for aid in label_areas('feature_leader') %}
+              {% set this_floor_id = rns.scopes[aid].floor_id %}
+              {% set area_lbls = labels(aid) | map('label_name') | reject('none') | list %}
+              {% for lbl in area_lbls %}
+                {% set m = lbl | regex_replace('^(Area |Floor |)Provides: (.+)$', 'M|\\1|\\2') %}
+                {% if m.startswith('M|') %}
+                  {% set parts = m.split('|') %}
+                  {% set prefix = parts[1] | trim %}
+                  {% set lname = parts[2] | trim %}
+                  {% set is_modifier = lname | regex_search('^[^:]+ (Component|Min|Max|Step|Unit|Icon|Initial|Static|Mode|Device Class): ') %}
+                  {% if lname != '' and not is_modifier %}
+                    {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'none') %}
+                    {% set scope_id_val = aid if scope_val in ['area', 'none'] else this_floor_id %}
+                    {% if scope_id_val != '' %}
+                      {% set safe_scope_id = scope_id_val | replace(' ', '_') | replace('-', '_') | lower %}
+                      {% set lslug = lname | lower | replace(' ', '_') | replace('-', '_') %}
+                      {% set default_component = 'sensor' if lname == 'Shoot Zone'
+                          else ('number' if lname == 'Root Zone' else 'select') %}
+                      {% if lname == 'Shoot Zone' %}{% set default_obj = safe_scope_id ~ '_vpd' %}
+                      {% elif lname == 'Root Zone' %}{% set default_obj = safe_scope_id ~ '_tracked_psi' %}
+                      {% else %}{% set default_obj = safe_scope_id ~ '_' ~ lslug %}{% endif %}
+                      {% set scope_prefix = ('Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '')) %}
+                      {% set comp_override = area_lbls
+                          | select('match', '^' ~ scope_prefix ~ 'Provides ' ~ lname ~ ' Component: .+$')
+                          | first | default('') | regex_replace('^.+: ', '') | trim %}
+                      {% set component = comp_override if comp_override != '' else default_component %}
+                      {% set lentry = {
+                        'scope': scope_val,
+                        'scope_id': scope_id_val,
+                        'component': component,
+                        'object_id': default_obj,
+                        'declaring_area_id': aid
+                      } %}
+                      {% if scope_id_val not in rns.scopes %}
+                        {% set rns.scopes = dict(rns.scopes, **{
+                          scope_id_val: {
+                            'kind': 'floor',
+                            'floor_id': scope_id_val,
+                            'labels': {lname: lentry}
+                          }
+                        }) %}
+                      {% else %}
+                        {% set existing = rns.scopes[scope_id_val] %}
+                        {% if lname not in existing.labels %}
+                          {% set new_labels = dict(existing.labels, **{lname: lentry}) %}
+                          {% set rns.scopes = dict(rns.scopes, **{scope_id_val: dict(existing, **{'labels': new_labels})}) %}
+                        {% endif %}
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+            {{ rns.scopes }}
+          label_map: >
+            {% set scopes = this.attributes.scopes | default({}) %}
+            {% set ns = namespace(d={}) %}
+            {% for sid, sdat in scopes.items() %}
+              {% for lname, ldat in sdat.get('labels', {}).items() %}
+                {% set ns.d = dict(ns.d, **{sid ~ '||' ~ lname: {
+                  'scope_id': sid,
+                  'label': lname,
+                  'scope': ldat.get('scope', 'area'),
+                  'component': ldat.get('component'),
+                  'object_id': ldat.get('object_id'),
+                  'label_data': ldat
+                }}) %}
+              {% endfor %}
+            {% endfor %}
+            {{ ns.d }}
+
   - sensor:
     - name: "Labeled Features State"
       unique_id: labeled_features_state
