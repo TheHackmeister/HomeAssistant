@@ -4915,7 +4915,9 @@ labeled_feature_area:
         _fd: '{{ feature_data | default({}) }}'
         _err_mode: '{{ (error_mode | default("log") | lower) }}'
         _safe_scope_id: '{{ _scope_id | replace(" ", "_") | replace("-", "_") | lower }}'
+        _delete: '{{ delete | default(false) | bool(false) }}'
         _scope_prefix: >-
+
           {{ 'Area ' if _scope == 'area' else ('Floor ' if _scope == 'floor' else '') }}
         _declared_area_id: '{{ _fd.get("declared_area_id", "") }}'
         _scope_name: >-
@@ -4961,6 +4963,18 @@ labeled_feature_area:
             - variables:
                 _aid: '{{ _scope_id }}'
                 _safe_aid: '{{ _safe_scope_id }}'
+            - if:
+                - condition: template
+                  value_template: '{{ _delete }}'
+              then:
+                - action: script.labeled_feature_entities
+                  data:
+                    component: sensor
+                    object_id: 'area_manifest_{{ _safe_aid }}'
+                    delete: true
+                    error_mode: '{{ _err_mode }}'
+                - stop: 'Manifest retracted.'
+            - variables:
                 _ent_ids: '{{ area_entities(_aid) | list }}'
                 _dev_ids: '{{ area_devices(_aid) | list }}'
                 _ent_count: '{{ _ent_ids | length }}'
@@ -4979,7 +4993,6 @@ labeled_feature_area:
               data:
                 component: sensor
                 object_id: 'area_manifest_{{ _safe_aid }}'
-                delete: '{{ delete | default(false) }}'
                 name: '{{ _aname }} Area Manifest'
                 icon: mdi:format-list-bulleted-square
                 device:
@@ -5011,7 +5024,18 @@ labeled_feature_area:
               value_template: '{{ _feature == "Shoot Zone" }}'
           sequence:
             - variables:
-                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_vpd") }}'
+                _obj: '{{ _safe_scope_id ~ "_vpd" }}'
+            - if:
+                - condition: template
+                  value_template: '{{ _delete }}'
+              then:
+                - action: script.labeled_feature_entities
+                  data:
+                    component: sensor
+                    object_id: '{{ _obj }}'
+                    delete: true
+                    error_mode: '{{ _err_mode }}'
+                - stop: 'Shoot Zone retracted.'
             - action: script.labeled_feature_entities
               data:
                 component: sensor
@@ -5074,7 +5098,19 @@ labeled_feature_area:
               value_template: '{{ _feature == "Root Zone" }}'
           sequence:
             - variables:
-                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_tracked_psi") }}'
+                _obj: '{{ _safe_scope_id ~ "_tracked_psi" }}'
+            - if:
+                - condition: template
+                  value_template: '{{ _delete }}'
+              then:
+                - action: script.labeled_feature_entities
+                  data:
+                    component: number
+                    object_id: '{{ _obj }}'
+                    delete: true
+                    error_mode: '{{ _err_mode }}'
+                - stop: 'Root Zone retracted.'
+            - variables:
                 _initial: '{{ _fd.get("initial", "0") | default("0", true) }}'
                 _min: '{{ _fd.get("min", "0") | default("0", true) }}'
                 _max: '{{ _fd.get("max", "2000") | default("2000", true) }}'
@@ -5127,7 +5163,19 @@ labeled_feature_area:
           sequence:
             - variables:
                 _fslug: '{{ _feature | lower | replace(" ", "_") | replace("-", "_") }}'
-                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_" ~ _fslug) }}'
+                _obj: '{{ _safe_scope_id ~ "_" ~ _fslug }}'
+            - if:
+                - condition: template
+                  value_template: '{{ _delete }}'
+              then:
+                - action: script.labeled_feature_entities
+                  data:
+                    component: select
+                    object_id: '{{ _obj }}'
+                    delete: true
+                    error_mode: '{{ _err_mode }}'
+                - stop: 'Generic select retracted.'
+            - variables:
                 _exclude_label_bare:   '{{ _feature ~ " Exclude: True" }}'
                 _exclude_label_scoped: '{{ _scope_prefix ~ _feature ~ " Exclude: True" }}'
                 _excluded_ents: >-
@@ -5227,7 +5275,7 @@ labeled_feature_area:
                 _obj: '{{ _safe_scope_id ~ "_" ~ _fslug }}'
             - if:
                 - condition: template
-                  value_template: '{{ delete | default(false) }}'
+                  value_template: '{{ _delete }}'
               then:
                 - action: script.labeled_feature_entities
                   data:
