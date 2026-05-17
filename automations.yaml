@@ -2545,14 +2545,16 @@
   alias: Labeled Feature Areas
   description: >
     Reacts to changes in `sensor.labeled_feature_areas_state.label_map`
-    (a flat `<scope_id>||<label>` → label_data map computed in
+    (the flat `<scope_id>||<label>` → label_data map computed in
     configuration.yaml's trigger-based template sensor) and dispatches
     creates / deletes via `script.labeled_feature_area` and
     `script.labeled_feature_entities`.
 
     All label parsing, scope resolution, component-default selection,
-    object_id computation, and floor dedup now lives in the sensor so
-    we can rely on HA's native state-change machinery for the diff:
+    object_id computation, and floor dedup live in the sensor —
+    `label_map` is built directly from the registry calls (no
+    `this.attributes.*` self-reference) so we can rely on HA's native
+    state-change machinery for the diff:
     `trigger.from_state.attributes.label_map` is the previous snapshot,
     `trigger.to_state.attributes.label_map` is the new one. Removes
     fire first so renames / component swaps retract the stale topic
@@ -2571,10 +2573,8 @@
   mode: queued
   max: 50
   actions:
-    # The heavy registry parsing now lives in
-    # `sensor.labeled_feature_areas_state` (configuration.yaml). The
-    # automation just diffs the sensor's `label_map` attribute between
-    # the previous and current snapshots.
+    # All registry parsing / flattening lives in the sensor. We only
+    # diff snapshots here.
     - variables:
         automation_error_mode: >-
           {% set em_label = labels('automation.labeled_feature_areas')
@@ -2583,7 +2583,9 @@
               | first | default('') %}
           {{ em_label | regex_replace('(?i)^error mode: ', '') | default('log', true) }}
         _now_map: '{{ trigger.to_state.attributes.label_map | default({}, true) }}'
-        _prev_map: '{{ trigger.from_state.attributes.label_map | default({}, true) }}'
+        _prev_map: >-
+          {{ (trigger.from_state.attributes.label_map
+              if trigger.from_state is not none else {}) | default({}, true) }}
         # `_is_start` is true when there is no prior snapshot to diff
         # against (sensor was never populated, e.g. brand new install or
         # cleared recorder). On a normal HA restart the trigger-based
@@ -2593,6 +2595,14 @@
         _is_start: >-
           {{ trigger.from_state is none
              or (trigger.from_state.attributes.label_map | default({}, true)) | length == 0 }}
+    # Diff key is `<scope_id>||<label>` (the map key); we also
+    # compare on `component` so a `Provides <Feature> Component:`
+    # override swap surfaces as remove-old-then-add-new and the
+    # stale discovery topic gets retracted before the new one
+    # publishes. We deliberately do NOT compare on `object_id` —
+    # the sensor no longer emits one; canonical naming lives in
+    # `script.labeled_feature_area`, which is responsible for
+    # computing the correct object_id on both add and delete.
     - variables:
         _added: >-
           {% if _is_start %}
@@ -2601,7 +2611,6 @@
           {% set ns = namespace(items=[]) %}
           {% for k, v in _now_map.items() %}
             {% if k not in _prev_map
-                or _prev_map[k].object_id != v.object_id
                 or _prev_map[k].component != v.component %}
               {% set ns.items = ns.items + [v] %}
             {% endif %}
@@ -2615,7 +2624,6 @@
           {% set ns = namespace(items=[]) %}
           {% for k, v in _prev_map.items() %}
             {% if k not in _now_map
-                or _now_map[k].object_id != v.object_id
                 or _now_map[k].component != v.component %}
               {% set ns.items = ns.items + [v] %}
             {% endif %}
@@ -2623,15 +2631,20 @@
           {{ ns.items }}
           {% endif %}
     # Removes first so renames / component swaps retract the stale topic before
-    # the new one publishes.
+    # the new one publishes. We delegate to `script.labeled_feature_area`
+    # (with `delete: true`) instead of calling
+    # `script.labeled_feature_entities` directly so the script's per-
+    # feature branch can compute the canonical `object_id` to retract —
+    # the sensor doesn't emit one anymore.
     - repeat:
         for_each: '{{ _removed }}'
         sequence:
-          - action: script.labeled_feature_entities
+          - action: script.labeled_feature_area
             data:
-              component: '{{ repeat.item.component }}'
-              object_id: '{{ repeat.item.object_id }}'
-              ha_topic: homeassistant
+              feature: '{{ repeat.item.label }}'
+              scope_id: '{{ repeat.item.scope_id }}'
+              scope: '{{ repeat.item.scope }}'
+              feature_data: '{{ repeat.item.label_data }}'
               delete: true
               error_mode: '{{ automation_error_mode }}'
             continue_on_error: true
@@ -2648,7 +2661,7 @@
                       level: error
                       message: >-
                         Labeled Feature Areas: error retracting
-                        {{ repeat.item.component }}.{{ repeat.item.object_id }}:
+                        {{ repeat.item.label }} for {{ repeat.item.scope_id }}:
                         {{ error }}
               - if:
                   - condition: template
@@ -2659,15 +2672,15 @@
                       alert_severity: high
                       alert_title: Labeled Feature Areas Error
                       alert_message: >-
-                        Error retracting {{ repeat.item.component }}.{{ repeat.item.object_id }}:
-                        {{ error }}
+                        Error retracting {{ repeat.item.label }} for
+                        {{ repeat.item.scope_id }}: {{ error }}
               - if:
                   - condition: template
                     value_template: '{{ automation_error_mode == "stop" }}'
                 then:
                   - stop: >-
                       Labeled Feature Areas: error retracting
-                      {{ repeat.item.component }}.{{ repeat.item.object_id }}
+                      {{ repeat.item.label }} for {{ repeat.item.scope_id }}
                     error: true
     - repeat:
         for_each: '{{ _added }}'

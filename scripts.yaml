@@ -4824,17 +4824,25 @@ labeled_feature_area:
   alias: Labeled Feature Area
   description: >
     Per-feature dispatcher for the Labeled Feature Areas stack. Resolves
-    scope, builds the appropriate MQTT discovery payload (or payloads) and
-    delegates publishing to `script.labeled_feature_entities`.
+    scope, computes the canonical `object_id` for the feature (the
+    sensor no longer carries one), builds the appropriate MQTT discovery
+    payload (or payloads) and delegates publishing — or retraction, when
+    `delete: true` — to `script.labeled_feature_entities`.
+
+    Single source of truth for "feature → component + object_id"
+    mapping. Adding a new built-in feature is a one-line edit to the
+    matching branch's `_obj` / `_component` defaults; arbitrary features
+    fall through to the generic select / component-override branches.
   mode: parallel
   max: 100
   fields:
     feature:
       name: Feature
       description: >
-        Feature name as it appears in the `(Area |Floor |)Gen: <FeatureName>`
-        label. Examples: 'Manifest', 'Shoot Zone', 'Root Zone', or any user-
-        declared name like 'Audio Mode'.
+        Feature name as it appears in the
+        `(Area |Floor |)Provides: <FeatureName>` label. Examples:
+        'Manifest', 'Shoot Zone', 'Root Zone', or any user-declared
+        name like 'Audio Mode' / 'Media Player'.
       required: true
       selector:
         text: {}
@@ -4858,15 +4866,33 @@ labeled_feature_area:
     feature_data:
       name: Feature Data
       description: >
-        Pre-computed feature dict from
-        `sensor.labeled_features_state.areas[<scope_id>].features[<feature>]`.
-        Includes `component`, `object_id`, optional `icon`, `initial`, `min`,
-        `max`, `step`, `unit_of_measurement`, `device_class`, `static_options`,
-        and `declared_area_id`.
+        Pre-computed label_data dict from
+        `sensor.labeled_feature_areas_state.label_map[<scope_id>||<feature>].label_data`.
+        Currently carries `scope`, `scope_id`, `declaring_area_id` and
+        `component` (the optional override from
+        `Provides <Feature> Component: <comp>` labels, default
+        `select`). Object_id, defaults (min/max/step/icon/etc) are
+        owned by this script's per-feature branches.
       required: false
       default: {}
       selector:
         object: {}
+    delete:
+      name: Delete
+      description: >
+        When true, retract the MQTT discovery topic(s) for this
+        feature instead of publishing them. The script computes the
+        same canonical `object_id` it would have published, then
+        passes it to `script.labeled_feature_entities` with
+        `delete: true`. This is how
+        `automation.labeled_feature_areas` cleans up after a label
+        removal or a `Component:` swap — the sensor no longer carries
+        the object_id, so the only place that knows the canonical
+        name for retraction is this script.
+      required: false
+      default: false
+      selector:
+        boolean: {}
     error_mode:
       name: Error Mode
       description: silent | log | alert | stop. Default 'log'.
@@ -4926,6 +4952,8 @@ labeled_feature_area:
     # ── Step 3: Branch by feature ───────────────────────────────────────────
     - choose:
         # ────────────────────── Manifest ─────────────────────────────────────
+        # Canonical object_id (owned here, not by the sensor):
+        #   sensor.area_manifest_<safe_scope_id>
         - conditions:
             - condition: template
               value_template: '{{ _feature == "Manifest" }}'
@@ -4933,8 +4961,8 @@ labeled_feature_area:
             - variables:
                 _aid: '{{ _scope_id }}'
                 _safe_aid: '{{ _safe_scope_id }}'
-                _ent_ids: '{{ _fd.get("entity_ids", area_entities(_aid) | list) }}'
-                _dev_ids: '{{ _fd.get("device_ids", area_devices(_aid) | list) }}'
+                _ent_ids: '{{ area_entities(_aid) | list }}'
+                _dev_ids: '{{ area_devices(_aid) | list }}'
                 _ent_count: '{{ _ent_ids | length }}'
                 _dev_count: '{{ _dev_ids | length }}'
                 _aname: '{{ area_name(_aid) | default(_aid, true) }}'
@@ -4951,6 +4979,7 @@ labeled_feature_area:
               data:
                 component: sensor
                 object_id: 'area_manifest_{{ _safe_aid }}'
+                delete: '{{ delete | default(false) }}'
                 name: '{{ _aname }} Area Manifest'
                 icon: mdi:format-list-bulleted-square
                 device:
@@ -5195,7 +5224,19 @@ labeled_feature_area:
             - variables:
                 _fslug: '{{ _feature | lower | replace(" ", "_") | replace("-", "_") }}'
                 _comp: '{{ _fd.get("component") }}'
-                _obj: '{{ _fd.get("object_id", _safe_scope_id ~ "_" ~ _fslug) }}'
+                _obj: '{{ _safe_scope_id ~ "_" ~ _fslug }}'
+            - if:
+                - condition: template
+                  value_template: '{{ delete | default(false) }}'
+              then:
+                - action: script.labeled_feature_entities
+                  data:
+                    component: '{{ _comp }}'
+                    object_id: '{{ _obj }}'
+                    delete: true
+                    error_mode: '{{ _err_mode }}'
+                - stop: 'Generic component-override retracted.'
+            - variables:
                 _initial: '{{ _fd.get("initial", "") | default("", true) }}'
                 _min: '{{ _fd.get("min", "0") | default("0", true) }}'
                 _max: '{{ _fd.get("max", "100") | default("100", true) }}'

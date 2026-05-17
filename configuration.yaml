@@ -30,17 +30,35 @@ template:
   # only on the registry mutations that can change the answer.
   #
   # State    : count of areas carrying the `feature_leader` label.
-  # scopes   : rich nested map { scope_id: { kind, floor_id, labels: {
-  #              <Label Name>: { scope, scope_id, component,
-  #                              object_id, declaring_area_id } } } }
-  #            (was previously called `features` inside the
-  #            `labeled_feature_areas` automation; renamed to `labels`
-  #            since the keys are literal label names parsed from
-  #            `(Area |Floor |)Provides: <Label>` declarations.)
-  # label_map: flat <scope_id>||<label> → label_data, used by
-  #            automation.labeled_feature_areas for cheap diffing via
-  #            `trigger.from_state.attributes.label_map` vs
-  #            `trigger.to_state.attributes.label_map`.
+  # label_map: flat <scope_id>||<label> → {
+  #              scope_id, label, scope, declaring_area_id, component,
+  #              label_data: { scope, scope_id, component,
+  #                            declaring_area_id }
+  #            }
+  #            The sensor owns ONLY the `(scope_id, label)` registry and
+  #            the optional component hint
+  #            (`Provides <Label> Component: <comp>` label; default
+  #            `select`). It does NOT compute object_ids and does NOT
+  #            know about specific features —
+  #            `script.labeled_feature_area` is the single source of
+  #            truth for canonical naming (`area_manifest_<scope>`,
+  #            `<scope>_vpd`, etc.) and for generic features
+  #            (`<component>.<scope>_<feature_slug>`).
+  #            `automation.labeled_feature_areas` triggers directly on
+  #            this attribute and diffs `from_state` vs `to_state` —
+  #            no flattening required in the automation. The diff
+  #            compares on `<scope_id>||<label>` plus `component` so a
+  #            `Component:` override swap correctly retract+republishes.
+  #
+  # Built inline from the registry calls so there is no
+  # `this.attributes.*` self-reference. (A previous iteration exposed
+  # both a nested `scopes` attribute AND a flat `label_map` computed
+  # from `this.attributes.scopes`. In HA template-sensor attribute
+  # renders, `this` resolves to the entity's PREVIOUS state, so
+  # `label_map` lagged `scopes` by one tick — removing a label bumped
+  # `last_updated` but `label_map` didn't actually change, so the
+  # automation silently missed the mutation. Keeping only `label_map`,
+  # built inline, eliminates the trap.)
   #
   # Triggers mirror the registry events that used to fire the
   # automation directly. `homeassistant.start` ensures restored state
@@ -63,14 +81,21 @@ template:
         state: >
           {{ label_areas('feature_leader') | list | count }}
         attributes:
-          scopes: >
-            {% set ha_topic = 'homeassistant' %}
+          # `label_map` is the SINGLE attribute — a flat
+          # <scope_id>||<label> → label_data view that the automation
+          # diffs directly. Built inline here from the registry calls
+          # so there is no `this.attributes.*` self-reference (which
+          # would resolve to the entity's previous state in HA template-
+          # sensor attribute renders and lag the real value by one tick).
+          label_map: >
             {% set ns = namespace(scopes={}) %}
-            {# Pass 1: skeleton (Manifest only) for every area gated by
-               `feature_leader`. Manifest's component+object_id are
-               deterministic from the area_id. #}
+            {# Pass 1: empty scope skeleton for every area gated by
+               `feature_leader`. Capture floor_id so Pass 2 can resolve
+               `Floor Provides:` declarations. No labels are seeded by
+               default — Manifest (and everything else) must be opted in
+               explicitly with an `(Area |Floor |)Provides: <Label>`
+               label on the area. #}
             {% for aid in label_areas('feature_leader') %}
-              {% set safe_aid = aid | replace(' ', '_') | replace('-', '_') | lower %}
               {% set fns = namespace(fid='') %}
               {% for fid in floors() %}
                 {% if aid in floor_areas(fid) %}{% set fns.fid = fid %}{% endif %}
@@ -79,15 +104,7 @@ template:
                 aid: {
                   'kind': 'area',
                   'floor_id': fns.fid,
-                  'labels': {
-                    'Manifest': {
-                      'scope': 'area',
-                      'scope_id': aid,
-                      'component': 'sensor',
-                      'object_id': 'area_manifest_' ~ safe_aid,
-                      'declaring_area_id': aid
-                    }
-                  }
+                  'labels': {}
                 }
               }) %}
             {% endfor %}
@@ -105,28 +122,28 @@ template:
                   {% set parts = m.split('|') %}
                   {% set prefix = parts[1] | trim %}
                   {% set lname = parts[2] | trim %}
+                  {# Filter modifier labels (`Provides <Feature> Component:
+                     <comp>`, `… Min: …`, etc.) so they don't get
+                     registered as features in their own right. #}
                   {% set is_modifier = lname | regex_search('^[^:]+ (Component|Min|Max|Step|Unit|Icon|Initial|Static|Mode|Device Class): ') %}
                   {% if lname != '' and not is_modifier %}
                     {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'none') %}
                     {% set scope_id_val = aid if scope_val in ['area', 'none'] else this_floor_id %}
                     {% if scope_id_val != '' %}
-                      {% set safe_scope_id = scope_id_val | replace(' ', '_') | replace('-', '_') | lower %}
-                      {% set lslug = lname | lower | replace(' ', '_') | replace('-', '_') %}
-                      {% set default_component = 'sensor' if lname == 'Shoot Zone'
-                          else ('number' if lname == 'Root Zone' else 'select') %}
-                      {% if lname == 'Shoot Zone' %}{% set default_obj = safe_scope_id ~ '_vpd' %}
-                      {% elif lname == 'Root Zone' %}{% set default_obj = safe_scope_id ~ '_tracked_psi' %}
-                      {% else %}{% set default_obj = safe_scope_id ~ '_' ~ lslug %}{% endif %}
+                      {# Component hint: comes from a sibling
+                         `(Area |Floor |)Provides <Feature> Component: <comp>`
+                         label on the same area, default `select`.
+                         object_id is NOT computed here — that belongs
+                         to `script.labeled_feature_area`. #}
                       {% set scope_prefix = ('Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '')) %}
                       {% set comp_override = area_lbls
                           | select('match', '^' ~ scope_prefix ~ 'Provides ' ~ lname ~ ' Component: .+$')
                           | first | default('') | regex_replace('^.+: ', '') | trim %}
-                      {% set component = comp_override if comp_override != '' else default_component %}
+                      {% set component = comp_override if comp_override != '' else 'select' %}
                       {% set lentry = {
                         'scope': scope_val,
                         'scope_id': scope_id_val,
                         'component': component,
-                        'object_id': default_obj,
                         'declaring_area_id': aid
                       } %}
                       {% if scope_id_val not in rns.scopes %}
@@ -149,23 +166,25 @@ template:
                 {% endif %}
               {% endfor %}
             {% endfor %}
-            {{ rns.scopes }}
-          label_map: >
-            {% set scopes = this.attributes.scopes | default({}) %}
-            {% set ns = namespace(d={}) %}
-            {% for sid, sdat in scopes.items() %}
+            {# Flatten the intermediate { scope_id: { …, labels: { … } } }
+               structure into the public <scope_id>||<label> → label_data
+               map the automation consumes. The nested form is only
+               needed during construction (Pass 2 dedupes per scope_id);
+               we never expose it. #}
+            {% set fns = namespace(d={}) %}
+            {% for sid, sdat in rns.scopes.items() %}
               {% for lname, ldat in sdat.get('labels', {}).items() %}
-                {% set ns.d = dict(ns.d, **{sid ~ '||' ~ lname: {
+                {% set fns.d = dict(fns.d, **{sid ~ '||' ~ lname: {
                   'scope_id': sid,
                   'label': lname,
                   'scope': ldat.get('scope', 'area'),
                   'component': ldat.get('component'),
-                  'object_id': ldat.get('object_id'),
+                  'declaring_area_id': ldat.get('declaring_area_id'),
                   'label_data': ldat
                 }}) %}
               {% endfor %}
             {% endfor %}
-            {{ ns.d }}
+            {{ fns.d }}
 
   - sensor:
     - name: "Labeled Features State"
