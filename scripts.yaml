@@ -3918,14 +3918,14 @@ labeled_feature_generics:
             # Reuses the shared `_media_target` computed above (same
             # most-recently-active algorithm used by every other media-
             # player kind). Check SUPPORT_SEEK (supported_features bit
-            # 1024 / 0x400). When seek isn't supported we silently fall
+            # 2). When seek isn't supported we silently fall
             # back to media_previous_track on the same target — gives a
             # sensible behavior on integrations like Music Assistant /
             # Snapcast that don't expose seek.
             - variables:
                 _seek_supports: >-
                   {{ (state_attr(_media_target, 'supported_features') | int(0))
-                     | bitwise_and(1024) > 0 }}
+                     | bitwise_and(2) > 0 }}
             - choose:
                 - conditions:
                     - condition: template
@@ -3952,7 +3952,7 @@ labeled_feature_generics:
             - variables:
                 _seek_supports: >-
                   {{ (state_attr(_media_target, 'supported_features') | int(0))
-                     | bitwise_and(1024) > 0 }}
+                     | bitwise_and(2) > 0 }}
             - choose:
                 - conditions:
                     - condition: template
