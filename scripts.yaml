@@ -3817,6 +3817,49 @@ labeled_feature_generics:
         - stop: 'Toggle path complete.'
 
     # ── Step 7: Non-toggle dispatch by feature kind ─────────────────────────
+    #
+    # ── Media target selection ──────────────────────────────────────────────
+    # All media-player kinds (transport + volume) collapse `final_targets`
+    # down to a single most-recently-active entity using the same algorithm
+    # used by media_seek_back / media_seek_forward:
+    #   1. currently playing/buffering, most recent last_changed
+    #   2. otherwise, most recent last_changed (ignoring unknown/unavailable)
+    #   3. fall back to final_targets | first
+    # This avoids fan-out across an area's full speaker set (which causes
+    # double-press toggles, volume drift on idle players, etc) and instead
+    # routes the action to whichever player the user was most recently
+    # listening on. The seek branches compute this same `_seek_target`
+    # locally because they predate the lift; their logic is identical.
+    - variables:
+        _media_kinds: >-
+          {{ ['media_toggle','media_play','media_pause','media_next',
+              'media_previous','media_seek_back','media_seek_forward',
+              'volume_up','volume_down'] }}
+        _media_candidates: >-
+          {%- if feature_meta.kind in _media_kinds -%}
+          {%- set ns = namespace(items=[]) -%}
+          {%- for eid in final_targets -%}
+            {%- set s = states[eid] -%}
+            {%- if s is not none and s.state not in ['unknown','unavailable','none'] -%}
+              {%- set ns.items = ns.items + [s] -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.items }}
+          {%- else -%}{{ [] }}{%- endif -%}
+        _media_playing: >-
+          {{ _media_candidates
+               | selectattr('state', 'in', ['playing','buffering'])
+               | sort(attribute='last_changed', reverse=true)
+               | list }}
+        _media_target: >-
+          {%- if feature_meta.kind not in _media_kinds -%}{{ '' }}
+          {%- elif _media_playing | length > 0 -%}
+            {{ (_media_playing | first).entity_id }}
+          {%- elif _media_candidates | length > 0 -%}
+            {{ (_media_candidates | sort(attribute='last_changed', reverse=true) | first).entity_id }}
+          {%- else -%}
+            {{ final_targets | first }}
+          {%- endif -%}
     - choose:
         - conditions:
             - condition: template
@@ -3824,85 +3867,165 @@ labeled_feature_generics:
           sequence:
             - action: media_player.media_play_pause
               target:
-                entity_id: '{{ final_targets }}'
+                entity_id: '{{ _media_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_play" }}'
           sequence:
             - action: media_player.media_play
               target:
-                entity_id: '{{ final_targets }}'
+                entity_id: '{{ _media_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_pause" }}'
           sequence:
             - action: media_player.media_pause
               target:
-                entity_id: '{{ final_targets }}'
+                entity_id: '{{ _media_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_next" }}'
           sequence:
             - action: media_player.media_next_track
               target:
-                entity_id: '{{ final_targets }}'
+                entity_id: '{{ _media_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_previous" }}'
           sequence:
             - action: media_player.media_previous_track
               target:
-                entity_id: '{{ final_targets }}'
+                entity_id: '{{ _media_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_seek_back" }}'
           sequence:
-            - action: media_player.media_seek
-              target:
-                entity_id: '{{ final_targets | first }}'
-              data:
-                seek_position: >-
-                  {{ [state_attr(final_targets | first, 'media_position')
-                       | float(0) - 30, 0] | max }}
+            # Pick the most-recently-active media_player from final_targets:
+            #   1. currently playing/buffering, most recent last_changed
+            #   2. otherwise, most recent last_changed (ignoring unknown/unavailable)
+            #   3. fall back to final_targets | first
+            # Then check SUPPORT_SEEK (supported_features bit 1024 / 0x400).
+            # When seek isn't supported we silently fall back to
+            # media_previous_track on the same target — gives a sensible
+            # behavior on integrations like Music Assistant / Snapcast that
+            # don't expose seek.
+            - variables:
+                _seek_candidates: >-
+                  {%- set ns = namespace(items=[]) -%}
+                  {%- for eid in final_targets -%}
+                    {%- set s = states[eid] -%}
+                    {%- if s is not none and s.state not in ['unknown','unavailable','none'] -%}
+                      {%- set ns.items = ns.items + [s] -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  {{ ns.items }}
+                _seek_playing: >-
+                  {{ _seek_candidates
+                       | selectattr('state', 'in', ['playing','buffering'])
+                       | sort(attribute='last_changed', reverse=true)
+                       | list }}
+                _seek_target: >-
+                  {%- if _seek_playing | length > 0 -%}
+                    {{ (_seek_playing | first).entity_id }}
+                  {%- elif _seek_candidates | length > 0 -%}
+                    {{ (_seek_candidates | sort(attribute='last_changed', reverse=true) | first).entity_id }}
+                  {%- else -%}
+                    {{ final_targets | first }}
+                  {%- endif -%}
+                _seek_supports: >-
+                  {{ (state_attr(_seek_target, 'supported_features') | int(0))
+                     | bitwise_and(1024) > 0 }}
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: '{{ _seek_supports }}'
+                  sequence:
+                    - action: media_player.media_seek
+                      target:
+                        entity_id: '{{ _seek_target }}'
+                      data:
+                        seek_position: >-
+                          {{ [state_attr(_seek_target, 'media_position')
+                               | float(0) - 30, 0] | max }}
+              default:
+                # Silent fallback: integration doesn't support seek.
+                - action: media_player.media_previous_track
+                  target:
+                    entity_id: '{{ _seek_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_seek_forward" }}'
           sequence:
-            - action: media_player.media_seek
-              target:
-                entity_id: '{{ final_targets | first }}'
-              data:
-                seek_position: >-
-                  {{ state_attr(final_targets | first, 'media_position')
-                       | float(0) + 30 }}
+            # Same target-selection + seek-support logic as media_seek_back;
+            # silent fallback to media_next_track when seek isn't supported.
+            - variables:
+                _seek_candidates: >-
+                  {%- set ns = namespace(items=[]) -%}
+                  {%- for eid in final_targets -%}
+                    {%- set s = states[eid] -%}
+                    {%- if s is not none and s.state not in ['unknown','unavailable','none'] -%}
+                      {%- set ns.items = ns.items + [s] -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  {{ ns.items }}
+                _seek_playing: >-
+                  {{ _seek_candidates
+                       | selectattr('state', 'in', ['playing','buffering'])
+                       | sort(attribute='last_changed', reverse=true)
+                       | list }}
+                _seek_target: >-
+                  {%- if _seek_playing | length > 0 -%}
+                    {{ (_seek_playing | first).entity_id }}
+                  {%- elif _seek_candidates | length > 0 -%}
+                    {{ (_seek_candidates | sort(attribute='last_changed', reverse=true) | first).entity_id }}
+                  {%- else -%}
+                    {{ final_targets | first }}
+                  {%- endif -%}
+                _seek_supports: >-
+                  {{ (state_attr(_seek_target, 'supported_features') | int(0))
+                     | bitwise_and(1024) > 0 }}
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: '{{ _seek_supports }}'
+                  sequence:
+                    - action: media_player.media_seek
+                      target:
+                        entity_id: '{{ _seek_target }}'
+                      data:
+                        seek_position: >-
+                          {{ state_attr(_seek_target, 'media_position')
+                               | float(0) + 30 }}
+              default:
+                # Silent fallback: integration doesn't support seek.
+                - action: media_player.media_next_track
+                  target:
+                    entity_id: '{{ _seek_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_up" }}'
           sequence:
-            - repeat:
-                for_each: '{{ final_targets }}'
-                sequence:
-                  - action: media_player.volume_set
-                    target:
-                      entity_id: '{{ repeat.item }}'
-                    data:
-                      volume_level: >-
-                        {{ [(state_attr(repeat.item, 'volume_level') | float(0))
-                            + 0.07, 1.0] | min }}
+            # Adjust only the most-recently-active player so a long-press
+            # doesn't drift volume on idle members of the area's speaker
+            # group. `_media_target` is computed once above.
+            - action: media_player.volume_set
+              target:
+                entity_id: '{{ _media_target }}'
+              data:
+                volume_level: >-
+                  {{ [(state_attr(_media_target, 'volume_level') | float(0))
+                      + 0.07, 1.0] | min }}
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_down" }}'
           sequence:
-            - repeat:
-                for_each: '{{ final_targets }}'
-                sequence:
-                  - action: media_player.volume_set
-                    target:
-                      entity_id: '{{ repeat.item }}'
-                    data:
-                      volume_level: >-
-                        {{ [(state_attr(repeat.item, 'volume_level') | float(0))
-                            - 0.07, 0.0] | max }}
+            - action: media_player.volume_set
+              target:
+                entity_id: '{{ _media_target }}'
+              data:
+                volume_level: >-
+                  {{ [(state_attr(_media_target, 'volume_level') | float(0))
+                      - 0.07, 0.0] | max }}
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "light_on" }}'
