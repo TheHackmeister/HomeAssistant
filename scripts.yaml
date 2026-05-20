@@ -3830,35 +3830,50 @@ labeled_feature_generics:
     # routes the action to whichever player the user was most recently
     # listening on. The seek branches compute this same `_seek_target`
     # locally because they predate the lift; their logic is identical.
+    # NOTE on the templating shape below: HA's `variables:` step serializes
+    # each value through its YAML representer, which means TemplateState
+    # objects (what you get from `states[eid]` or `states | selectattr(...)`)
+    # are repr'd back to strings rather than preserved as objects. So we
+    # deliberately keep `_media_candidates` and `_media_playing` as **lists
+    # of entity-id strings**, and rank by `(last_changed_iso, eid)` tuples
+    # built fresh inside `_media_target` — which is also a plain string.
     - variables:
         _media_kinds: >-
           {{ ['media_toggle','media_play','media_pause','media_next',
               'media_previous','media_seek_back','media_seek_forward',
               'volume_up','volume_down'] }}
         _media_candidates: >-
-          {%- if feature_meta.kind in _media_kinds -%}
           {%- set ns = namespace(items=[]) -%}
-          {%- for eid in final_targets -%}
-            {%- set s = states[eid] -%}
-            {%- if s is not none and s.state not in ['unknown','unavailable','none'] -%}
-              {%- set ns.items = ns.items + [s] -%}
+          {%- if feature_meta.kind in _media_kinds -%}
+            {%- for eid in final_targets -%}
+              {%- if states(eid) not in ['unknown','unavailable','none'] -%}
+                {%- set ns.items = ns.items + [eid] -%}
+              {%- endif -%}
+            {%- endfor -%}
+          {%- endif -%}
+          {{ ns.items }}
+        _media_playing: >-
+          {%- set ns = namespace(items=[]) -%}
+          {%- for eid in _media_candidates -%}
+            {%- if states(eid) in ['playing','buffering'] -%}
+              {%- set ns.items = ns.items + [eid] -%}
             {%- endif -%}
           {%- endfor -%}
           {{ ns.items }}
-          {%- else -%}{{ [] }}{%- endif -%}
-        _media_playing: >-
-          {{ _media_candidates
-               | selectattr('state', 'in', ['playing','buffering'])
-               | sort(attribute='last_changed', reverse=true)
-               | list }}
         _media_target: >-
           {%- if feature_meta.kind not in _media_kinds -%}{{ '' }}
-          {%- elif _media_playing | length > 0 -%}
-            {{ (_media_playing | first).entity_id }}
-          {%- elif _media_candidates | length > 0 -%}
-            {{ (_media_candidates | sort(attribute='last_changed', reverse=true) | first).entity_id }}
           {%- else -%}
-            {{ final_targets | first }}
+            {%- set pool = _media_playing if (_media_playing | length > 0) else _media_candidates -%}
+            {%- if pool | length > 0 -%}
+              {%- set ns = namespace(items=[]) -%}
+              {%- for eid in pool -%}
+                {%- set lc = states[eid].last_changed -%}
+                {%- set ns.items = ns.items + [(lc.isoformat() if lc is not none else '', eid)] -%}
+              {%- endfor -%}
+              {{ (ns.items | sort(reverse=true) | first)[1] }}
+            {%- else -%}
+              {{ final_targets | first }}
+            {%- endif -%}
           {%- endif -%}
     - choose:
         - conditions:
@@ -3900,40 +3915,16 @@ labeled_feature_generics:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_seek_back" }}'
           sequence:
-            # Pick the most-recently-active media_player from final_targets:
-            #   1. currently playing/buffering, most recent last_changed
-            #   2. otherwise, most recent last_changed (ignoring unknown/unavailable)
-            #   3. fall back to final_targets | first
-            # Then check SUPPORT_SEEK (supported_features bit 1024 / 0x400).
-            # When seek isn't supported we silently fall back to
-            # media_previous_track on the same target — gives a sensible
-            # behavior on integrations like Music Assistant / Snapcast that
-            # don't expose seek.
+            # Reuses the shared `_media_target` computed above (same
+            # most-recently-active algorithm used by every other media-
+            # player kind). Check SUPPORT_SEEK (supported_features bit
+            # 1024 / 0x400). When seek isn't supported we silently fall
+            # back to media_previous_track on the same target — gives a
+            # sensible behavior on integrations like Music Assistant /
+            # Snapcast that don't expose seek.
             - variables:
-                _seek_candidates: >-
-                  {%- set ns = namespace(items=[]) -%}
-                  {%- for eid in final_targets -%}
-                    {%- set s = states[eid] -%}
-                    {%- if s is not none and s.state not in ['unknown','unavailable','none'] -%}
-                      {%- set ns.items = ns.items + [s] -%}
-                    {%- endif -%}
-                  {%- endfor -%}
-                  {{ ns.items }}
-                _seek_playing: >-
-                  {{ _seek_candidates
-                       | selectattr('state', 'in', ['playing','buffering'])
-                       | sort(attribute='last_changed', reverse=true)
-                       | list }}
-                _seek_target: >-
-                  {%- if _seek_playing | length > 0 -%}
-                    {{ (_seek_playing | first).entity_id }}
-                  {%- elif _seek_candidates | length > 0 -%}
-                    {{ (_seek_candidates | sort(attribute='last_changed', reverse=true) | first).entity_id }}
-                  {%- else -%}
-                    {{ final_targets | first }}
-                  {%- endif -%}
                 _seek_supports: >-
-                  {{ (state_attr(_seek_target, 'supported_features') | int(0))
+                  {{ (state_attr(_media_target, 'supported_features') | int(0))
                      | bitwise_and(1024) > 0 }}
             - choose:
                 - conditions:
@@ -3942,16 +3933,16 @@ labeled_feature_generics:
                   sequence:
                     - action: media_player.media_seek
                       target:
-                        entity_id: '{{ _seek_target }}'
+                        entity_id: '{{ _media_target }}'
                       data:
                         seek_position: >-
-                          {{ [state_attr(_seek_target, 'media_position')
+                          {{ [state_attr(_media_target, 'media_position')
                                | float(0) - 30, 0] | max }}
               default:
                 # Silent fallback: integration doesn't support seek.
                 - action: media_player.media_previous_track
                   target:
-                    entity_id: '{{ _seek_target }}'
+                    entity_id: '{{ _media_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "media_seek_forward" }}'
@@ -3959,30 +3950,8 @@ labeled_feature_generics:
             # Same target-selection + seek-support logic as media_seek_back;
             # silent fallback to media_next_track when seek isn't supported.
             - variables:
-                _seek_candidates: >-
-                  {%- set ns = namespace(items=[]) -%}
-                  {%- for eid in final_targets -%}
-                    {%- set s = states[eid] -%}
-                    {%- if s is not none and s.state not in ['unknown','unavailable','none'] -%}
-                      {%- set ns.items = ns.items + [s] -%}
-                    {%- endif -%}
-                  {%- endfor -%}
-                  {{ ns.items }}
-                _seek_playing: >-
-                  {{ _seek_candidates
-                       | selectattr('state', 'in', ['playing','buffering'])
-                       | sort(attribute='last_changed', reverse=true)
-                       | list }}
-                _seek_target: >-
-                  {%- if _seek_playing | length > 0 -%}
-                    {{ (_seek_playing | first).entity_id }}
-                  {%- elif _seek_candidates | length > 0 -%}
-                    {{ (_seek_candidates | sort(attribute='last_changed', reverse=true) | first).entity_id }}
-                  {%- else -%}
-                    {{ final_targets | first }}
-                  {%- endif -%}
                 _seek_supports: >-
-                  {{ (state_attr(_seek_target, 'supported_features') | int(0))
+                  {{ (state_attr(_media_target, 'supported_features') | int(0))
                      | bitwise_and(1024) > 0 }}
             - choose:
                 - conditions:
@@ -3991,16 +3960,16 @@ labeled_feature_generics:
                   sequence:
                     - action: media_player.media_seek
                       target:
-                        entity_id: '{{ _seek_target }}'
+                        entity_id: '{{ _media_target }}'
                       data:
                         seek_position: >-
-                          {{ state_attr(_seek_target, 'media_position')
+                          {{ state_attr(_media_target, 'media_position')
                                | float(0) + 30 }}
               default:
                 # Silent fallback: integration doesn't support seek.
                 - action: media_player.media_next_track
                   target:
-                    entity_id: '{{ _seek_target }}'
+                    entity_id: '{{ _media_target }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_up" }}'
