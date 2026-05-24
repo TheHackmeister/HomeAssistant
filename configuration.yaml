@@ -306,8 +306,17 @@ template:
                     {% if e.domain in ['event', 'button'] %}
                       {% set base_enabled = true %}
                     {% else %}
-                      {% set base_enabled = e.state | lower in
-                          ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] %}
+                      {# Default truth function. Two rules ORed together:
+                         1. State equals the feature name (case-sensitive).
+                            Makes `input_select` / option-style leaders
+                            work with just `Leader: <F>` — no Enable/Disable
+                            labels required when the option string IS the
+                            feature name.
+                         2. State is a generic truthy value (on, true, …).
+                            Covers boolean leaders. #}
+                      {% set base_enabled = (e.state == fname) or
+                          (e.state | lower in
+                              ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked']) %}
                     {% endif %}
                   {% endif %}
                 {% endif %}
@@ -378,8 +387,12 @@ template:
                     {% if entity.domain in ['event', 'button'] %}
                       {% set feat_enabled = true %}
                     {% else %}
-                      {% set feat_enabled = entity.state | lower in
-                          ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked'] %}
+                      {# Default truth function — see `leaders` attribute
+                         above for the rationale. State equals feature
+                         name (case-sensitive) OR generic truthy value. #}
+                      {% set feat_enabled = (entity.state == fname) or
+                          (entity.state | lower in
+                              ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked']) %}
                     {% endif %}
                   {% endif %}
                 {% endif %}
