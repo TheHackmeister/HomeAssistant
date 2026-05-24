@@ -2625,90 +2625,29 @@ labeled_feature_follower:
               data: {}
               continue_on_error: true
             else:
-            # script.* — validate args against the target's declared fields.
-            # state_attr(<script>, 'fields') can return one of:
-            #   - None (script doesn't exist)
-            #   - dict keyed by field name → {field: meta, ...}
-            #   - list of dicts (HA 2026.x+) → [{name: f, ...}, ...]
-            #   - list of strings (defensive) → [f, ...]
-            # Normalize to a list of field-name strings so the membership
-            # checks below work against every shape.
+            # Pass every arg through to the script. HA does not expose
+            # script field declarations as state attributes
+            # (`state_attr(<script>, 'fields')` is always None), so we
+            # can't validate arg names from inside a template.
+            # Undeclared fields are silently ignored by the script
+            # invocation; typo'd Arg labels will simply not have an
+            # effect (rather than raising an Error Mode warning).
             - variables:
-                _script_fields_raw: >-
-                  {{ state_attr(_it.ref | trim, 'fields') or {} }}
-                _script_field_names: >-
-                  {%- set raw = _script_fields_raw -%}
-                  {%- if raw is mapping -%}
-                    {{ raw.keys() | list }}
-                  {%- elif raw is iterable and raw is not string -%}
-                    {%- set ns = namespace(items=[]) -%}
-                    {%- for item in raw -%}
-                      {%- if item is mapping and 'name' in item -%}
-                        {%- set ns.items = ns.items + [item.name] -%}
-                      {%- elif item is string -%}
-                        {%- set ns.items = ns.items + [item] -%}
-                      {%- endif -%}
-                    {%- endfor -%}
-                    {{ ns.items }}
-                  {%- else -%}
-                    {{ [] }}
-                  {%- endif -%}
-                _std_for_script: >-
-                  {%- set sf = _script_field_names -%}
-                  {%- set ns = namespace(d={}) -%}
-                  {%- for k, v in _std_fields_base.items() -%}
-                    {%- if k in sf -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
-                  {%- endfor -%}
-                  {{ ns.d }}
-                _invalid_args: >-
-                  {%- set sf = _script_field_names -%}
-                  {%- set ns = namespace(inv=[]) -%}
-                  {%- for k in (_args or {}).keys() -%}
-                    {%- if k not in sf -%}{%- set ns.inv = ns.inv + [k] -%}{%- endif -%}
-                  {%- endfor -%}
-                  {{ ns.inv }}
-                _valid_args: >-
-                  {%- set sf = _script_field_names -%}
-                  {%- set ns = namespace(d={}) -%}
-                  {%- for k, v in (_args or {}).items() -%}
-                    {%- if k in sf -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
-                  {%- endfor -%}
-                  {{ ns.d }}
-
-            # Report invalid args (and stop if error_mode == stop).
-            - if:
-              - condition: template
-                value_template: '{{ _invalid_args | length > 0 }}'
-              then:
-              - action: script.labeled_feature_error_mode
-                data:
-                  error_mode: '{{ follower_error_mode }}'
-                  source: Labeled Feature Follower
-                  message: >-
-                    Arg field(s) {{ _invalid_args }} not declared by {{ _it.ref }}
-                    for {{ follower_entity_id }} (feature: {{ feature_name }}).
-              - if:
-                - condition: template
-                  value_template: '{{ follower_error_mode == "stop" }}'
-                then:
-                - stop: 'Labeled Feature Follower: Arg field(s) {{ _invalid_args }} not declared by {{ _it.ref }} (feature: {{ feature_name }}).'
-                  error: true
-
-            # Dispatch
+                _all_args: '{{ _args or {} }}'
             - choose:
               - conditions:
                   - condition: template
-                    value_template: '{{ _valid_args | length == 0 }}'
+                    value_template: '{{ _all_args | length == 0 }}'
                 sequence:
                 - action: '{{ _it.ref }}'
-                  data: '{{ _std_for_script }}'
+                  data: '{{ _std_fields_base }}'
                   continue_on_error: true
               default:
               - action: script.turn_on
                 target:
                   entity_id: '{{ _it.ref | trim }}'
                 data:
-                  variables: '{{ _std_for_script | combine(_valid_args) }}'
+                  variables: '{{ _std_fields_base | combine(_all_args) }}'
                 continue_on_error: true
 
         # ───────── feature kind ─────────
