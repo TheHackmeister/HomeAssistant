@@ -2448,6 +2448,20 @@
                     - condition: template
                       value_template: '{{ _it.kind == "script" }}'
                   sequence:
+                  # Guard: skip + report when ref is empty / None. The parser
+                  # should never produce this, but a malformed label could.
+                  - if:
+                    - condition: template
+                      value_template: '{{ (_it.ref | default("") | string | trim) == "" }}'
+                    then:
+                    - action: script.labeled_feature_error_mode
+                      data:
+                        error_mode: '{{ feature_error_mode }}'
+                        source: Labeled Feature Leaders
+                        message: >-
+                          Empty script ref in action item (variant={{ _it.variant }},
+                          tag={{ _it.tag }}) for {{ leader_entity_id }} (feature: {{ feature_name }}).
+                    - stop: 'LF Leaders: empty script ref (handled per error_mode).'
                   - if:
                     - condition: template
                       value_template: '{{ _it.ref.startswith("automation.") or _it.ref.startswith("scene.") }}'
@@ -2457,24 +2471,31 @@
                       continue_on_error: true
                     else:
                     - variables:
+                        # `or {}` (not `| default({})`) — Jinja's default only
+                        # replaces Undefined; state_attr returns None when the
+                        # target script doesn't exist, and `None in <set>` is
+                        # a TypeError.
                         _script_fields: >-
-                          {{ state_attr(_it.ref | trim, 'fields') | default({}) }}
+                          {{ state_attr(_it.ref | trim, 'fields') or {} }}
                         _std_for_script: >-
+                          {%- set sf = _script_fields or {} -%}
                           {%- set ns = namespace(d={}) -%}
                           {%- for k, v in _std_fields_base.items() -%}
-                            {%- if k in _script_fields -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
+                            {%- if k in sf -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
                           {%- endfor -%}
                           {{ ns.d }}
                         _invalid_args: >-
+                          {%- set sf = _script_fields or {} -%}
                           {%- set ns = namespace(inv=[]) -%}
-                          {%- for k in _args.keys() -%}
-                            {%- if k not in _script_fields -%}{%- set ns.inv = ns.inv + [k] -%}{%- endif -%}
+                          {%- for k in (_args or {}).keys() -%}
+                            {%- if k not in sf -%}{%- set ns.inv = ns.inv + [k] -%}{%- endif -%}
                           {%- endfor -%}
                           {{ ns.inv }}
                         _valid_args: >-
+                          {%- set sf = _script_fields or {} -%}
                           {%- set ns = namespace(d={}) -%}
-                          {%- for k, v in _args.items() -%}
-                            {%- if k in _script_fields -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
+                          {%- for k, v in (_args or {}).items() -%}
+                            {%- if k in sf -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
                           {%- endfor -%}
                           {{ ns.d }}
                     - if:
