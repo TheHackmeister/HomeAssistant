@@ -2471,28 +2471,51 @@
                       continue_on_error: true
                     else:
                     - variables:
-                        # `or {}` (not `| default({})`) — Jinja's default only
-                        # replaces Undefined; state_attr returns None when the
-                        # target script doesn't exist, and `None in <set>` is
-                        # a TypeError.
-                        _script_fields: >-
+                        # state_attr(<script>, 'fields') can return one of:
+                        #   - None (script doesn't exist)
+                        #   - dict keyed by field name → {field: meta, ...}
+                        #   - list of dicts (HA 2026.x+) → [{name: f, ...}, ...]
+                        #   - list of strings (defensive) → [f, ...]
+                        # We normalize to a *list of field-name strings*
+                        # (`_script_field_names`) so the membership checks
+                        # below work against every shape. `or {}` only handles
+                        # the None case; HA's `| default({})` doesn't replace
+                        # None at all.
+                        _script_fields_raw: >-
                           {{ state_attr(_it.ref | trim, 'fields') or {} }}
+                        _script_field_names: >-
+                          {%- set raw = _script_fields_raw -%}
+                          {%- if raw is mapping -%}
+                            {{ raw.keys() | list }}
+                          {%- elif raw is iterable and raw is not string -%}
+                            {%- set ns = namespace(items=[]) -%}
+                            {%- for item in raw -%}
+                              {%- if item is mapping and 'name' in item -%}
+                                {%- set ns.items = ns.items + [item.name] -%}
+                              {%- elif item is string -%}
+                                {%- set ns.items = ns.items + [item] -%}
+                              {%- endif -%}
+                            {%- endfor -%}
+                            {{ ns.items }}
+                          {%- else -%}
+                            {{ [] }}
+                          {%- endif -%}
                         _std_for_script: >-
-                          {%- set sf = _script_fields or {} -%}
+                          {%- set sf = _script_field_names -%}
                           {%- set ns = namespace(d={}) -%}
                           {%- for k, v in _std_fields_base.items() -%}
                             {%- if k in sf -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
                           {%- endfor -%}
                           {{ ns.d }}
                         _invalid_args: >-
-                          {%- set sf = _script_fields or {} -%}
+                          {%- set sf = _script_field_names -%}
                           {%- set ns = namespace(inv=[]) -%}
                           {%- for k in (_args or {}).keys() -%}
                             {%- if k not in sf -%}{%- set ns.inv = ns.inv + [k] -%}{%- endif -%}
                           {%- endfor -%}
                           {{ ns.inv }}
                         _valid_args: >-
-                          {%- set sf = _script_fields or {} -%}
+                          {%- set sf = _script_field_names -%}
                           {%- set ns = namespace(d={}) -%}
                           {%- for k, v in (_args or {}).items() -%}
                             {%- if k in sf -%}{%- set ns.d = dict(ns.d, **{k: v}) -%}{%- endif -%}
