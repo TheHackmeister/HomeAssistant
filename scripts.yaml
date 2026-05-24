@@ -4068,57 +4068,52 @@ labeled_feature_somrig:
     # ── Step 2: Branch by event + media_playing ─────────────────────────────
     - choose:
         # ────────────── 1_short_release ──────────────
+        # Always fires both Lights Off (floor scope) and Media Pause
+        # (scope: none) regardless of any local media_playing signal —
+        # the goal is "single button = quiet the house" and we don't
+        # want to depend on a per-area is-anything-playing check
+        # (which historically picked up the wrong media_player).
+        # The downstream `labeled_feature_generics` Media Pause call
+        # resolves its own target across all media players in the
+        # house via the standard Provides/Follower chain and
+        # dispatches `media_player.media_pause`, which is safely a
+        # no-op on players that are already paused/idle.
         - conditions:
             - condition: template
               value_template: '{{ mapped_event == "1_short_release" }}'
           sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Lights Off
-                    exclude_feature: '{{ _leader_feature }}'
-                    # Lights Off is intentionally forced to the leader's floor
-                    # so a single button press clears every light on the floor,
-                    # regardless of which area the button itself lives in.
-                    scope: floor
-                    scope_id: '{{ _resolved_floor_id }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Media Pause
-                    exclude_feature: '{{ _leader_feature }}'
-                    # Media Pause is intentionally forced to scope: none so a
-                    # single short press pauses every media player in the
-                    # house — not just the players in the button's area.
-                    # Provides / Follower resolution still applies; we just
-                    # don't filter the candidate set by scope.
-                    scope: none
-                    scope_id: ''
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
-              else:
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Lights Off
-                    exclude_feature: '{{ _leader_feature }}'
-                    # See note above: Lights Off always operates at the floor scope.
-                    scope: floor
-                    scope_id: '{{ _resolved_floor_id }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
+            - action: script.labeled_feature_generics
+              data:
+                feature: Lights Off
+                exclude_feature: '{{ _leader_feature }}'
+                # Lights Off is intentionally forced to the leader's floor
+                # so a single button press clears every light on the floor,
+                # regardless of which area the button itself lives in.
+                scope: floor
+                scope_id: '{{ _resolved_floor_id }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+            - action: script.labeled_feature_generics
+              data:
+                feature: Media Pause
+                exclude_feature: '{{ _leader_feature }}'
+                # Media Pause is intentionally forced to scope: none so a
+                # single short press pauses every media player in the
+                # house — not just the players in the button's area.
+                # Provides / Follower resolution still applies; we just
+                # don't filter the candidate set by scope. Calling pause
+                # on an already-paused player is a no-op, so we always
+                # fire (no media_playing branch).
+                scope: none
+                scope_id: ''
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
 
         # ────────────── 2_short_release ──────────────
         - conditions:
