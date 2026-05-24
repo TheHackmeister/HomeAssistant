@@ -4115,8 +4115,13 @@ labeled_feature_somrig:
                   data:
                     feature: Media Pause
                     exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
+                    # Media Pause is intentionally forced to scope: none so a
+                    # single short press pauses every media player in the
+                    # house — not just the players in the button's area.
+                    # Provides / Follower resolution still applies; we just
+                    # don't filter the candidate set by scope.
+                    scope: none
+                    scope_id: ''
                     follower_entity_id: '{{ follower_entity_id | default("") }}'
                     leader_entity_id: '{{ leader_entity_id | default("") }}'
                     leader_enabled: '{{ leader_enabled | default(true) }}'
