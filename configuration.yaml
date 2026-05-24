@@ -311,7 +311,7 @@ template:
                     {% endif %}
                   {% endif %}
                 {% endif %}
-                {% set inverted = (fname + ' Invert: true') in labels %}
+                {% set inverted = (scope_pfx + fname + ' Invert: True') in labels %}
                 {% set final_enabled = (not base_enabled) if inverted else base_enabled %}
                 {% set fns.features = dict(fns.features, **{
                   fname: {'enabled': final_enabled, 'scope': scope}
@@ -383,7 +383,7 @@ template:
                     {% endif %}
                   {% endif %}
                 {% endif %}
-                {% set inverted = (fname + ' Invert: true') in labels %}
+                {% set inverted = (scope_pfx + fname + ' Invert: True') in labels %}
                 {% set feat_enabled = (not feat_enabled) if inverted else feat_enabled %}
                 {% set feat_value = prev_f.get('value', entity.state) if is_skip else entity.state %}
                 {% set feat_ts = prev_f.get('timestamp', entity.last_changed_timestamp) if is_skip else entity.last_changed_timestamp %}
