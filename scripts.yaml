@@ -4208,22 +4208,13 @@ labeled_feature_somrig:
                       - condition: template
                         value_template: '{{ repeat.index <= 200 }}'
                     sequence:
-                      # Self-correcting tick: budget 500ms wall-clock per
-                      # iteration. We measure how long the dispatch took and
-                      # subtract that from the delay (with a 50ms floor so the
-                      # while: still gets a real yield to re-check the leader
-                      # state). This makes the visible step cadence consistent
-                      # even when the underlying media_player / light service
-                      # call latency varies.
-                      # Fire-and-forget dispatch via script.turn_on: returns
-                      # immediately so the loop's wall-clock cadence is
-                      # independent of how long the underlying media_player /
-                      # light service call takes. Inner error handling inside
+                      # Fire-and-forget dispatch via script.turn_on so the
+                      # loop's wall-clock cadence is independent of how long
+                      # the underlying media_player / light service call
+                      # takes. Inner error handling inside
                       # labeled_feature_generics (Error Mode logging/alerts)
                       # still applies; only error *propagation* back to this
                       # loop is dropped.
-                      - variables:
-                          _tick_start: '{{ as_timestamp(now()) }}'
                       - action: script.turn_on
                         target:
                           entity_id: script.labeled_feature_generics
@@ -4238,9 +4229,21 @@ labeled_feature_somrig:
                             leader_enabled: '{{ leader_enabled | default(true) }}'
                             toggle: '{{ _toggle_in }}'
                             error_mode: '{{ _err_mode }}'
-                      - delay:
-                          milliseconds: >-
-                            {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
+                      # Wait up to 300ms for ANY new event on the leader.
+                      # As soon as the user releases (or any other event
+                      # fires on the button), the leader entity's state
+                      # changes and the wait resolves — the while: then
+                      # re-evaluates and exits. On timeout we just loop
+                      # for the next step. This replaces a hard delay:
+                      # so the loop's exit latency is <50ms instead of
+                      # up to a full inter-step interval.
+                      - wait_for_trigger:
+                          - trigger: state
+                            entity_id: '{{ leader_entity_id }}'
+                        timeout:
+                          milliseconds: 300
+                        continue_on_timeout: true
+
               else:
                 - action: script.labeled_feature_generics
                   data:
@@ -4280,9 +4283,8 @@ labeled_feature_somrig:
                             value_template: '{{ repeat.index <= 200 }}'
                         sequence:
                           # Fire-and-forget dispatch — see note in 1_long_press
-                          # branch. Targets 500ms wall-clock per step.
-                          - variables:
-                              _tick_start: '{{ as_timestamp(now()) }}'
+                          # branch. Inter-tick wait uses wait_for_trigger:
+                          # so the loop exits in <50ms after release.
                           - action: script.turn_on
                             target:
                               entity_id: script.labeled_feature_generics
@@ -4297,9 +4299,18 @@ labeled_feature_somrig:
                                 leader_enabled: '{{ leader_enabled | default(true) }}'
                                 toggle: '{{ _toggle_in }}'
                                 error_mode: '{{ _err_mode }}'
-                          - delay:
-                              milliseconds: >-
-                                {{ [(500 - ((as_timestamp(now()) - _tick_start) * 1000)) | int, 50] | max }}
+                          # Wait up to 300ms for ANY new event on the leader.
+                          # As soon as the user releases, the leader entity's
+                          # state changes and the wait resolves — the while:
+                          # then re-evaluates and exits. On timeout we just
+                          # loop for the next step.
+                          - wait_for_trigger:
+                              - trigger: state
+                                entity_id: '{{ leader_entity_id }}'
+                            timeout:
+                              milliseconds: 300
+                            continue_on_timeout: true
+
                   else:
                     - action: script.labeled_feature_generics
                       data:
