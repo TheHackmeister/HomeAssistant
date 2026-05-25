@@ -4229,20 +4229,19 @@ labeled_feature_somrig:
                             leader_enabled: '{{ leader_enabled | default(true) }}'
                             toggle: '{{ _toggle_in }}'
                             error_mode: '{{ _err_mode }}'
-                      # Wait up to 300ms for ANY new event on the leader.
-                      # As soon as the user releases (or any other event
-                      # fires on the button), the leader entity's state
-                      # changes and the wait resolves — the while: then
-                      # re-evaluates and exits. On timeout we just loop
-                      # for the next step. This replaces a hard delay:
-                      # so the loop's exit latency is <50ms instead of
-                      # up to a full inter-step interval.
-                      - wait_for_trigger:
-                          - trigger: state
-                            entity_id: '{{ leader_entity_id }}'
+                      # Wait up to 300ms for the leader's state to change
+                      # off its initial value (i.e. user released the
+                      # button or pressed something else). The while:
+                      # then re-evaluates and exits. On timeout we just
+                      # loop for the next step. wait_template: is used
+                      # instead of wait_for_trigger: because trigger
+                      # entity_ids can't be templated at script-load
+                      # time, but template values can.
+                      - wait_template: '{{ states(leader_entity_id) != _leader_initial_state }}'
                         timeout:
                           milliseconds: 300
                         continue_on_timeout: true
+
 
               else:
                 - action: script.labeled_feature_generics
@@ -4299,17 +4298,17 @@ labeled_feature_somrig:
                                 leader_enabled: '{{ leader_enabled | default(true) }}'
                                 toggle: '{{ _toggle_in }}'
                                 error_mode: '{{ _err_mode }}'
-                          # Wait up to 300ms for ANY new event on the leader.
-                          # As soon as the user releases, the leader entity's
-                          # state changes and the wait resolves — the while:
-                          # then re-evaluates and exits. On timeout we just
-                          # loop for the next step.
-                          - wait_for_trigger:
-                              - trigger: state
-                                entity_id: '{{ leader_entity_id }}'
+                          # Wait up to 300ms for the leader's state to change
+                          # off its initial value (user released the button
+                          # or pressed something else). wait_template: is
+                          # used instead of wait_for_trigger: because trigger
+                          # entity_ids can't be templated at script-load
+                          # time, but template values can.
+                          - wait_template: '{{ states(leader_entity_id) != _leader_initial_state }}'
                             timeout:
                               milliseconds: 300
                             continue_on_timeout: true
+
 
                   else:
                     - action: script.labeled_feature_generics
