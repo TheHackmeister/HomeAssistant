@@ -232,9 +232,7 @@ template:
             'Fan On':             {'domain': 'fan',          'kind': 'fan_on',             'domain_label': 'Fan'},
             'Fan Off':            {'domain': 'fan',          'kind': 'fan_off',            'domain_label': 'Fan'},
             'Fan Up':             {'domain': 'fan',          'kind': 'fan_up',             'domain_label': 'Fan'},
-            'Fan Down':           {'domain': 'fan',          'kind': 'fan_down',           'domain_label': 'Fan'},
-            'Ads':                {'domain': '',             'kind': 'ads',                'domain_label': ''},
-            'Night':              {'domain': '',             'kind': 'night',              'domain_label': ''}
+            'Fan Down':           {'domain': 'fan',          'kind': 'fan_down',           'domain_label': 'Fan'}
           } }}
         last_updated_at: >
 
