@@ -3693,31 +3693,109 @@ labeled_feature_generics:
                 - action: media_player.media_next_track
                   target:
                     entity_id: '{{ _media_target }}'
+        # ── Stepping kinds: Volume Up/Down, Lights Up/Down ──────────────────
+        # These four kinds run in two modes:
+        #   - One-shot: caller did not pass `leader_entity_id` (manual
+        #     dispatch, or a mapping script that wants a single step).
+        #   - Held / repeating: caller passed `leader_entity_id` — typically
+        #     a button entity. We loop on a 300 ms cadence (≤ 200 iters /
+        #     ~60 s safety cap) until the leader's state changes (the user
+        #     releases the button, presses something else, or the button
+        #     entity emits a new event).
+        #
+        # Volume Up / Volume Down use an *accumulator*: we snapshot the
+        # starting volume_level once, before the loop, then increment a
+        # local `_current_vol` variable by ±0.07 each tick and pass the
+        # absolute level to `media_player.volume_set`. We never read
+        # state_attr(target, 'volume_level') mid-loop, which would race
+        # with state echoes from integrations like lnxlink and cause the
+        # value to stall or oscillate.
+        #
+        # Lights Up / Lights Down use HA's built-in `brightness_step_pct`
+        # relative-step on `light.turn_on` — the integration owns the
+        # relative arithmetic, so no accumulator is needed; we just re-fire
+        # the same call each tick.
+        #
+        # `_media_target` (volume) and `final_targets` (lights) are
+        # resolved once above and reused across every tick, so scope /
+        # Provides / Exclude / most-recently-active resolution does not
+        # repeat per tick.
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_up" }}'
           sequence:
-            # Adjust only the most-recently-active player so a long-press
-            # doesn't drift volume on idle members of the area's speaker
-            # group. `_media_target` is computed once above.
-            - action: media_player.volume_set
-              target:
-                entity_id: '{{ _media_target }}'
-              data:
-                volume_level: >-
-                  {{ [(state_attr(_media_target, 'volume_level') | float(0))
-                      + 0.07, 1.0] | min }}
+            - variables:
+                _hold_eid: '{{ leader_entity_id | default("") }}'
+                _hold_initial: >-
+                  {{ states(leader_entity_id) if (leader_entity_id is defined
+                     and leader_entity_id != "") else "" }}
+                _vol_start: "{{ state_attr(_media_target, 'volume_level') | float(0) }}"
+            - if:
+                - condition: template
+                  value_template: '{{ _hold_eid != "" }}'
+              then:
+                - repeat:
+                    while:
+                      - condition: template
+                        value_template: '{{ states(_hold_eid) == _hold_initial }}'
+                      - condition: template
+                        value_template: '{{ repeat.index <= 200 }}'
+                    sequence:
+                      - variables:
+                          _vol_start: "{{ [_vol_start + 0.07, 1.0] | min }}"
+                      - action: media_player.volume_set
+                        target:
+                          entity_id: '{{ _media_target }}'
+                        data:
+                          volume_level: '{{ _vol_start }}'
+                      - wait_template: '{{ states(_hold_eid) != _hold_initial }}'
+                        timeout:
+                          milliseconds: 300
+                        continue_on_timeout: true
+              else:
+                - action: media_player.volume_set
+                  target:
+                    entity_id: '{{ _media_target }}'
+                  data:
+                    volume_level: '{{ [_vol_start + 0.07, 1.0] | min }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_down" }}'
           sequence:
-            - action: media_player.volume_set
-              target:
-                entity_id: '{{ _media_target }}'
-              data:
-                volume_level: >-
-                  {{ [(state_attr(_media_target, 'volume_level') | float(0))
-                      - 0.07, 0.0] | max }}
+            - variables:
+                _hold_eid: '{{ leader_entity_id | default("") }}'
+                _hold_initial: >-
+                  {{ states(leader_entity_id) if (leader_entity_id is defined
+                     and leader_entity_id != "") else "" }}
+                _vol_start: "{{ state_attr(_media_target, 'volume_level') | float(0) }}"
+            - if:
+                - condition: template
+                  value_template: '{{ _hold_eid != "" }}'
+              then:
+                - repeat:
+                    while:
+                      - condition: template
+                        value_template: '{{ states(_hold_eid) == _hold_initial }}'
+                      - condition: template
+                        value_template: '{{ repeat.index <= 200 }}'
+                    sequence:
+                      - variables:
+                          _vol_start: "{{ [_vol_start - 0.07, 0.0] | max }}"
+                      - action: media_player.volume_set
+                        target:
+                          entity_id: '{{ _media_target }}'
+                        data:
+                          volume_level: '{{ _vol_start }}'
+                      - wait_template: '{{ states(_hold_eid) != _hold_initial }}'
+                        timeout:
+                          milliseconds: 300
+                        continue_on_timeout: true
+              else:
+                - action: media_player.volume_set
+                  target:
+                    entity_id: '{{ _media_target }}'
+                  data:
+                    volume_level: '{{ [_vol_start - 0.07, 0.0] | max }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "light_on" }}'
@@ -3736,20 +3814,72 @@ labeled_feature_generics:
             - condition: template
               value_template: '{{ feature_meta.kind == "light_up" }}'
           sequence:
-            - action: light.turn_on
-              target:
-                entity_id: '{{ final_targets }}'
-              data:
-                brightness_step_pct: 10
+            - variables:
+                _hold_eid: '{{ leader_entity_id | default("") }}'
+                _hold_initial: >-
+                  {{ states(leader_entity_id) if (leader_entity_id is defined
+                     and leader_entity_id != "") else "" }}
+            - if:
+                - condition: template
+                  value_template: '{{ _hold_eid != "" }}'
+              then:
+                - repeat:
+                    while:
+                      - condition: template
+                        value_template: '{{ states(_hold_eid) == _hold_initial }}'
+                      - condition: template
+                        value_template: '{{ repeat.index <= 200 }}'
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: '{{ final_targets }}'
+                        data:
+                          brightness_step_pct: 10
+                      - wait_template: '{{ states(_hold_eid) != _hold_initial }}'
+                        timeout:
+                          milliseconds: 300
+                        continue_on_timeout: true
+              else:
+                - action: light.turn_on
+                  target:
+                    entity_id: '{{ final_targets }}'
+                  data:
+                    brightness_step_pct: 10
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "light_down" }}'
           sequence:
-            - action: light.turn_on
-              target:
-                entity_id: '{{ final_targets }}'
-              data:
-                brightness_step_pct: -10
+            - variables:
+                _hold_eid: '{{ leader_entity_id | default("") }}'
+                _hold_initial: >-
+                  {{ states(leader_entity_id) if (leader_entity_id is defined
+                     and leader_entity_id != "") else "" }}
+            - if:
+                - condition: template
+                  value_template: '{{ _hold_eid != "" }}'
+              then:
+                - repeat:
+                    while:
+                      - condition: template
+                        value_template: '{{ states(_hold_eid) == _hold_initial }}'
+                      - condition: template
+                        value_template: '{{ repeat.index <= 200 }}'
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: '{{ final_targets }}'
+                        data:
+                          brightness_step_pct: -10
+                      - wait_template: '{{ states(_hold_eid) != _hold_initial }}'
+                        timeout:
+                          milliseconds: 300
+                        continue_on_timeout: true
+              else:
+                - action: light.turn_on
+                  target:
+                    entity_id: '{{ final_targets }}'
+                  data:
+                    brightness_step_pct: -10
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "fan_on" }}'
@@ -4184,157 +4314,47 @@ labeled_feature_somrig:
                 error_mode: '{{ _err_mode }}'
 
         # ────────────── 1_long_press ──────────────
-        # Repeats the stepping action every 300ms until the leader entity's
-        # state changes (i.e. user releases or presses something else), with a
-        # safety cap. If leader_entity_id is missing we fall back to a single
-        # dispatch so this still does something when called manually.
+        # The 300ms repeat-while-held loop now lives inside
+        # `labeled_feature_generics` for the stepping kinds
+        # (Volume Up/Down, Lights Up/Down). Passing `leader_entity_id`
+        # is what opts into the loop — generics watches that entity for
+        # state changes and exits when the button releases or fires a
+        # new event. If leader_entity_id is empty (manual test call),
+        # generics falls back to a single one-shot step automatically.
         - conditions:
             - condition: template
               value_template: '{{ mapped_event == "1_long_press" }}'
           sequence:
-            - variables:
-                _long_press_feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
-                _leader_initial_state: >-
-                  {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
-            - if:
-                - condition: template
-                  value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
-              then:
-                - repeat:
-                    # Safety cap: ~60s of held button at 300ms cadence.
-                    while:
-                      - condition: template
-                        value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
-                      - condition: template
-                        value_template: '{{ repeat.index <= 200 }}'
-                    sequence:
-                      # Fire-and-forget dispatch via script.turn_on so the
-                      # loop's wall-clock cadence is independent of how long
-                      # the underlying media_player / light service call
-                      # takes. Inner error handling inside
-                      # labeled_feature_generics (Error Mode logging/alerts)
-                      # still applies; only error *propagation* back to this
-                      # loop is dropped.
-                      - action: script.turn_on
-                        target:
-                          entity_id: script.labeled_feature_generics
-                        data:
-                          variables:
-                            feature: '{{ _long_press_feature }}'
-                            exclude_feature: '{{ _leader_feature }}'
-                            scope: '{{ _scope }}'
-                            scope_id: '{{ scope_id | default("") }}'
-                            follower_entity_id: '{{ follower_entity_id | default("") }}'
-                            leader_entity_id: '{{ leader_entity_id | default("") }}'
-                            leader_enabled: '{{ leader_enabled | default(true) }}'
-                            toggle: '{{ _toggle_in }}'
-                            error_mode: '{{ _err_mode }}'
-                      # Wait up to 300ms for the leader's state to change
-                      # off its initial value (i.e. user released the
-                      # button or pressed something else). The while:
-                      # then re-evaluates and exits. On timeout we just
-                      # loop for the next step. wait_template: is used
-                      # instead of wait_for_trigger: because trigger
-                      # entity_ids can't be templated at script-load
-                      # time, but template values can.
-                      - wait_template: '{{ states(leader_entity_id) != _leader_initial_state }}'
-                        timeout:
-                          milliseconds: 300
-                        continue_on_timeout: true
-
-
-              else:
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: '{{ _long_press_feature }}'
-                    exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
 
         # ────────────── 2_long_press ──────────────
-        # Playing (Volume Down) repeats every 300ms with the same safety guard
-        # described above. Not-Playing (Ads) is a toggle, fires once.
+        # Playing (Volume Down) uses generics' hold loop (see 1_long_press
+        # comment). Not-Playing (Ads) is a toggle and fires once.
         - conditions:
             - condition: template
               value_template: '{{ mapped_event == "2_long_press" }}'
           sequence:
-            - if:
-                - condition: template
-                  value_template: '{{ media_playing }}'
-              then:
-                - variables:
-                    _leader_initial_state: >-
-                      {{ states(leader_entity_id) if (leader_entity_id is defined and leader_entity_id != "") else "" }}
-                - if:
-                    - condition: template
-                      value_template: '{{ leader_entity_id is defined and leader_entity_id != "" }}'
-                  then:
-                    - repeat:
-                        while:
-                          - condition: template
-                            value_template: '{{ states(leader_entity_id) == _leader_initial_state }}'
-                          - condition: template
-                            value_template: '{{ repeat.index <= 200 }}'
-                        sequence:
-                          # Fire-and-forget dispatch — see note in 1_long_press
-                          # branch. Inter-tick wait uses wait_for_trigger:
-                          # so the loop exits in <50ms after release.
-                          - action: script.turn_on
-                            target:
-                              entity_id: script.labeled_feature_generics
-                            data:
-                              variables:
-                                feature: Volume Down
-                                exclude_feature: '{{ _leader_feature }}'
-                                scope: '{{ _scope }}'
-                                scope_id: '{{ scope_id | default("") }}'
-                                follower_entity_id: '{{ follower_entity_id | default("") }}'
-                                leader_entity_id: '{{ leader_entity_id | default("") }}'
-                                leader_enabled: '{{ leader_enabled | default(true) }}'
-                                toggle: '{{ _toggle_in }}'
-                                error_mode: '{{ _err_mode }}'
-                          # Wait up to 300ms for the leader's state to change
-                          # off its initial value (user released the button
-                          # or pressed something else). wait_template: is
-                          # used instead of wait_for_trigger: because trigger
-                          # entity_ids can't be templated at script-load
-                          # time, but template values can.
-                          - wait_template: '{{ states(leader_entity_id) != _leader_initial_state }}'
-                            timeout:
-                              milliseconds: 300
-                            continue_on_timeout: true
-
-
-                  else:
-                    - action: script.labeled_feature_generics
-                      data:
-                        feature: Volume Down
-                        exclude_feature: '{{ _leader_feature }}'
-                        scope: '{{ _scope }}'
-                        scope_id: '{{ scope_id | default("") }}'
-                        follower_entity_id: '{{ follower_entity_id | default("") }}'
-                        leader_entity_id: '{{ leader_entity_id | default("") }}'
-                        leader_enabled: '{{ leader_enabled | default(true) }}'
-                        toggle: '{{ _toggle_in }}'
-                        error_mode: '{{ _err_mode }}'
-              else:
-                # Ads — toggle, fires once
-                - action: script.labeled_feature_generics
-                  data:
-                    feature: Ads
-                    exclude_feature: '{{ _leader_feature }}'
-                    scope: '{{ _scope }}'
-                    scope_id: '{{ scope_id | default("") }}'
-                    follower_entity_id: '{{ follower_entity_id | default("") }}'
-                    leader_entity_id: '{{ leader_entity_id | default("") }}'
-                    leader_enabled: '{{ leader_enabled | default(true) }}'
-                    toggle: '{{ _toggle_in }}'
-                    error_mode: '{{ _err_mode }}'
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Volume Down" if media_playing else "Ads" }}'
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
 labeled_feature_entities:
   alias: Labeled Feature Entities
   description: >
