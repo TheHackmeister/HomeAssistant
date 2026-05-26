@@ -5373,3 +5373,775 @@ labeled_feature_area:
           then:
             - stop: "Labeled Feature Area: unknown feature '{{ _feature }}'."
               error: true
+labeled_feature_styrbar:
+  alias: Labeled Feature Styrbar
+  description: >
+    Maps IKEA STYRBAR (4-button + dimmer wheel) raw event names into calls to
+    `script.labeled_feature_generics`. Reads the raw button event from the
+    `feature` field (e.g. 'on', 'brightness_move_up', 'arrow_right_click').
+
+    Initial implementation is **lights-only** — the four `arrow_*` events are
+    reserved for future use and currently no-op (their `choose:` branches are
+    empty stubs so the script does not Error Mode on them). `*_release` and
+    `brightness_stop` events are ignored (no `choose:` branch); the hold loop
+    inside `labeled_feature_generics` already exits on the leader's state
+    change, so the explicit "release" event is not needed.
+
+    Event → generic-feature mapping (all area-scoped):
+      on                    Lights On            (one-shot)
+      off                   Lights Off           (one-shot)
+      brightness_move_up    Lights Up            (hold loop via leader_entity_id)
+      brightness_move_down  Lights Down          (hold loop)
+      brightness_stop       ignored
+      arrow_left_click      TODO
+      arrow_left_hold       TODO
+      arrow_left_release    ignored
+      arrow_right_click     TODO
+      arrow_right_hold      TODO
+      arrow_right_release   ignored
+  mode: parallel
+  max: 50
+  fields:
+    feature:
+      name: Feature (Button Event)
+      description: >
+        The raw button event string from the STYRBAR button entity, e.g.
+        'on', 'off', 'brightness_move_up', 'arrow_left_click'.
+      required: true
+      selector:
+        select:
+          custom_value: true
+          options:
+            - 'on'
+            - 'off'
+            - brightness_move_up
+            - brightness_move_down
+            - arrow_left_click
+            - arrow_left_hold
+            - arrow_right_click
+            - arrow_right_hold
+    follower_entity_id:
+      name: Follower Entity ID
+      description: Used for area lookup. Passed automatically by labeled_feature_follower.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_entity_id:
+      name: Leader Entity ID (the button)
+      description: >
+        Used as fallback for area lookup, and — critically — forwarded to
+        `labeled_feature_generics` for the stepping features (Lights Up /
+        Lights Down) so the hold-while-held loop runs until the button's
+        state changes.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_enabled:
+      name: Leader Enabled
+      description: Pass-through from the leader. Not used directly by the styrbar mapping.
+      required: false
+      default: true
+      selector:
+        boolean: {}
+    leader_feature:
+      name: Leader Feature Name
+      description: >
+        The leader's labeled feature name (e.g. 'Bedroom Buttons'), passed by
+        the leader automation alongside `feature`. Forwarded as
+        `exclude_feature` on every downstream `labeled_feature_generics` call
+        so that `(Area |Floor |)<leader_feature> Exclude: True` opts entities
+        out of every action this script dispatches.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    toggle:
+      name: Toggle
+      description: >
+        Pass-through toggle flag from the leader. Forwarded to every
+        labeled_feature_generics call.
+      required: false
+      default: false
+      selector:
+        boolean: {}
+    scope:
+      name: Scope
+      description: Scope of the feature (area, floor, or none).
+      required: false
+      default: area
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - none
+    scope_id:
+      name: Scope ID
+      description: The resolved area_id or floor_id passed by the automation.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    error_mode:
+      name: Error Mode
+      description: silent | log | alert | stop. Default 'log'.
+      required: false
+      default: log
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
+  sequence:
+    # ── Step 1: Resolve normalized inputs and scope ids ─────────────────────
+    - variables:
+        _scope: '{{ (scope | default("area") | lower) }}'
+        _toggle_in: '{{ (toggle | default(false)) | bool(false) }}'
+        _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        _leader_feature: '{{ leader_feature | default("") | trim }}'
+        _event: '{{ (feature | default("") | trim) }}'
+
+    # ── Step 2: Branch by event ─────────────────────────────────────────────
+    # All dispatched generic features are area-scoped (lights-only initial
+    # implementation). The brightness_move_* branches forward
+    # `leader_entity_id` so generics' built-in hold loop runs.
+    - choose:
+        # ────────────── on ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "on" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Lights On
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── off ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "off" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Lights Off
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── brightness_move_up ──────────────
+        # Stepping feature: forwarding leader_entity_id opts into the
+        # generics hold loop.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "brightness_move_up" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Lights Up
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── brightness_move_down ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "brightness_move_down" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Lights Down
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── arrow_left_click ──────────────
+        # TODO: implement (Media Previous / Ads / etc).
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "arrow_left_click" }}'
+          sequence: []
+
+        # ────────────── arrow_left_hold ──────────────
+        # TODO: implement (Media Seek Back / Fan Off / etc).
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "arrow_left_hold" }}'
+          sequence: []
+
+        # ────────────── arrow_right_click ──────────────
+        # TODO: implement (Media Next / Night / etc).
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "arrow_right_click" }}'
+          sequence: []
+
+        # ────────────── arrow_right_hold ──────────────
+        # TODO: implement (Media Seek Forward / Fan On toggle / etc).
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "arrow_right_hold" }}'
+          sequence: []
+
+        # All other events (brightness_stop, *_release, *_initial_press)
+        # have no `choose:` branch and fall through silently — no Error
+        # Mode is raised because they are expected "noise" events that
+        # the script intentionally does not act on.
+labeled_feature_symfonisk:
+  alias: Labeled Feature Symfonisk
+  description: >
+    Maps IKEA SYMFONISK Gen 2 Sound Remote raw event names into calls to
+    `script.labeled_feature_generics`. Reads the raw button event from the
+    `feature` field (e.g. 'toggle', 'track_next', 'volume_up_hold',
+    'dots_1_short_release', 'dots_2_double_press').
+
+    Mixes scopes deliberately:
+      - The transport buttons (toggle / track_*) target every media player
+        in the house (`scope: none`) so the remote works regardless of which
+        area it's pressed in.
+      - The volume rocker doubles as area light control on short taps
+        (`volume_up`/`volume_down` -> Lights On/Off) and switches between
+        global volume and area lights on long-hold depending on whether
+        media is currently playing in the remote's resolved scope.
+      - The two `dots_*` buttons drive user-defined toggle features at the
+        scopes the user picked: Screen, TV Input (area), Ads, Accent (area),
+        Bright (floor), Night (global).
+
+    Ignored events (no `choose:` branch): `*_initial_press`, `*_long_release`.
+
+    Event → generic-feature mapping:
+      toggle                       Media Toggle      (scope: none)
+      track_previous               Media Previous    (scope: none)
+      track_next                   Media Next        (scope: none)
+      volume_up                    Lights On         (area scope, one-shot)
+      volume_down                  Lights Off        (area scope, one-shot)
+      volume_up_hold   playing     Volume Up         (scope: none, hold loop)
+      volume_up_hold   not playing Lights Up         (area scope, hold loop)
+      volume_down_hold playing     Volume Down       (scope: none, hold loop)
+      volume_down_hold not playing Lights Down       (area scope, hold loop)
+      dots_1_short_release         Screen   toggle   (area scope)
+      dots_1_double_press          TV Input toggle   (area scope)
+      dots_1_long_press            Bright   toggle   (floor scope)
+      dots_2_short_release         Ads      toggle   (area scope)
+      dots_2_double_press          Night    toggle   (scope: none)
+      dots_2_long_press            Accent   toggle   (area scope)
+  mode: parallel
+  max: 50
+  fields:
+    feature:
+      name: Feature (Button Event)
+      description: >
+        The raw button event string from the SYMFONISK button entity.
+      required: true
+      selector:
+        select:
+          custom_value: true
+          options:
+            - toggle
+            - track_previous
+            - track_next
+            - volume_up
+            - volume_down
+            - volume_up_hold
+            - volume_down_hold
+            - dots_1_short_release
+            - dots_1_long_press
+            - dots_1_double_press
+            - dots_2_short_release
+            - dots_2_long_press
+            - dots_2_double_press
+    follower_entity_id:
+      name: Follower Entity ID
+      description: Used for area lookup. Passed automatically by labeled_feature_follower.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_entity_id:
+      name: Leader Entity ID (the button)
+      description: >
+        Used as fallback for area lookup, and forwarded to
+        `labeled_feature_generics` on the *_hold branches so the hold-loop
+        runs until the button's state changes.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    leader_enabled:
+      name: Leader Enabled
+      description: Pass-through from the leader. Not used directly by the symfonisk mapping.
+      required: false
+      default: true
+      selector:
+        boolean: {}
+    leader_feature:
+      name: Leader Feature Name
+      description: >
+        The leader's labeled feature name. Forwarded as `exclude_feature` on
+        every downstream `labeled_feature_generics` call.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    toggle:
+      name: Toggle
+      description: >
+        Pass-through toggle flag from the leader. Forwarded to every
+        labeled_feature_generics call **except** the dots_* branches which
+        always force `toggle: true` (their semantics are explicitly toggles).
+      required: false
+      default: false
+      selector:
+        boolean: {}
+    scope:
+      name: Scope
+      description: Scope of the feature (area, floor, or none).
+      required: false
+      default: area
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - none
+    scope_id:
+      name: Scope ID
+      description: The resolved area_id or floor_id passed by the automation.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    error_mode:
+      name: Error Mode
+      description: silent | log | alert | stop. Default 'log'.
+      required: false
+      default: log
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
+  sequence:
+    # ── Step 1: Resolve scope ids and scope entity set ──────────────────────
+    # Mirrors labeled_feature_somrig's prologue verbatim because the
+    # volume_*_hold branches need the same `media_playing` signal somrig
+    # uses for its long-press branches.
+    - variables:
+        _scope: '{{ (scope | default("area") | lower) }}'
+        _toggle_in: '{{ (toggle | default(false)) | bool(false) }}'
+        _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        _leader_feature: '{{ leader_feature | default("") | trim }}'
+        _event: '{{ (feature | default("") | trim) }}'
+        _resolved_area_id: >-
+          {%- if _scope == 'area' and scope_id is defined and scope_id != '' -%}
+            {{ scope_id }}
+          {%- elif follower_entity_id is defined and follower_entity_id != '' -%}
+            {{ area_id(follower_entity_id) | default('') }}
+          {%- elif leader_entity_id is defined and leader_entity_id != '' -%}
+            {{ area_id(leader_entity_id) | default('') }}
+          {%- else -%}{{ '' }}{%- endif -%}
+        _resolved_floor_id: >-
+          {%- if _scope == 'floor' and scope_id is defined and scope_id != '' -%}
+            {{ scope_id }}
+          {%- elif _scope == 'floor' and follower_entity_id is defined and follower_entity_id != '' -%}
+            {%- set aid = area_id(follower_entity_id) -%}
+            {%- set ns = namespace(found='') -%}
+            {%- for fid in floors() -%}
+              {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+            {%- endfor -%}{{ ns.found }}
+          {%- elif _scope == 'floor' and leader_entity_id is defined and leader_entity_id != '' -%}
+            {%- set aid = area_id(leader_entity_id) -%}
+            {%- set ns = namespace(found='') -%}
+            {%- for fid in floors() -%}
+              {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+            {%- endfor -%}{{ ns.found }}
+          {%- else -%}
+            {# For non-floor scopes we still try to derive the floor id so
+               that the `dots_1_long_press` Floor Bright branch has a
+               scope_id to dispatch with. #}
+            {%- set aid = _resolved_area_id -%}
+            {%- if aid == '' and follower_entity_id is defined and follower_entity_id != '' -%}
+              {%- set aid = area_id(follower_entity_id) | default('') -%}
+            {%- endif -%}
+            {%- if aid == '' and leader_entity_id is defined and leader_entity_id != '' -%}
+              {%- set aid = area_id(leader_entity_id) | default('') -%}
+            {%- endif -%}
+            {%- set ns = namespace(found='') -%}
+            {%- if aid != '' -%}
+              {%- for fid in floors() -%}
+                {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+            {{ ns.found }}
+          {%- endif -%}
+    - variables:
+        # Scope entity set mirrors labeled_feature_generics — used here only
+        # to compute `media_playing` for the volume_*_hold branches.
+        scope_entity_set: >-
+          {% if _scope == 'area' and _resolved_area_id != '' %}
+            {% set area_ents = area_entities(_resolved_area_id) | list %}
+            {% set area_devs = area_devices(_resolved_area_id) %}
+            {% set ns = namespace(dev_ents=[]) %}
+            {% for d in area_devs %}
+              {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list %}
+            {% endfor %}
+            {{ (area_ents + ns.dev_ents) | unique | list }}
+          {% elif _scope == 'floor' and _resolved_floor_id != '' %}
+            {% set ns = namespace(ents=[]) %}
+            {% for a in floor_areas(_resolved_floor_id) %}
+              {% set ns.ents = ns.ents + area_entities(a) | list %}
+              {% for d in area_devices(a) %}
+                {% set ns.ents = ns.ents + device_entities(d) | list %}
+              {% endfor %}
+            {% endfor %}
+            {{ ns.ents | unique | list }}
+          {% elif _resolved_area_id != '' %}
+            {% set area_ents = area_entities(_resolved_area_id) | list %}
+            {% set area_devs = area_devices(_resolved_area_id) %}
+            {% set ns = namespace(dev_ents=[]) %}
+            {% for d in area_devs %}
+              {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list %}
+            {% endfor %}
+            {{ (area_ents + ns.dev_ents) | unique | list }}
+          {% else %}
+            {{ [] }}
+          {% endif %}
+        _exclude_unscoped_label: '{{ _leader_feature ~ " Exclude: True" }}'
+        _exclude_scoped_label: >-
+          {{ (('Area ' if _scope == 'area' else
+               ('Floor ' if _scope == 'floor' else '')) ~ _leader_feature) ~ " Exclude: True" }}
+    - variables:
+        excluded_entities: >-
+          {% if _leader_feature == '' %}
+            {{ [] }}
+          {% else %}
+            {% set unscoped = label_entities(_exclude_unscoped_label) | list %}
+            {% set scoped = label_entities(_exclude_scoped_label) | list %}
+            {% set all_excl = (unscoped + scoped) | unique | list %}
+            {% if scope_entity_set | length > 0 %}
+              {{ all_excl | select('in', scope_entity_set) | list }}
+            {% else %}
+              {{ all_excl }}
+            {% endif %}
+          {% endif %}
+        _scope_prefix_str: >-
+          {{ 'Area ' if _scope == 'area' else ('Floor ' if _scope == 'floor' else '') }}
+        _media_provider_resolved: >-
+          {% set _label = 'Media Player' %}
+          {% set ns = namespace(out=[]) %}
+          {% set candidates = [
+            _label,
+            _scope_prefix_str ~ 'Provides: ' ~ _label,
+            _scope_prefix_str ~ 'Follower: ' ~ _label,
+            _scope_prefix_str ~ 'Leader: '   ~ _label
+          ] %}
+          {% for c in candidates %}
+            {% if ns.out | length == 0 %}
+              {% set ents = label_entities(c) | list %}
+              {% if _scope_prefix_str != '' and c != _label and scope_entity_set | length > 0 %}
+                {% set ents = ents | select('in', scope_entity_set) | list %}
+              {% endif %}
+              {% if ents | length > 0 %}{% set ns.out = ents %}{% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.out }}
+        media_playing: >-
+          {% set mp_in_scope = states.media_player
+               | rejectattr('entity_id', 'in', excluded_entities)
+               | list %}
+          {% set mp_in_scope_ids = mp_in_scope | map(attribute='entity_id') | list %}
+          {% if scope_entity_set | length > 0 %}
+            {% set candidate_ids = (mp_in_scope_ids | select('in', scope_entity_set) | list)
+                                   + (_media_provider_resolved | select('in', scope_entity_set) | list) %}
+            {{ mp_in_scope
+               | selectattr('entity_id', 'in', candidate_ids | unique | list)
+               | selectattr('state', 'in', ['playing', 'buffering'])
+               | list | count > 0 }}
+          {% elif _resolved_area_id != '' %}
+            {% set area_ids = area_entities(_resolved_area_id) %}
+            {% set candidate_ids = (mp_in_scope_ids | select('in', area_ids) | list)
+                                   + (_media_provider_resolved | select('in', area_ids) | list) %}
+            {{ mp_in_scope
+               | selectattr('entity_id', 'in', candidate_ids | unique | list)
+               | selectattr('state', 'in', ['playing', 'buffering'])
+               | list | count > 0 }}
+          {% else %}
+            false
+          {% endif %}
+
+    # ── Step 2: Branch by event ─────────────────────────────────────────────
+    - choose:
+        # ────────────── toggle ──────────────
+        # Transport buttons force scope: none so the press works
+        # regardless of which area the remote is in.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "toggle" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Media Toggle
+                exclude_feature: '{{ _leader_feature }}'
+                scope: none
+                scope_id: ''
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── track_previous ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "track_previous" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Media Previous
+                exclude_feature: '{{ _leader_feature }}'
+                scope: none
+                scope_id: ''
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── track_next ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "track_next" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Media Next
+                exclude_feature: '{{ _leader_feature }}'
+                scope: none
+                scope_id: ''
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── volume_up ──────────────
+        # Single tap always controls AREA lights, regardless of whether
+        # anything is playing. The dedicated *_hold variant is what
+        # branches between volume and brightness.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "volume_up" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Lights On
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── volume_down ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "volume_down" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Lights Off
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── volume_up_hold ──────────────
+        # Playing → global Volume Up (the user wants louder music
+        # regardless of which area they're standing in).
+        # Not playing → area Lights Up (the user is dimming the room).
+        # Forwarding leader_entity_id opts into the generics hold loop.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "volume_up_hold" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Volume Up" if media_playing else "Lights Up" }}'
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ "none" if media_playing else _scope }}'
+                scope_id: '{{ "" if media_playing else (scope_id | default("")) }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── volume_down_hold ──────────────
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "volume_down_hold" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: '{{ "Volume Down" if media_playing else "Lights Down" }}'
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ "none" if media_playing else _scope }}'
+                scope_id: '{{ "" if media_playing else (scope_id | default("")) }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: '{{ _toggle_in }}'
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── dots_1_short_release ──────────────
+        # User-defined Area Screen feature. Resolution happens entirely
+        # through `(Area )Follower: Screen` labels on target entities;
+        # toggle: true forces the toggle path in generics.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "dots_1_short_release" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Screen
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: true
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── dots_1_double_press ──────────────
+        # User-defined Area TV Input feature.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "dots_1_double_press" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: TV Input
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: true
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── dots_1_long_press ──────────────
+        # User-defined Floor Bright feature — explicitly floor-scoped so
+        # one press affects the whole floor.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "dots_1_long_press" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Bright
+                exclude_feature: '{{ _leader_feature }}'
+                scope: floor
+                scope_id: '{{ _resolved_floor_id }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: true
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── dots_2_short_release ──────────────
+        # User-defined Area Ads feature. (Note: `Ads` is also a generic
+        # catalog entry — labeled_feature_generics will dispatch
+        # `homeassistant.toggle` against entities labeled
+        # `(Area )Follower: Ads` thanks to the existing `ads` kind in
+        # feature_meta. toggle: true is a no-op for that kind.)
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "dots_2_short_release" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Ads
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: true
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── dots_2_double_press ──────────────
+        # Global Night feature.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "dots_2_double_press" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Night
+                exclude_feature: '{{ _leader_feature }}'
+                scope: none
+                scope_id: ''
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: true
+                error_mode: '{{ _err_mode }}'
+
+        # ────────────── dots_2_long_press ──────────────
+        # User-defined Area Accent feature.
+        - conditions:
+            - condition: template
+              value_template: '{{ _event == "dots_2_long_press" }}'
+          sequence:
+            - action: script.labeled_feature_generics
+              data:
+                feature: Accent
+                exclude_feature: '{{ _leader_feature }}'
+                scope: '{{ _scope }}'
+                scope_id: '{{ scope_id | default("") }}'
+                follower_entity_id: '{{ follower_entity_id | default("") }}'
+                leader_entity_id: '{{ leader_entity_id | default("") }}'
+                leader_enabled: '{{ leader_enabled | default(true) }}'
+                toggle: true
+                error_mode: '{{ _err_mode }}'
+
+        # All other events (*_initial_press, *_long_release) have no
+        # `choose:` branch and fall through silently.
