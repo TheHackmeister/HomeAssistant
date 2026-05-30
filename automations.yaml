@@ -2169,8 +2169,19 @@
               {% set prev_entry = _prev_s.get(scope_id_val, None) %}
               {% set _prev_entry = prev_entry if (prev_entry is not none and prev_entry is mapping) else none %}
               {% set prev_enabled = _prev_entry.get('enabled') if _prev_entry is not none else none %}
+              {% set prev_ts = _prev_entry.get('last_changed_timestamp') if _prev_entry is not none else none %}
               {% set new_enabled = _entry.get('enabled', false) %}
-              {% if prev_enabled is none or prev_enabled != new_enabled %}
+              {% set new_ts = _entry.get('last_changed_timestamp') %}
+              {# Dispatch when `enabled` actually flipped OR when the
+                 timestamp bumped without an enabled flip (button-style
+                 leaders: the sensor forces the timestamp forward on
+                 every accepted button event so repeat presses don't
+                 collapse into a no-op). Treats first-time entries
+                 (`prev_enabled is none`) as flips per the existing
+                 contract. #}
+              {% if prev_enabled is none
+                    or prev_enabled != new_enabled
+                    or (prev_ts is not none and new_ts is not none and prev_ts != new_ts) %}
                 {% set ns.items = ns.items + [{
                   'feature': fname,
                   'scope': scope_val,

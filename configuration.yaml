@@ -604,7 +604,19 @@ template:
                   {% set prev_entry = existing_s.get(scope_id_val, {}) %}
                   {% set prev_enabled = prev_entry.get('enabled', None) %}
                   {% set prev_ts = prev_entry.get('last_changed_timestamp', ts) %}
-                  {% set flipped = (prev_enabled is none) or (prev_enabled != new_enabled) %}
+                  {# Bump the timestamp whenever `enabled` actually flips
+                     OR when the leader is on a button/event domain (every
+                     accepted press is a distinct "user did the thing"
+                     event — same canonical event name twice in a row
+                     still means two presses). The leaders automation
+                     diffs on (enabled, last_changed_timestamp) so a
+                     timestamp bump alone is enough to dispatch followers
+                     for steady-state-enabled buttons. #}
+                  {% set _leader_dom = _changed_eid.split('.')[0] %}
+                  {% set _is_button_leader = _leader_dom in ['event', 'button'] %}
+                  {% set flipped = (prev_enabled is none)
+                                   or (prev_enabled != new_enabled)
+                                   or _is_button_leader %}
                   {% set new_ts = ts if flipped else prev_ts %}
                   {% set new_entry = {
                     'enabled': new_enabled,
