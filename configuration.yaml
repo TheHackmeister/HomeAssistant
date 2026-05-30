@@ -221,6 +221,22 @@ template:
         # of the label still fire one cleanup tick).
       - trigger: event
         event_type: labeled_feature_set
+    # Gate the firehose of `state_changed` events down to ones that
+    # could actually affect this sensor's render. We deliberately do
+    # NOT reference `this.attributes.*` here — in HA trigger-based
+    # template sensors, `this` is undefined during the `conditions:`
+    # phase (only bound during the attribute render), so any reference
+    # would raise UndefinedError on every event and block triggers
+    # entirely.
+    #
+    # Trade-off: when a user removes the `feature_leader` label from
+    # an entity, this gate immediately rejects that entity's
+    # subsequent state_changed events. The stale entry in
+    # `leaders` / `features` lingers until the next leader-driven
+    # tick, at which point the attribute templates' orphan logic
+    # walks `this.attributes.*` and drops anything no longer labeled.
+    # In practice this is fine — orphans are harmless until the next
+    # tick, and another leader changing state is the common case.
     conditions:
       - condition: template
         value_template: >
@@ -228,10 +244,7 @@ template:
           {% if evtype == 'labeled_feature_set' %}
             true
           {% else %}
-            {% set eid = trigger.event.data.entity_id | default('') %}
-            {% set is_leader = eid in label_entities('feature_leader') %}
-            {% set was_tracked = eid in (this.attributes.get('leaders', {}) | default({})) %}
-            {{ is_leader or was_tracked }}
+            {{ trigger.event.data.entity_id | default('') in label_entities('feature_leader') }}
           {% endif %}
     sensor:
     - name: "Labeled Features State"
