@@ -244,7 +244,23 @@ template:
           {% if evtype == 'labeled_feature_set' %}
             true
           {% else %}
-            {{ trigger.event.data.entity_id | default('') in label_entities('feature_leader') }}
+            {% set eid = trigger.event.data.entity_id | default('') %}
+            {% set old = trigger.event.data.old_state %}
+            {# Reject events where there is no real prior state
+               (boot restore, integration reconnect, etc). This
+               specifically prevents the boot-time button-leader
+               re-emission from looking like a fresh press to the
+               sensor's per-triple rebuild. Real user presses
+               always have an `old_state` whose state is a previous
+               event_type / value (not unknown/unavailable). #}
+            {% if eid not in label_entities('feature_leader') %}
+              false
+            {% elif old is none or (old.state | string | lower)
+                    in ['unknown', 'unavailable', 'none'] %}
+              false
+            {% else %}
+              true
+            {% endif %}
           {% endif %}
     sensor:
     - name: "Labeled Features State"
