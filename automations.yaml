@@ -2204,9 +2204,15 @@
             {% else %}
               {{ [] }}
             {% endif %}
-          leader_current_value: >-
-            {{ state_attr('sensor.labeled_features_state', 'leaders')
-               | default({}) | dictsort | map('first') | list }}
+          # NOTE: `leader_current_value` is intentionally re-computed in
+          # the next `variables:` block — this first definition existed
+          # only as a left-over typo (passed an entire dict through
+          # `dictsort` and then misused `map('first')`). It's left here
+          # as `''` so anything that referenced it in this block before
+          # the rebuild gets a safe default instead of a TypeError when
+          # the sensor's `leaders` attribute is a mapping (which it
+          # always is). Real value resolved in the next step.
+          leader_current_value: ''
           # Resolve area/floor ids for downstream resolution. For
           # leader-driven entries we trust the triple's scope/scope_id.
           # For runtime label-prefix resolution we still need
@@ -2230,13 +2236,17 @@
       - variables:
           # leader_current_value: pulled from the sensor's `leaders` map.
           # Used by the legacy `<F>: <state_value>` shorthand parser below.
+          # `state_attr(...).get(leader_entity_id, {}).get('current_value', '')`
+          # is the straightforward path — no `dictsort | items` chain
+          # (which choked on mappings with the "Can only get item pairs
+          # from a mapping" TypeError).
           leader_current_value: >-
             {% if (leader_entity_id | trim) != '' %}
-              {{ state_attr('sensor.labeled_features_state', 'leaders')
-                 | default({}) | dictsort | items
-                 | selectattr(0, 'eq', leader_entity_id)
-                 | map('last') | map(attribute='current_value')
-                 | list | first | default('') }}
+              {% set _ldrs = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
+              {% set _ldrs = _ldrs if _ldrs is mapping else {} %}
+              {% set _l = _ldrs.get(leader_entity_id, {}) %}
+              {% set _l = _l if _l is mapping else {} %}
+              {{ _l.get('current_value', '') | string }}
             {% else %}{{ '' }}{% endif %}
           leader_only: "{% set only_label = scoped_feature_leader + ' Only: ' %}
             {% set match = all_leader_labels
