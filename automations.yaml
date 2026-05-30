@@ -2172,16 +2172,34 @@
               {% set prev_ts = _prev_entry.get('last_changed_timestamp') if _prev_entry is not none else none %}
               {% set new_enabled = _entry.get('enabled', false) %}
               {% set new_ts = _entry.get('last_changed_timestamp') %}
-              {# Dispatch when `enabled` actually flipped OR when the
-                 timestamp bumped without an enabled flip (button-style
-                 leaders: the sensor forces the timestamp forward on
-                 every accepted button event so repeat presses don't
-                 collapse into a no-op). Treats first-time entries
-                 (`prev_enabled is none`) as flips per the existing
-                 contract. #}
-              {% if prev_enabled is none
-                    or prev_enabled != new_enabled
-                    or (prev_ts is not none and new_ts is not none and prev_ts != new_ts) %}
+              {# Dispatch predicate. Three paths into a dispatch:
+                 1. First-seed entry (`prev_enabled is none`) — only
+                    when the triggering leader's state is real (i.e.
+                    not unknown/unavailable/none). This blocks the
+                    boot-time noise where a leader's
+                    unknown→real-state transition causes the sensor
+                    to write its first features-entry, but with
+                    `prev_enabled = none` — we'd otherwise dispatch
+                    on every leader resolving from unknown on boot.
+                    Manual overrides (triggering_leader == '') are
+                    always real and always dispatch.
+                 2. Genuine flip (`prev_enabled != new_enabled`) —
+                    classic case, always dispatches.
+                 3. Timestamp-only bump (`prev_ts != new_ts`) — only
+                    counts when the triggering leader is a button/
+                    event-domain entity. The sensor only bumps
+                    timestamp-without-flip for those, so this gate
+                    prevents non-button leader re-evaluations from
+                    spuriously firing. #}
+              {% set _trig = _entry.get('triggering_leader', '') %}
+              {% set _trig_dom = (_trig | string).split('.')[0] if _trig else '' %}
+              {% set _is_button = _trig_dom in ['event', 'button'] %}
+              {% set _leader_state_real = (_trig | trim) == ''
+                  or (states(_trig) | string | lower) not in ['unknown', 'unavailable', 'none'] %}
+              {% set _is_first_seed = prev_enabled is none %}
+              {% if (_is_first_seed and _leader_state_real)
+                    or (not _is_first_seed and prev_enabled != new_enabled)
+                    or (_is_button and prev_ts is not none and new_ts is not none and prev_ts != new_ts) %}
                 {% set ns.items = ns.items + [{
                   'feature': fname,
                   'scope': scope_val,
