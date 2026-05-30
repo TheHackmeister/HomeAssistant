@@ -2132,10 +2132,16 @@
   max: 50
   actions:
   - variables:
-      _now_features: '{{ trigger.to_state.attributes.features | default({}) }}'
-      _prev_features: >-
+      # Defensive: any of these may be non-mapping if the sensor's
+      # attributes were carried over from the previous (flat) schema or
+      # if something weird happened upstream. Coerce to {} so the diff
+      # below is safe to walk.
+      _now_features_raw: '{{ trigger.to_state.attributes.features | default({}) }}'
+      _prev_features_raw: >-
         {{ (trigger.from_state.attributes.features
             if trigger.from_state is not none else {}) | default({}) }}
+      _now_features: '{{ _now_features_raw if _now_features_raw is mapping else {} }}'
+      _prev_features: '{{ _prev_features_raw if _prev_features_raw is mapping else {} }}'
       automation_error_mode: >-
         {% set em_label = labels('automation.labeled_feature_leaders')
             | map('label_name') | reject('none')
@@ -2151,19 +2157,27 @@
       changed_entries: >-
         {% set ns = namespace(items=[]) %}
         {% for fname, scopes_map in _now_features.items() %}
-          {% for scope_val, sids_map in (scopes_map | default({})).items() %}
-            {% for scope_id_val, entry in (sids_map | default({})).items() %}
-              {% set prev_entry = _prev_features.get(fname, {}).get(scope_val, {}).get(scope_id_val, None) %}
-              {% set prev_enabled = prev_entry.enabled if prev_entry is not none and 'enabled' in prev_entry else none %}
-              {% set new_enabled = entry.get('enabled', false) %}
+          {% set _sm = scopes_map if scopes_map is mapping else {} %}
+          {% for scope_val, sids_map in _sm.items() %}
+            {% set _sids = sids_map if sids_map is mapping else {} %}
+            {% for scope_id_val, entry in _sids.items() %}
+              {% set _entry = entry if entry is mapping else {} %}
+              {% set _prev_f = _prev_features.get(fname, {}) %}
+              {% set _prev_f = _prev_f if _prev_f is mapping else {} %}
+              {% set _prev_s = _prev_f.get(scope_val, {}) %}
+              {% set _prev_s = _prev_s if _prev_s is mapping else {} %}
+              {% set prev_entry = _prev_s.get(scope_id_val, None) %}
+              {% set _prev_entry = prev_entry if (prev_entry is not none and prev_entry is mapping) else none %}
+              {% set prev_enabled = _prev_entry.get('enabled') if _prev_entry is not none else none %}
+              {% set new_enabled = _entry.get('enabled', false) %}
               {% if prev_enabled is none or prev_enabled != new_enabled %}
                 {% set ns.items = ns.items + [{
                   'feature': fname,
                   'scope': scope_val,
                   'scope_id': scope_id_val,
                   'enabled': new_enabled,
-                  'triggering_leader': entry.get('triggering_leader', ''),
-                  'last_changed_timestamp': entry.get('last_changed_timestamp', 0),
+                  'triggering_leader': _entry.get('triggering_leader', ''),
+                  'last_changed_timestamp': _entry.get('last_changed_timestamp', 0),
                 }] %}
               {% endif %}
             {% endfor %}
