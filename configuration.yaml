@@ -186,13 +186,58 @@ template:
             {% endfor %}
             {{ fns.d }}
 
-  - sensor:
+  # ─────────────────────────────────────────────────────────────────────
+  # sensor.labeled_features_state  (trigger-based)
+  #
+  # Re-evaluated on:
+  #   * state_changed event for any entity carrying the `feature_leader`
+  #     label
+  #   * `labeled_feature_set` event — manual override path used by
+  #     `script.labeled_feature_generics` (feature: Set Feature) to write
+  #     directly into `features` without a backing leader.
+  #
+  # Attributes:
+  #   feature_meta — static catalog (unchanged).
+  #   leaders      — per-leader { current_value, previous_value,
+  #                  last_changed_timestamp }. Updated for the leader that
+  #                  drove this tick; carried through for everyone else.
+  #   features     — first-class observable. Nested by
+  #                  feature → scope → scope_id → entry.
+  #                  Each entry: { enabled, mode, last_changed_timestamp,
+  #                               triggering_leader }
+  #                  `mode` is read from a label on this sensor:
+  #                  `<Scoped F> Mode: Leader|Any|All`
+  #                  `last_changed_timestamp` only bumps when `enabled`
+  #                  flips. `triggering_leader` is the leader entity_id
+  #                  that drove this tick, or '' for manual overrides.
+  # ─────────────────────────────────────────────────────────────────────
+  - trigger:
+      - trigger: event
+        event_type: state_changed
+        # Filter inside the template (HA event triggers don't accept
+        # an entity-id filter directly). We re-render only when the
+        # changed entity is currently labeled `feature_leader` or when
+        # the previous attributes carried an entry for it (so removals
+        # of the label still fire one cleanup tick).
+      - trigger: event
+        event_type: labeled_feature_set
+    conditions:
+      - condition: template
+        value_template: >
+          {% set evtype = trigger.event.event_type %}
+          {% if evtype == 'labeled_feature_set' %}
+            true
+          {% else %}
+            {% set eid = trigger.event.data.entity_id | default('') %}
+            {% set is_leader = eid in label_entities('feature_leader') %}
+            {% set was_tracked = eid in (this.attributes.get('leaders', {}) | default({})) %}
+            {{ is_leader or was_tracked }}
+          {% endif %}
+    sensor:
     - name: "Labeled Features State"
       unique_id: labeled_features_state
       state_class: measurement
       unit_of_measurement: leaders
-      availability: >
-        {{ label_entities('feature_leader') | count > 0 }}
       state: >
         {{ label_entities('feature_leader') | list | count }}
       attributes:
@@ -234,187 +279,320 @@ template:
             'Fan Up':             {'domain': 'fan',          'kind': 'fan_up',             'domain_label': 'Fan'},
             'Fan Down':           {'domain': 'fan',          'kind': 'fan_down',           'domain_label': 'Fan'}
           } }}
-        last_updated_at: >
-
-          {% set entities = expand(label_entities('feature_leader'))
-              | sort(attribute='last_changed_timestamp')
-              | rejectattr('state', 'in', ['unknown', 'unavailable'])
-              | rejectattr('state', 'match', '.*_initial_press$')
-              | list %}
-          {% if entities | count > 0 %}
-            {{ entities | last | attr('last_changed_timestamp') }}
-          {% else %}
-            {{ 0 }}
-          {% endif %}
+        # ── leaders ─────────────────────────────────────────────────────
+        # Per-leader diagnostic and substitution surface.
+        # Only the entity that drove this tick has its entry rebuilt;
+        # every other leader's entry is carried through from
+        # `this.attributes.leaders` unchanged.
+        #
+        # `trigger.event.event_type` is `state_changed` for leader-driven
+        # ticks (we filter to feature_leader-labeled entities inline) and
+        # `labeled_feature_set` for manual override events — the latter
+        # does not touch leaders.
         leaders: >
-          {% set entities = expand(label_entities('feature_leader'))
-              | sort(attribute='last_changed_timestamp') %}
+          {% set _all_leaders = label_entities('feature_leader') | list %}
+          {% set _evtype = trigger.event.event_type | default('') %}
+          {% set _is_state_changed = (_evtype == 'state_changed') %}
+          {% set _changed_eid = trigger.event.data.entity_id | default('') if _is_state_changed else '' %}
+          {% set _prev_leaders = this.attributes.get('leaders', {}) | default({}) %}
           {% set ns = namespace(result={}) %}
-          {% for e in entities %}
-            {% set cv_raw = e.attributes.event_type | default(e.state) if e.domain == 'event' else e.state %}
-            {% set is_skip = cv_raw | regex_search('_initial_press$') or cv_raw | lower in ['unknown', 'unavailable'] %}
-            {% set prev_l = this.attributes.get('leaders', {}).get(e.entity_id, {}) %}
+          {# Carry every existing entry through, but only for entities
+             that still carry the feature_leader label. Orphans drop. #}
+          {% for eid, ldat in _prev_leaders.items() %}
+            {% if eid in _all_leaders and eid != _changed_eid %}
+              {% set ns.result = dict(ns.result, **{eid: ldat}) %}
+            {% endif %}
+          {% endfor %}
+          {# Add entries for any newly-labeled leaders we don't have yet
+             (skip the changed one — handled below with full evaluation). #}
+          {% for eid in _all_leaders %}
+            {% if eid not in ns.result and eid != _changed_eid %}
+              {% set st = states(eid) %}
+              {% set lct = states[eid].last_changed_timestamp
+                            if states[eid] is not none else 0 %}
+              {% set ns.result = dict(ns.result, **{eid: {
+                'current_value': st,
+                'previous_value': '',
+                'last_changed_timestamp': lct
+              }}) %}
+            {% endif %}
+          {% endfor %}
+          {# Rebuild the changed leader's entry from the trigger payload. #}
+          {% if _is_state_changed and _changed_eid in _all_leaders %}
+            {% set new_state = trigger.event.data.new_state %}
+            {% set cv_raw = new_state.attributes.event_type | default(new_state.state) if (new_state is not none and new_state.entity_id.split('.')[0] == 'event') else (new_state.state if new_state is not none else '') %}
+            {% set is_skip = cv_raw | regex_search('_initial_press$') or cv_raw | lower in ['unknown', 'unavailable', 'none'] %}
+            {% set prev_l = _prev_leaders.get(_changed_eid, {}) %}
             {% set cv = prev_l.get('current_value', cv_raw) if is_skip else cv_raw %}
-            {% set cv_ts = prev_l.get('last_changed_timestamp', e.last_changed_timestamp) if is_skip else e.last_changed_timestamp %}
+            {% set cv_ts = prev_l.get('last_changed_timestamp', (new_state.last_changed.timestamp() if (new_state is not none and new_state.last_changed is not none) else now().timestamp())) if is_skip else (new_state.last_changed.timestamp() if (new_state is not none and new_state.last_changed is not none) else now().timestamp()) %}
             {% set old_cv_l = prev_l.get('current_value', '') %}
             {% set old_pv_l = prev_l.get('previous_value', '') %}
             {% set prev_cv_l_raw = old_cv_l if cv != old_cv_l else old_pv_l %}
-            {% set prev_cv_l = '' if prev_cv_l_raw | regex_search('_initial_press$') or prev_cv_l_raw | lower in ['unknown', 'unavailable'] else prev_cv_l_raw %}
-            {% set labels = labels(e.entity_id)
-                | map('label_name') | reject('none') | list %}
-            {% set fns = namespace(features={}) %}
-            {% for label in labels %}
-              {% set feature_match = label
-                  | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
-              {% if feature_match != label %}
-                {% set fname = feature_match %}
-                {% set scope = 'area' if label | lower | regex_search('^area leader') else
-                               ('floor' if label | lower | regex_search('^floor leader') else 'none') %}
-                {% set scope_pfx = 'Area ' if scope == 'area' else ('Floor ' if scope == 'floor' else '') %}
-                {% set inc_lbl = (scope_pfx + fname + ' Increasing: True') in labels %}
-                {% set dec_lbl = (scope_pfx + fname + ' Decreasing: True') in labels %}
-                {% if inc_lbl or dec_lbl %}
-                  {# Direction takes precedence over Enable/Disable labels #}
-                  {% set cur_n  = cv  | float(none) %}
-                  {% set prev_n = prev_cv_l | float(none) %}
-                  {% set has_movement = cur_n is not none and prev_n is not none %}
-                  {% set is_inc = has_movement and cur_n > prev_n %}
-                  {% set is_dec = has_movement and cur_n < prev_n %}
-                  {% set base_enabled = (inc_lbl and is_inc) or (dec_lbl and is_dec) %}
+            {% set prev_cv_l = '' if (prev_cv_l_raw | regex_search('_initial_press$') or prev_cv_l_raw | lower in ['unknown', 'unavailable', 'none']) else prev_cv_l_raw %}
+            {% set ns.result = dict(ns.result, **{_changed_eid: {
+              'current_value': cv,
+              'previous_value': prev_cv_l,
+              'last_changed_timestamp': cv_ts
+            }}) %}
+          {% endif %}
+          {{ ns.result }}
+
+        # ── features ────────────────────────────────────────────────────
+        # First-class observable. Nested:
+        #   feature → scope → scope_id → {
+        #     enabled, mode, last_changed_timestamp, triggering_leader
+        #   }
+        #
+        # On a `state_changed` tick (changed leader):
+        #   1. Re-evaluate the changed leader's per-(F, scope, scope_id)
+        #      truth value for every feature it leads.
+        #   2. For each touched triple, resolve its `mode` from labels on
+        #      this sensor entity: `<Scoped F> Mode: Leader|Any|All`.
+        #      Default `leader`.
+        #   3. Compute new `enabled`:
+        #        leader  → the changed leader's value
+        #        any/all → fold across every leader mapped to the same
+        #                  triple (re-evaluating each from its current
+        #                  state). The changed leader's value comes from
+        #                  step 1; others are evaluated inline.
+        #   4. If new `enabled` differs from previous, bump
+        #      `last_changed_timestamp`. Always set `triggering_leader`
+        #      to the changed leader's entity_id.
+        #   5. Every other triple in `this.attributes.features` is
+        #      carried through unchanged, UNLESS no leader maps to it
+        #      and it was not sourced via a manual override
+        #      (`triggering_leader: ''`) — those drop.
+        #
+        # On a `labeled_feature_set` tick (manual override):
+        #   1. Read target_feature/scope/scope_id/enabled/timestamp from
+        #      the event payload.
+        #   2. Write features[target_feature][scope][scope_id] = {
+        #        enabled, mode (preserve existing or 'leader'),
+        #        last_changed_timestamp: timestamp,
+        #        triggering_leader: ''
+        #      }
+        #   3. Carry everything else through unchanged.
+        features: >
+          {% set _all_leaders = label_entities('feature_leader') | list %}
+          {% set _evtype = trigger.event.event_type | default('') %}
+          {% set _is_state_changed = (_evtype == 'state_changed') %}
+          {% set _is_manual = (_evtype == 'labeled_feature_set') %}
+          {% set _changed_eid = trigger.event.data.entity_id | default('') if _is_state_changed else '' %}
+          {% set _prev_features = this.attributes.get('features', {}) | default({}) %}
+          {% set _sensor_labels = labels('sensor.labeled_features_state') | map('label_name') | reject('none') | list %}
+
+          {# Mode lookup helper macro replacement: we inline below. #}
+
+          {# Helper inline — evaluate a single leader for a single feature
+             label string. Returns the post-Invert enabled value. #}
+          {% macro eval_leader(eid, full_label, scope_pfx, fname, cv, prev_cv) %}
+            {%- set lbls = labels(eid) | map('label_name') | reject('none') | list -%}
+            {%- set st = states(eid) -%}
+            {%- set dom = eid.split('.')[0] -%}
+            {%- set inc_lbl = (scope_pfx + fname + ' Increasing: True') in lbls -%}
+            {%- set dec_lbl = (scope_pfx + fname + ' Decreasing: True') in lbls -%}
+            {%- set ns2 = namespace(base=false) -%}
+            {%- if inc_lbl or dec_lbl -%}
+              {%- set cur_n = cv | float(none) -%}
+              {%- set prev_n = prev_cv | float(none) -%}
+              {%- set has_mov = cur_n is not none and prev_n is not none -%}
+              {%- set is_inc = has_mov and cur_n > prev_n -%}
+              {%- set is_dec = has_mov and cur_n < prev_n -%}
+              {%- set ns2.base = (inc_lbl and is_inc) or (dec_lbl and is_dec) -%}
+            {%- else -%}
+              {%- set en_lbl = lbls | select('match', '^' + scope_pfx + fname + ' Enable: .+') | first | default('') -%}
+              {%- set dis_lbl = lbls | select('match', '^' + scope_pfx + fname + ' Disable: .+') | first | default('') -%}
+              {%- set en_val = en_lbl | regex_replace('^.+: ', '') -%}
+              {%- set dis_val = dis_lbl | regex_replace('^.+: ', '') -%}
+              {%- if en_val != '' or dis_val != '' -%}
+                {%- set by_en = en_val != '' and st == en_val -%}
+                {%- set by_dis = dis_val != '' and st == dis_val -%}
+                {%- if en_val != '' and dis_val != '' -%}
+                  {%- set ns2.base = by_en and not by_dis -%}
+                {%- elif en_val != '' -%}
+                  {%- set ns2.base = by_en -%}
+                {%- else -%}
+                  {%- set ns2.base = not by_dis -%}
+                {%- endif -%}
+              {%- else -%}
+                {%- if dom in ['event', 'button'] -%}
+                  {%- set ns2.base = true -%}
+                {%- else -%}
+                  {%- set ns2.base = (st == fname) or (st | lower in ['on','true','home','open','detected','active','unlocked']) -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- set inverted = (scope_pfx + fname + ' Invert: True') in lbls -%}
+            {{- (not ns2.base) if inverted else ns2.base -}}
+          {% endmacro %}
+
+          {# Build mapping: (feature, scope, scope_id) → list of leader entity_ids
+             that lead it. Used both for drop semantics and for any/all mode
+             folding. We always rebuild this — it's cheap and means we don't
+             need a separate persisted index. #}
+          {% set tns = namespace(triples={}) %}
+          {% for eid in _all_leaders %}
+            {% set _aid = area_id(eid) | default('') | trim %}
+            {% set _fid = namespace(v='') %}
+            {% if _aid != '' %}
+              {% for fid in floors() %}
+                {% if _aid in floor_areas(fid) %}{% set _fid.v = fid %}{% endif %}
+              {% endfor %}
+            {% endif %}
+            {% for lbl in (labels(eid) | map('label_name') | reject('none') | list) %}
+              {% set m = lbl | regex_replace('^(Area |Floor |)Leader: (.+)$', 'M|\\1|\\2') %}
+              {% if m.startswith('M|') %}
+                {% set parts = m.split('|') %}
+                {% set prefix = parts[1] | trim %}
+                {% set fname = parts[2] | trim %}
+                {% set scope_val = 'area' if prefix == 'Area' else ('floor' if prefix == 'Floor' else 'global') %}
+                {% set scope_id_val = _aid if scope_val == 'area' else (_fid.v if scope_val == 'floor' else '') %}
+                {% if scope_val == 'area' and scope_id_val == '' %}
+                  {# Leader has no area; skip — area scope cannot resolve #}
+                {% elif scope_val == 'floor' and scope_id_val == '' %}
+                  {# Leader has no floor; skip — floor scope cannot resolve #}
                 {% else %}
-                  {% set en_lbl = labels
-                      | select('match', '^' + fname + ' Enable: .+')
-                      | first | default('') %}
-                  {% set dis_lbl = labels
-                      | select('match', '^' + fname + ' Disable: .+')
-                      | first | default('') %}
-                  {% set en_val = en_lbl | regex_replace('^.+: ', '') %}
-                  {% set dis_val = dis_lbl | regex_replace('^.+: ', '') %}
-                  {% if en_val != '' or dis_val != '' %}
-                    {% set by_en = en_val != '' and e.state == en_val %}
-                    {% set by_dis = dis_val != '' and e.state == dis_val %}
-                    {% if en_val != '' and dis_val != '' %}
-                      {% set base_enabled = by_en and not by_dis %}
-                    {% elif en_val != '' %}
-                      {% set base_enabled = by_en %}
-                    {% else %}
-                      {% set base_enabled = not by_dis %}
-                    {% endif %}
-                  {% else %}
-                    {% if e.domain in ['event', 'button'] %}
-                      {% set base_enabled = true %}
-                    {% else %}
-                      {# Default truth function. Two rules ORed together:
-                         1. State equals the feature name (case-sensitive).
-                            Makes `input_select` / option-style leaders
-                            work with just `Leader: <F>` — no Enable/Disable
-                            labels required when the option string IS the
-                            feature name.
-                         2. State is a generic truthy value (on, true, …).
-                            Covers boolean leaders. #}
-                      {% set base_enabled = (e.state == fname) or
-                          (e.state | lower in
-                              ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked']) %}
-                    {% endif %}
+                  {% set key = fname ~ '||' ~ scope_val ~ '||' ~ scope_id_val %}
+                  {% set existing = tns.triples.get(key, []) %}
+                  {% if eid not in existing %}
+                    {% set tns.triples = dict(tns.triples, **{key: existing + [eid]}) %}
                   {% endif %}
                 {% endif %}
-                {% set inverted = (scope_pfx + fname + ' Invert: True') in labels %}
-                {% set final_enabled = (not base_enabled) if inverted else base_enabled %}
-                {% set fns.features = dict(fns.features, **{
-                  fname: {'enabled': final_enabled, 'scope': scope}
-                }) %}
               {% endif %}
             {% endfor %}
-            {% set ns.result = dict(ns.result, **{
-              e.entity_id: {
-                'current_value': cv,
-                'previous_value': prev_cv_l,
-                'last_changed_timestamp': cv_ts,
-                'features': fns.features
-              }
-            }) %}
           {% endfor %}
-          {{ ns.result }}
-        features: >
+
+          {# Resolve mode for a given (fname, scope) from labels on this
+             sensor. Default 'leader'. #}
+          {% set mode_for = namespace(d={}) %}
+          {% for key in tns.triples.keys() %}
+            {% set k_parts = key.split('||') %}
+            {% set fname = k_parts[0] %}
+            {% set scope_val = k_parts[1] %}
+            {% set scope_pfx = 'Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '') %}
+            {% set mode_lbl = _sensor_labels | select('match', '^' + scope_pfx + fname + ' Mode: (Leader|Any|All)$') | first | default('') %}
+            {% set mv = (mode_lbl | regex_replace('^.+: ', '') | lower) if mode_lbl != '' else 'leader' %}
+            {% set mode_for.d = dict(mode_for.d, **{key: mv}) %}
+          {% endfor %}
+
+          {# Decide what (feature, scope, scope_id) triples this tick
+             should touch. Start with everything that has a leader mapped
+             (so orphans drop). On a state_changed tick, also flag triples
+             belonging to the changed leader for re-evaluation. On a
+             manual tick, no leader triples are touched. #}
           {% set ns = namespace(result={}) %}
-          {% for entity in expand(label_entities('feature_leader'))
-              | sort(attribute='last_changed_timestamp') %}
-            {% set cv_raw = entity.attributes.event_type | default(entity.state) if entity.domain == 'event' else entity.state %}
-            {% set is_skip = cv_raw | regex_search('_initial_press$') or cv_raw | lower in ['unknown', 'unavailable'] %}
-            {% set labels  = labels(entity.entity_id)
-                | map('label_name') | reject('none') | list %}
-            {% for label in labels %}
-              {% set feature_match = label
-                  | regex_replace('(?i)^(Area |Floor |)Leader: ', '') %}
-              {% if feature_match != label %}
-                {% set fname = feature_match %}
-                {% set prev_f = this.attributes.get('features', {}).get(fname, {}) %}
-                {% set scope_pfx = 'Area ' if label | lower | regex_search('^area leader') else ('Floor ' if label | lower | regex_search('^floor leader') else '') %}
-                {% set inc_lbl = (scope_pfx + fname + ' Increasing: True') in labels %}
-                {% set dec_lbl = (scope_pfx + fname + ' Decreasing: True') in labels %}
-                {% if inc_lbl or dec_lbl %}
-                  {# Direction takes precedence over Enable/Disable labels #}
-                  {% set feat_value_cur = prev_f.get('value', entity.state) if is_skip else entity.state %}
-                  {% set feat_value_prev = prev_f.get('previous_value', '') %}
-                  {% set cur_n  = feat_value_cur  | float(none) %}
-                  {% set prev_n = feat_value_prev | float(none) %}
-                  {% set has_movement = cur_n is not none and prev_n is not none %}
-                  {% set is_inc = has_movement and cur_n > prev_n %}
-                  {% set is_dec = has_movement and cur_n < prev_n %}
-                  {% set feat_enabled = (inc_lbl and is_inc) or (dec_lbl and is_dec) %}
-                {% else %}
-                  {% set en_lbl = labels
-                      | select('match', '^' + fname + ' Enable: .+')
-                      | first | default('') %}
-                  {% set dis_lbl = labels
-                      | select('match', '^' + fname + ' Disable: .+')
-                      | first | default('') %}
-                  {% set en_val  = en_lbl  | regex_replace('^.+: ', '') %}
-                  {% set dis_val = dis_lbl | regex_replace('^.+: ', '') %}
-                  {% if en_val != '' or dis_val != '' %}
-                    {% set by_en  = en_val  != '' and entity.state == en_val %}
-                    {% set by_dis = dis_val != '' and entity.state == dis_val %}
-                    {% if en_val != '' and dis_val != '' %}
-                      {% set feat_enabled = by_en and not by_dis %}
-                    {% elif en_val != '' %}
-                      {% set feat_enabled = by_en %}
-                    {% else %}
-                      {% set feat_enabled = not by_dis %}
-                    {% endif %}
+
+          {# Carry through all existing triples that are either:
+             (a) still mapped to a leader, OR
+             (b) manual overrides (triggering_leader == '') #}
+          {% for fname, scopes_map in _prev_features.items() %}
+            {% for scope_val, sids in (scopes_map | default({})).items() %}
+              {% for scope_id_val, entry in (sids | default({})).items() %}
+                {% set key = fname ~ '||' ~ scope_val ~ '||' ~ scope_id_val %}
+                {% set has_leader = key in tns.triples %}
+                {% set is_manual = (entry.get('triggering_leader', '') == '') %}
+                {% if has_leader or is_manual %}
+                  {% set existing_f = ns.result.get(fname, {}) %}
+                  {% set existing_s = existing_f.get(scope_val, {}) %}
+                  {% set existing_s = dict(existing_s, **{scope_id_val: entry}) %}
+                  {% set existing_f = dict(existing_f, **{scope_val: existing_s}) %}
+                  {% set ns.result = dict(ns.result, **{fname: existing_f}) %}
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+          {% endfor %}
+
+          {# Manual override path. #}
+          {% if _is_manual %}
+            {% set _tgt = trigger.event.data.target_feature | default('') | trim %}
+            {% set _scp = trigger.event.data.scope | default('') | lower | trim %}
+            {% set _sid = trigger.event.data.scope_id | default('') | string %}
+            {% set _ena = trigger.event.data.enabled | default(false) | bool(false) %}
+            {% set _ts = trigger.event.data.timestamp | default(now().timestamp()) | float(now().timestamp()) %}
+            {% if _tgt != '' and _scp in ['area','floor','global'] %}
+              {% set existing_f = ns.result.get(_tgt, {}) %}
+              {% set existing_s = existing_f.get(_scp, {}) %}
+              {% set prev_entry = existing_s.get(_sid, {}) %}
+              {% set _mode = prev_entry.get('mode', 'leader') %}
+              {% set new_entry = {
+                'enabled': _ena,
+                'mode': _mode,
+                'last_changed_timestamp': _ts,
+                'triggering_leader': ''
+              } %}
+              {% set existing_s = dict(existing_s, **{_sid: new_entry}) %}
+              {% set existing_f = dict(existing_f, **{_scp: existing_s}) %}
+              {% set ns.result = dict(ns.result, **{_tgt: existing_f}) %}
+            {% endif %}
+          {% endif %}
+
+          {# State-changed path. Rebuild every (feature, scope, scope_id)
+             triple that the changed leader contributes to. #}
+          {% if _is_state_changed and _changed_eid in _all_leaders %}
+            {% set new_state = trigger.event.data.new_state %}
+            {% set cv_raw = new_state.attributes.event_type | default(new_state.state) if (new_state is not none and new_state.entity_id.split('.')[0] == 'event') else (new_state.state if new_state is not none else '') %}
+            {% set is_skip = cv_raw | regex_search('_initial_press$') or cv_raw | lower in ['unknown', 'unavailable', 'none'] %}
+            {% if not is_skip %}
+              {% set ts = (new_state.last_changed.timestamp() if (new_state is not none and new_state.last_changed is not none) else now().timestamp()) %}
+              {% set prev_l = this.attributes.get('leaders', {}).get(_changed_eid, {}) %}
+              {% set prev_cv = prev_l.get('current_value', '') %}
+              {# Iterate this leader's triples. #}
+              {% for key, leaders_list in tns.triples.items() %}
+                {% if _changed_eid in leaders_list %}
+                  {% set kp = key.split('||') %}
+                  {% set fname = kp[0] %}
+                  {% set scope_val = kp[1] %}
+                  {% set scope_id_val = kp[2] %}
+                  {% set scope_pfx = 'Area ' if scope_val == 'area' else ('Floor ' if scope_val == 'floor' else '') %}
+                  {% set mode = mode_for.d.get(key, 'leader') %}
+                  {# Per-leader truth for the changed leader #}
+                  {% set this_truth = eval_leader(_changed_eid, '', scope_pfx, fname, cv_raw, prev_cv) | trim == 'True' %}
+                  {% if mode == 'leader' %}
+                    {% set new_enabled = this_truth %}
                   {% else %}
-                    {% if entity.domain in ['event', 'button'] %}
-                      {% set feat_enabled = true %}
+                    {# Fold over every leader mapped to this triple. For
+                       others, use their current state from `states()` as
+                       cv and the (changed leader's previous) doesn't
+                       apply — use empty string for prev_cv on others. #}
+                    {% set lns = namespace(values=[]) %}
+                    {% for other_eid in leaders_list %}
+                      {% if other_eid == _changed_eid %}
+                        {% set lns.values = lns.values + [this_truth] %}
+                      {% else %}
+                        {% set other_cv = states(other_eid) %}
+                        {% set other_prev = this.attributes.get('leaders', {}).get(other_eid, {}).get('previous_value', '') %}
+                        {% set other_truth = eval_leader(other_eid, '', scope_pfx, fname, other_cv, other_prev) | trim == 'True' %}
+                        {% set lns.values = lns.values + [other_truth] %}
+                      {% endif %}
+                    {% endfor %}
+                    {% if mode == 'all' %}
+                      {% set new_enabled = lns.values | min %}
                     {% else %}
-                      {# Default truth function — see `leaders` attribute
-                         above for the rationale. State equals feature
-                         name (case-sensitive) OR generic truthy value. #}
-                      {% set feat_enabled = (entity.state == fname) or
-                          (entity.state | lower in
-                              ['on', 'true', 'home', 'open', 'detected', 'active', 'unlocked']) %}
+                      {% set new_enabled = lns.values | max %}
                     {% endif %}
                   {% endif %}
+                  {% set existing_f = ns.result.get(fname, {}) %}
+                  {% set existing_s = existing_f.get(scope_val, {}) %}
+                  {% set prev_entry = existing_s.get(scope_id_val, {}) %}
+                  {% set prev_enabled = prev_entry.get('enabled', None) %}
+                  {% set prev_ts = prev_entry.get('last_changed_timestamp', ts) %}
+                  {% set flipped = (prev_enabled is none) or (prev_enabled != new_enabled) %}
+                  {% set new_ts = ts if flipped else prev_ts %}
+                  {% set new_entry = {
+                    'enabled': new_enabled,
+                    'mode': mode,
+                    'last_changed_timestamp': new_ts,
+                    'triggering_leader': _changed_eid
+                  } %}
+                  {% set existing_s = dict(existing_s, **{scope_id_val: new_entry}) %}
+                  {% set existing_f = dict(existing_f, **{scope_val: existing_s}) %}
+                  {% set ns.result = dict(ns.result, **{fname: existing_f}) %}
                 {% endif %}
-                {% set inverted = (scope_pfx + fname + ' Invert: True') in labels %}
-                {% set feat_enabled = (not feat_enabled) if inverted else feat_enabled %}
-                {% set feat_value = prev_f.get('value', entity.state) if is_skip else entity.state %}
-                {% set feat_ts = prev_f.get('timestamp', entity.last_changed_timestamp) if is_skip else entity.last_changed_timestamp %}
-                {% set old_val_f = prev_f.get('value', '') %}
-                {% set old_pv_f = prev_f.get('previous_value', '') %}
-                {% set prev_val_f_raw = old_val_f if feat_value != old_val_f else old_pv_f %}
-                {% set prev_val_f = '' if prev_val_f_raw | regex_search('_initial_press$') or prev_val_f_raw | lower in ['unknown', 'unavailable'] else prev_val_f_raw %}
-                {% set ns.result = dict(ns.result, **{
-                  fname: {
-                    'leader_entity_id': entity.entity_id,
-                    'value': feat_value,
-                    'previous_value': prev_val_f,
-                    'enabled': feat_enabled,
-                    'timestamp': feat_ts
-                  }
-                }) %}
-              {% endif %}
-             {% endfor %}
-           {% endfor %}
-           {{ ns.result }}
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+
+          {{ ns.result }}
 
     - default_entity_id: sensor.house_home_count
       name: 'House: Home Count'

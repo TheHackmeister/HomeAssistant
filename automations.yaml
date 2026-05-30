@@ -2093,501 +2093,555 @@
 - id: '1776536295923'
   alias: Labeled Feature Leaders
   description: >
-    Implements The Dispatch Loop (see Label Based Features.md) against the
-    leader entity's labels for each detected feature. For each leader that
-    changed since the last trigger, sorts its features alphabetically, then
-    per feature:
-      1. Evaluates runtime gates (Only, Between/Not Between, Toggle,
-         Direction-gated `leader_should_proceed`).
-      2. Builds an action list from labels (kind=script | kind=feature),
-         keyed by (variant, tag). Implicit feature item is auto-added unless
-         a replacement-style `Script` / `Feature` label is present.
-         Legacy `<F>: <state_value>` shorthand labels are translated into
-         feature items targeting `<F>` with leader_enabled=true.
-      3. Sorts the array by (tag, variant) — no-tag last, Enable→Normal→Disable.
-      4. Filters by leader_enabled (drops Enable variants when disabled and
-         vice versa).
-      5. Walks the array in one repeat:. For `script` items: dispatches
-         the named script/automation/scene with resolved args. For `feature`
+    Reacts to `sensor.labeled_features_state.features` and dispatches followers
+    for every (feature, scope, scope_id) entry whose `enabled` value flipped.
+
+    Trigger: `state` on `sensor.labeled_features_state`, `attribute: features`.
+    The automation diffs `trigger.from_state.attributes.features` against
+    `trigger.to_state.attributes.features` and finds every entry whose
+    `enabled` value changed.
+
+    For each changed entry the automation:
+      1. Identifies the dispatching leader = `entry.triggering_leader`.
+         For manual overrides (`triggering_leader == ''`) the leader-label
+         parsing is skipped and only the implicit feature dispatch runs.
+      2. Applies runtime gates against the triggering leader's labels —
+         Only, Between/Not Between, Toggle.
+      3. Builds an action list from those labels (kind=script | kind=feature),
+         keyed by (variant, tag). Implicit feature item auto-added unless a
+         replacement-style `Script` / `Feature` label is present. Legacy
+         `<F>: <state_value>` shorthand labels on the leader are translated
+         into feature items targeting `<F>` with `leader_enabled=true`.
+      4. Sorts by (tag, variant) — no-tag last, Enable→Normal→Disable.
+      5. Filters by `enabled` (drops Enable variants when disabled and vice
+         versa).
+      6. Walks the array in one repeat:. For `script` items: dispatches the
+         named script/automation/scene with resolved args. For `feature`
          items: resolves the follower set via the standard `(Area |Floor |)Follower:`
          + `(Area |Floor |)Provides: <DomainLabel>` resolver and calls
          `script.labeled_feature_follower` once per follower.
-      6. Errors are routed through the feature's `Error Mode:` label
+      7. Errors are routed through the feature's `Error Mode:` label
          (silent / log / alert / stop). `stop` halts only this feature's
          action loop; other features still dispatch.
   triggers:
   - trigger: state
     entity_id: sensor.labeled_features_state
-    attribute: leaders
+    attribute: features
   conditions: []
   mode: queued
   max: 50
   actions:
   - variables:
-      cutoff: '{{ trigger.from_state.attributes.last_updated_at | float(0) }}'
-      changed_entities: >-
-        {{ expand(label_entities('feature_leader'))
-           | selectattr('last_changed_timestamp', '>', cutoff)
-           | map(attribute='entity_id')
-           | list }}
+      _now_features: '{{ trigger.to_state.attributes.features | default({}) }}'
+      _prev_features: >-
+        {{ (trigger.from_state.attributes.features
+            if trigger.from_state is not none else {}) | default({}) }}
       automation_error_mode: >-
         {% set em_label = labels('automation.labeled_feature_leaders')
             | map('label_name') | reject('none')
             | select('match', '(?i)^error mode: .+')
             | first | default('') %}
         {{ em_label | regex_replace('(?i)^error mode: ', '') | default('log', true) }}
+  # Build a flat list of changed entries: every (feature, scope, scope_id)
+  # whose `enabled` value differs from the previous snapshot (including
+  # newly-added entries where the previous value was missing/undefined).
+  # Each item carries: feature, scope, scope_id, enabled, triggering_leader,
+  # last_changed_timestamp.
+  - variables:
+      changed_entries: >-
+        {% set ns = namespace(items=[]) %}
+        {% for fname, scopes_map in _now_features.items() %}
+          {% for scope_val, sids_map in (scopes_map | default({})).items() %}
+            {% for scope_id_val, entry in (sids_map | default({})).items() %}
+              {% set prev_entry = _prev_features.get(fname, {}).get(scope_val, {}).get(scope_id_val, None) %}
+              {% set prev_enabled = prev_entry.enabled if prev_entry is not none and 'enabled' in prev_entry else none %}
+              {% set new_enabled = entry.get('enabled', false) %}
+              {% if prev_enabled is none or prev_enabled != new_enabled %}
+                {% set ns.items = ns.items + [{
+                  'feature': fname,
+                  'scope': scope_val,
+                  'scope_id': scope_id_val,
+                  'enabled': new_enabled,
+                  'triggering_leader': entry.get('triggering_leader', ''),
+                  'last_changed_timestamp': entry.get('last_changed_timestamp', 0),
+                }] %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+        {% endfor %}
+        {{ ns.items | sort(attribute='feature') }}
   - repeat:
-      for_each: '{{ changed_entities }}'
+      for_each: '{{ changed_entries }}'
       sequence:
       - variables:
-          leader_entity_id: '{{ repeat.item }}'
+          _entry: '{{ repeat.item }}'
+          feature_name: '{{ _entry.feature }}'
+          resolved_scope: '{{ _entry.scope }}'
+          resolved_scope_id: '{{ _entry.scope_id }}'
+          leader_enabled: '{{ _entry.enabled }}'
+          leader_entity_id: '{{ _entry.triggering_leader }}'
+          # Manual overrides have an empty triggering_leader; we skip
+          # all leader-label parsing and runtime gates for them and
+          # only run the implicit feature dispatch.
+          _is_manual_override: '{{ (leader_entity_id | trim) == "" }}'
           all_leader_labels: >-
-            {{ labels(leader_entity_id) | map('label_name') | reject('none') | list }}
-          leader_features: >-
-            {{ trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('features', {}) }}
+            {% if (leader_entity_id | trim) != '' %}
+              {{ labels(leader_entity_id) | map('label_name') | reject('none') | list }}
+            {% else %}
+              {{ [] }}
+            {% endif %}
           leader_current_value: >-
-            {{ trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('current_value', '') }}
-          leader_previous_value: >-
-            {{ trigger.to_state.attributes.leaders.get(leader_entity_id, {}).get('previous_value', '') }}
-          # Step 1: sort features alphabetically by name. The sensor returns
-          # them keyed by feature_name; we sort the keys to get deterministic
-          # ordering across features (Day before Night, etc.).
-          sorted_feature_names: '{{ leader_features | list | sort }}'
+            {{ state_attr('sensor.labeled_features_state', 'leaders')
+               | default({}) | dictsort | map('first') | list }}
+          # Resolve area/floor ids for downstream resolution. For
+          # leader-driven entries we trust the triple's scope/scope_id.
+          # For runtime label-prefix resolution we still need
+          # resolved_area_id / resolved_floor_id below.
+          resolved_area_id: >-
+            {%- if resolved_scope == 'area' -%}{{ resolved_scope_id }}
+            {%- elif (leader_entity_id | trim) != '' -%}{{ area_id(leader_entity_id) | default('', true) | trim }}
+            {%- else -%}{{- '' -}}{%- endif -%}
+          resolved_floor_id: >-
+            {%- if resolved_scope == 'floor' -%}{{ resolved_scope_id }}
+            {%- elif (leader_entity_id | trim) != '' -%}
+              {%- set aid = area_id(leader_entity_id) -%}
+              {%- set ns = namespace(found='') -%}
+              {%- for fid in floors() -%}
+                {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+              {%- endfor -%}{{ ns.found }}
+            {%- else -%}{{- '' -}}{%- endif -%}
+          scoped_feature_leader: '{{ (resolved_scope | capitalize + '' '') if
+            resolved_scope in [''area'', ''floor''] else '''' }}{{ feature_name
+            }}'
+      - variables:
+          # leader_current_value: pulled from the sensor's `leaders` map.
+          # Used by the legacy `<F>: <state_value>` shorthand parser below.
+          leader_current_value: >-
+            {% if (leader_entity_id | trim) != '' %}
+              {{ state_attr('sensor.labeled_features_state', 'leaders')
+                 | default({}) | dictsort | items
+                 | selectattr(0, 'eq', leader_entity_id)
+                 | map('last') | map(attribute='current_value')
+                 | list | first | default('') }}
+            {% else %}{{ '' }}{% endif %}
+          leader_only: "{% set only_label = scoped_feature_leader + ' Only: ' %}
+            {% set match = all_leader_labels
+                | select('match', '^' + only_label + '(Enable|Disable)$')
+                | first | default('') %}
+            {{ match | regex_replace('^.+: ', '') }}"
+          leader_between: "{{ all_leader_labels
+            | select('match', '^' + scoped_feature_leader + ' Between: .+')
+            | map('regex_replace', '^.+: ', '') | list }}"
+          leader_not_between: "{{ all_leader_labels
+            | select('match', '^' + scoped_feature_leader + ' Not Between: .+')
+            | map('regex_replace', '^.+: ', '') | list }}"
+          leader_time_ok: '{% set now_time = now().strftime(''%H:%M'') %} {% set
+            ns = namespace(ok=true, any_b=false) %} {% for val in leader_between
+            %} {% set p = val.split('':'') %} {% set s = p[0]+'':''+p[1] if (p|length==4
+            or (p|length==3 and p[2]==''-'')) and p[0]!=''-'' else ''-'' %} {%
+            set e = p[2]+'':''+p[3] if p|length==4 else (p[1]+'':''+p[2] if p|length==3
+            and p[0]==''-'' else ''-'') %} {% set in_r = ((s==''-'' or now_time>=s)
+            and (e==''-'' or now_time<=e)) if (s==''-'' or e==''-'' or s<=e) else
+            (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.any_b = true
+            %}{% endif %} {% endfor %} {% if leader_between|length > 0 %}{% set
+            ns.ok = ns.any_b %}{% endif %} {% for val in leader_not_between %}
+            {% set p = val.split('':'') %} {% set s = p[0]+'':''+p[1] if (p|length==4
+            or (p|length==3 and p[2]==''-'')) and p[0]!=''-'' else ''-'' %} {%
+            set e = p[2]+'':''+p[3] if p|length==4 else (p[1]+'':''+p[2] if p|length==3
+            and p[0]==''-'' else ''-'') %} {% set in_r = ((s==''-'' or now_time>=s)
+            and (e==''-'' or now_time<=e)) if (s==''-'' or e==''-'' or s<=e) else
+            (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.ok = false
+            %}{% endif %} {% endfor %} {{ ns.ok }}'
+          leader_toggle: '{{ (scoped_feature_leader + " Toggle: True") in all_leader_labels }}'
+          # leader_should_proceed: runtime gate. Manual overrides bypass
+          # all of these (the entry already represents the intended
+          # value), so we early-out when there's no triggering leader.
+          # Direction labels (Increasing/Decreasing) are already applied
+          # in the sensor — we no longer need to filter them here.
+          leader_should_proceed: '{% if (leader_entity_id | trim) == "" %} true
+            {% elif leader_toggle %} true
+            {% elif leader_only == "Enable" and not leader_enabled %} false
+            {% elif leader_only == "Disable" and leader_enabled %} false
+            {% elif not leader_time_ok %} false
+            {% else %} true {% endif %}'
+          feature_error_mode: "{% set pfx = scoped_feature_leader + ' Error Mode: ' %}
+            {% set match = all_leader_labels
+                | select('match', '^' + pfx + '(silent|log|alert|stop)$')
+                | first | default('') %}
+            {{ match | regex_replace('^.+: ', '') | default(automation_error_mode, true) }}"
+          leader_feature_overrides: "{% set cv = leader_current_value | trim %}
+            {% if cv != '' and (leader_entity_id | trim) != '' %}
+              {% set ns = namespace(features=[]) %}
+              {% for lbl in all_leader_labels %}
+                {% if lbl | regex_search(': ' + cv + '$') %}
+                  {% set prefix_raw = lbl | regex_replace(': ' + cv + '$', '') | trim %}
+                  {% set prefix = prefix_raw | regex_replace('^(Area |Floor )', '') | trim %}
+                  {% if not prefix | regex_search('^(Area |Floor |)Leader')
+                        and not prefix | regex_search('^(Area |Floor |)Follower')
+                        and not prefix | regex_search('^Feature')
+                        and not prefix | regex_search(' (Enable|Disable|Invert|Only|Script|Error Mode)$')
+                        and not prefix | regex_search(' (Between|Not Between|Increasing|Decreasing)$')
+                        and not prefix | regex_search(' Arg ') %}
+                    {% set ns.features = ns.features + [prefix] %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+              {{ ns.features }}
+            {% else %}{{ [] }}{% endif %}"
+      - condition: template
+        value_template: '{{ leader_should_proceed }}'
+
+      # ─────────────────────────────────────────────────────────────
+      # Step 2 — Build the action list from labels (leader entity).
+      # Mirrors the follower's parser: regex_search + regex_replace
+      # per label to extract variant / extra / kind / tag / ref.
+      # Plus the legacy `<F>: <state_value>` shorthand on a leader
+      # is also translated into a feature item targeting <F>.
+      # ─────────────────────────────────────────────────────────────
+      - variables:
+          _label_actions: >-
+            {% set ns = namespace(items=[]) %}
+            {% set sf = scoped_feature_leader %}
+            {% set base_re = '^' ~ sf ~ ' (Enable |Disable )?(Extra )?(Script|Feature)( \\S+)?: .+$' %}
+            {% for lbl in all_leader_labels %}
+              {% if lbl | regex_search(base_re) %}
+                {% set variant = 'enable' if (lbl | regex_search('^' ~ sf ~ ' Enable '))
+                                 else ('disable' if (lbl | regex_search('^' ~ sf ~ ' Disable '))
+                                       else 'normal') %}
+                {% set extra = lbl | regex_search('^' ~ sf ~ ' (Enable |Disable )?Extra ') %}
+                {% set kind_word = ('script'
+                  if (lbl | regex_search('^' ~ sf ~ ' (Enable |Disable )?(Extra )?Script( |:)'))
+                  else 'feature') %}
+                {% set kw = 'Script' if kind_word == 'script' else 'Feature' %}
+                {% set tag_pat = '^' ~ sf ~ ' (Enable |Disable )?(Extra )?' ~ kw ~ ' (\\S+): ' %}
+                {% set tag_match = lbl | regex_findall(tag_pat) %}
+                {% set tag = '' %}
+                {% if tag_match | length > 0 %}
+                  {% set first = tag_match[0] %}
+                  {% if first is string %}{% set tag = first | trim %}
+                  {% else %}{% set tag = first[-1] | trim %}{% endif %}
+                {% endif %}
+                {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
+                {% set ns.items = ns.items + [{
+                  'kind': kind_word,
+                  'replaces_implicit': (not extra),
+                  'variant': variant,
+                  'tag': tag,
+                  'ref': ref
+                }] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.items }}
+          # ── Arg pool keyed by (variant, tag).
+          # Substitution syntax:  <attribute>.<dotted.path>
+          #   - Must match ^[A-Za-z_][A-Za-z0-9_]*\.
+          #   - First segment names a top-level attribute on
+          #     sensor.labeled_features_state.
+          #   - Walks the remaining segments through nested dicts.
+          #   - Empty segment ('..') is a literal empty-string key
+          #     (used for global scope's '' scope_id).
+          #   - Special case for `leaders`: if the first path
+          #     segment is not already a key in `leaders` dict,
+          #     splice the triggering leader_entity_id in as the
+          #     first key.
+          _arg_pools: >-
+            {% set _sensor_attrs = states['sensor.labeled_features_state'].attributes
+                                   if states['sensor.labeled_features_state'] is not none else {} %}
+            {% set sf = scoped_feature_leader %}
+            {% set arg_re = '^' ~ sf ~ ' (Enable |Disable )?Arg(?: \\S+)? \\S+: .+$' %}
+            {% set sub_re = '^[A-Za-z_][A-Za-z0-9_]*\\.' %}
+            {% set ns = namespace(pools={}) %}
+            {% for lbl in all_leader_labels %}
+              {% if lbl | regex_search(arg_re) %}
+                {% set variant = 'enable' if (lbl | regex_search('^' ~ sf ~ ' Enable Arg'))
+                                 else ('disable' if (lbl | regex_search('^' ~ sf ~ ' Disable Arg'))
+                                       else 'normal') %}
+                {% if variant == 'normal' %}
+                  {% set after_arg = lbl | regex_replace('^' ~ sf ~ ' Arg ', '') %}
+                {% else %}
+                  {% set vw = 'Enable' if variant == 'enable' else 'Disable' %}
+                  {% set after_arg = lbl | regex_replace('^' ~ sf ~ ' ' ~ vw ~ ' Arg ', '') %}
+                {% endif %}
+                {% set head = after_arg | regex_replace(':.*$', '') %}
+                {% set toks = head.split() %}
+                {% if toks | length >= 2 %}
+                  {% set tag = toks[0] | trim %}
+                  {% set field_raw = toks[1] | trim %}
+                {% else %}
+                  {% set tag = '' %}
+                  {% set field_raw = toks[0] | trim %}
+                {% endif %}
+                {% set raw = lbl | regex_replace('^[^:]+: ', '') | trim %}
+                {% if raw | regex_search(sub_re) %}
+                  {% set parts = raw.split('.') %}
+                  {% set attr_name = parts[0] %}
+                  {% set path = parts[1:] %}
+                  {% set cur_ns = namespace(v=_sensor_attrs.get(attr_name, none)) %}
+                  {% if attr_name == 'leaders' and path | length > 0
+                        and cur_ns.v is not none
+                        and (path[0] not in cur_ns.v)
+                        and (leader_entity_id | trim) != '' %}
+                    {% set cur_ns.v = cur_ns.v.get(leader_entity_id, none) %}
+                  {% endif %}
+                  {% for seg in path %}
+                    {% if cur_ns.v is mapping %}
+                      {% set cur_ns.v = cur_ns.v.get(seg, none) %}
+                    {% else %}
+                      {% set cur_ns.v = none %}
+                    {% endif %}
+                  {% endfor %}
+                  {% set resolved = (cur_ns.v if cur_ns.v is not none else raw) | string %}
+                {% else %}
+                  {% set resolved = raw %}
+                {% endif %}
+                {% set pool_key = variant ~ '||' ~ tag %}
+                {% set existing = ns.pools.get(pool_key, {}) %}
+                {% set ns.pools = dict(ns.pools, **{pool_key: dict(existing, **{field_raw: resolved})}) %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.pools }}
+          # Legacy `<F>: <state_value>` shorthand on leaders.
+          _shorthand_features: >-
+            {% set ns = namespace(items=[]) %}
+            {% for ovr in leader_feature_overrides %}
+              {% set ovr_toggle = (ovr + ' Toggle: True') in all_leader_labels %}
+              {% set ns.items = ns.items + [{
+                'kind': 'feature',
+                'replaces_implicit': true,
+                'variant': 'normal',
+                'tag': '',
+                'ref': ovr,
+                'shorthand': true,
+                'shorthand_toggle': ovr_toggle
+              }] %}
+            {% endfor %}
+            {{ ns.items }}
+          _has_replacement: >-
+            {{ (_label_actions + _shorthand_features)
+               | selectattr('replaces_implicit', 'equalto', true)
+               | list | length > 0 }}
+      - variables:
+          _action_list: >-
+            {%- set implicit = [] -%}
+            {%- if not _has_replacement -%}
+              {%- set implicit = [{
+                'kind': 'feature',
+                'replaces_implicit': false,
+                'variant': 'normal',
+                'tag': '',
+                'ref': '',
+                'implicit': true
+              }] -%}
+            {%- endif -%}
+            {{ _label_actions + _shorthand_features + implicit }}
+
+      # ─────────────────────────────────────────────────────────────
+      # Step 3 — Sort by (tag, variant). Step 4 — filter by state.
+      # ─────────────────────────────────────────────────────────────
+      - variables:
+          _variant_rank: >-
+            {{ {'enable': 0, 'normal': 1, 'disable': 2} }}
+          sorted_actions: >-
+            {%- set ns = namespace(annotated=[]) -%}
+            {%- for it in _action_list -%}
+              {%- set tag = it.tag | default('') -%}
+              {%- set tag_bucket = 1 if tag == '' else 0 -%}
+              {%- set tag_key = tag if tag != '' else '~~' -%}
+              {%- set variant_key = _variant_rank.get(it.variant | default('normal'), 1) -%}
+              {%- set ns.annotated = ns.annotated + [
+                dict(it, **{
+                  '_tag_bucket': tag_bucket,
+                  '_tag_key': tag_key,
+                  '_variant_key': variant_key
+                })
+              ] -%}
+            {%- endfor -%}
+            {{ ns.annotated
+               | sort(attribute='_variant_key')
+               | sort(attribute='_tag_key')
+               | sort(attribute='_tag_bucket') }}
+          filtered_actions: >-
+            {%- set ns = namespace(out=[]) -%}
+            {%- for it in sorted_actions -%}
+              {%- set v = it.variant | default('normal') -%}
+              {%- if v == 'enable' and not (leader_enabled | bool) -%}
+              {%- elif v == 'disable' and (leader_enabled | bool) -%}
+              {%- else -%}
+                {%- set ns.out = ns.out + [it] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.out }}
+          _scope_pfx: >-
+            {{ 'Area ' if resolved_scope == 'area' else ('Floor ' if resolved_scope == 'floor' else '') }}
+          scope_entity_set: >-
+            {% if resolved_scope == 'area' and resolved_area_id != '' %}
+              {% set area_ents = area_entities(resolved_area_id) | list %}
+              {% set area_devs = area_devices(resolved_area_id) %}
+              {% set ns = namespace(dev_ents=[]) %}
+              {% for d in area_devs %}
+                {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list %}
+              {% endfor %}
+              {{ (area_ents + ns.dev_ents) | unique | list }}
+            {% elif resolved_scope == 'floor' and resolved_floor_id != '' %}
+              {% set ns = namespace(ents=[]) %}
+              {% for a in floor_areas(resolved_floor_id) %}
+                {% set ns.ents = ns.ents + area_entities(a) | list %}
+                {% for d in area_devices(a) %}
+                  {% set ns.ents = ns.ents + device_entities(d) | list %}
+                {% endfor %}
+              {% endfor %}
+              {{ ns.ents | unique | list }}
+            {% else %}
+              {{ [] }}
+            {% endif %}
+          _std_fields_base: >-
+            {{ {'leader_entity_id': leader_entity_id,
+                'feature': feature_name,
+                'leader_feature': feature_name,
+                'leader_enabled': leader_enabled,
+                'scope': resolved_scope,
+                'scope_id': resolved_scope_id} }}
+
+      # ─────────────────────────────────────────────────────────────
+      # Step 5 — Execute the action loop.
+      # ─────────────────────────────────────────────────────────────
       - repeat:
-          for_each: '{{ sorted_feature_names }}'
+          for_each: '{{ filtered_actions }}'
           sequence:
           - variables:
-              feature_name: '{{ repeat.item }}'
-              leader_enabled: '{{ leader_features[repeat.item].enabled }}'
-              resolved_scope: '{{ leader_features[repeat.item].scope }}'
-              resolved_area_id: '{{ area_id(leader_entity_id) | default("", true)
-                | trim }}'
-              resolved_floor_id: '{%- if resolved_scope == ''floor'' -%} {%- set aid
-                = area_id(leader_entity_id) -%} {%- set ns = namespace(found='''')
-                -%} {%- for fid in floors() -%} {%- if aid in floor_areas(fid) -%}{%-
-                set ns.found = fid -%}{%- endif -%} {%- endfor -%}{{- ns.found -}}
-                {%- endif -%}'
-              resolved_scope_id: '{%- if resolved_scope == ''area'' -%}{{- resolved_area_id
-                | trim -}}{%- elif resolved_scope == ''floor'' -%}{{- resolved_floor_id
-                | trim -}}{%- endif -%}'
-              scoped_feature_leader: '{{ (resolved_scope | capitalize + '' '') if
-                resolved_scope in [''area'', ''floor''] else '''' }}{{ feature_name
-                }}'
-              leader_only: "{% set only_label = scoped_feature_leader + ' Only: '
-                %} {% set match = all_leader_labels\n               | select('match',
-                '^' + only_label + '(Enable|Disable)$')\n               | first |
-                default('') %}\n{{ match | regex_replace('^.+: ', '') }}\n"
-              leader_between: "{{ all_leader_labels\n   | select('match', '^' + scoped_feature_leader
-                + ' Between: .+')\n   | map('regex_replace', '^.+: ', '')\n   | list
-                }}\n"
-              leader_not_between: "{{ all_leader_labels\n   | select('match', '^'
-                + scoped_feature_leader + ' Not Between: .+')\n   | map('regex_replace',
-                '^.+: ', '')\n   | list }}\n"
-              leader_time_ok: '{% set now_time = now().strftime(''%H:%M'') %} {% set
-                ns = namespace(ok=true, any_b=false) %} {% for val in leader_between
-                %} {% set p = val.split('':'') %} {% set s = p[0]+'':''+p[1] if (p|length==4
-                or (p|length==3 and p[2]==''-'')) and p[0]!=''-'' else ''-'' %} {%
-                set e = p[2]+'':''+p[3] if p|length==4 else (p[1]+'':''+p[2] if p|length==3
-                and p[0]==''-'' else ''-'') %} {% set in_r = ((s==''-'' or now_time>=s)
-                and (e==''-'' or now_time<=e)) if (s==''-'' or e==''-'' or s<=e) else
-                (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.any_b = true
-                %}{% endif %} {% endfor %} {% if leader_between|length > 0 %}{% set
-                ns.ok = ns.any_b %}{% endif %} {% for val in leader_not_between %}
-                {% set p = val.split('':'') %} {% set s = p[0]+'':''+p[1] if (p|length==4
-                or (p|length==3 and p[2]==''-'')) and p[0]!=''-'' else ''-'' %} {%
-                set e = p[2]+'':''+p[3] if p|length==4 else (p[1]+'':''+p[2] if p|length==3
-                and p[0]==''-'' else ''-'') %} {% set in_r = ((s==''-'' or now_time>=s)
-                and (e==''-'' or now_time<=e)) if (s==''-'' or e==''-'' or s<=e) else
-                (now_time>=s or now_time<=e) %} {% if in_r %}{% set ns.ok = false
-                %}{% endif %} {% endfor %} {{ ns.ok }}
+              _it: '{{ repeat.item }}'
+              _args: >-
+                {{ _arg_pools.get(((_it.variant | default('normal')) ~ '||' ~ (_it.tag | default(''))), {}) }}
 
-                '
-              leader_toggle: '{{ (scoped_feature_leader + '' Toggle: True'') in all_leader_labels
-                }}
-
-                '
-              leader_should_proceed: '{% if leader_toggle %} true {% elif leader_only
-                == ''enable'' and not leader_enabled %} false {% elif leader_only
-                == ''disable'' and leader_enabled %} false {% elif not leader_time_ok
-                %} false {% elif not leader_enabled and ((scoped_feature_leader +
-                '' Increasing: True'') in all_leader_labels or (scoped_feature_leader
-                + '' Decreasing: True'') in all_leader_labels) %} false {% else %}
-                true {% endif %}
-
-                '
-              feature_error_mode: "{% set pfx = scoped_feature_leader + ' Error Mode:
-                ' %}\n   {% set match = all_leader_labels\n     | select('match',
-                '^' + pfx + '(silent|log|alert|stop)$')\n     | first | default('')
-                %}\n  {{ match | regex_replace('^.+: ', '') | default(automation_error_mode,
-                true) }}\n"
-              leader_feature_overrides: "{% set cv = leader_current_value | trim %}
-                {% if cv != '' %}\n  {% set ns = namespace(features=[]) %}\n  {% for
-                lbl in all_leader_labels %}\n    {% if lbl | regex_search(': ' + cv
-                + '$') %}\n      {% set prefix_raw = lbl | regex_replace(': ' + cv
-                + '$', '') | trim %}\n      {% set prefix = prefix_raw | regex_replace('^(Area
-                |Floor )', '') | trim %}\n      {% if not prefix | regex_search('^(Area
-                |Floor |)Leader')\n            and not prefix | regex_search('^(Area
-                |Floor |)Follower')\n            and not prefix | regex_search('^Feature')\n
-                \           and not prefix | regex_search(' (Enable|Disable|Invert|Only|Script|Error
-                Mode)$')\n            and not prefix | regex_search(' (Between|Not
-                Between|Increasing|Decreasing)$')\n            and not prefix | regex_search('
-                Arg ') %}\n        {% set ns.features = ns.features + [prefix] %}\n
-                \     {% endif %}\n    {% endif %}\n  {% endfor %}\n  {{ ns.features
-                }}\n{% else %}\n  {{ [] }}\n{% endif %}"
-          - condition: template
-            value_template: '{{ leader_should_proceed }}'
-
-          # ─────────────────────────────────────────────────────────────
-          # Step 2 — Build the action list from labels (leader entity).
-          # Mirrors the follower's parser: regex_search + regex_replace
-          # per label to extract variant / extra / kind / tag / ref.
-          # Plus the legacy `<F>: <state_value>` shorthand on a leader
-          # is also translated into a feature item targeting <F>.
-          # ─────────────────────────────────────────────────────────────
-          - variables:
-              _label_actions: >-
-                {% set ns = namespace(items=[]) %}
-                {% set sf = scoped_feature_leader %}
-                {% set base_re = '^' ~ sf ~ ' (Enable |Disable )?(Extra )?(Script|Feature)( \\S+)?: .+$' %}
-                {% for lbl in all_leader_labels %}
-                  {% if lbl | regex_search(base_re) %}
-                    {% set variant = 'enable' if (lbl | regex_search('^' ~ sf ~ ' Enable '))
-                                     else ('disable' if (lbl | regex_search('^' ~ sf ~ ' Disable '))
-                                           else 'normal') %}
-                    {% set extra = lbl | regex_search('^' ~ sf ~ ' (Enable |Disable )?Extra ') %}
-                    {% set kind_word = ('script'
-                      if (lbl | regex_search('^' ~ sf ~ ' (Enable |Disable )?(Extra )?Script( |:)'))
-                      else 'feature') %}
-                    {% set kw = 'Script' if kind_word == 'script' else 'Feature' %}
-                    {% set tag_pat = '^' ~ sf ~ ' (Enable |Disable )?(Extra )?' ~ kw ~ ' (\\S+): ' %}
-                    {% set tag_match = lbl | regex_findall(tag_pat) %}
-                    {% set tag = '' %}
-                    {% if tag_match | length > 0 %}
-                      {% set first = tag_match[0] %}
-                      {% if first is string %}{% set tag = first | trim %}
-                      {% else %}{% set tag = first[-1] | trim %}{% endif %}
-                    {% endif %}
-                    {% set ref = lbl | regex_replace('^[^:]+: ', '') | trim %}
-                    {% set ns.items = ns.items + [{
-                      'kind': kind_word,
-                      'replaces_implicit': (not extra),
-                      'variant': variant,
-                      'tag': tag,
-                      'ref': ref
-                    }] %}
-                  {% endif %}
-                {% endfor %}
-                {{ ns.items }}
-              _arg_pools: >-
-                {% set lf_l = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
-                {% set lf_f = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
-                {% set sf = scoped_feature_leader %}
-                {% set arg_re = '^' ~ sf ~ ' (Enable |Disable )?Arg(?: \\S+)? \\S+: .+$' %}
-                {% set ns = namespace(pools={}) %}
-                {% for lbl in all_leader_labels %}
-                  {% if lbl | regex_search(arg_re) %}
-                    {% set variant = 'enable' if (lbl | regex_search('^' ~ sf ~ ' Enable Arg'))
-                                     else ('disable' if (lbl | regex_search('^' ~ sf ~ ' Disable Arg'))
-                                           else 'normal') %}
-                    {% if variant == 'normal' %}
-                      {% set after_arg = lbl | regex_replace('^' ~ sf ~ ' Arg ', '') %}
-                    {% else %}
-                      {% set vw = 'Enable' if variant == 'enable' else 'Disable' %}
-                      {% set after_arg = lbl | regex_replace('^' ~ sf ~ ' ' ~ vw ~ ' Arg ', '') %}
-                    {% endif %}
-                    {% set head = after_arg | regex_replace(':.*$', '') %}
-                    {% set toks = head.split() %}
-                    {% if toks | length >= 2 %}
-                      {% set tag = toks[0] | trim %}
-                      {% set field_raw = toks[1] | trim %}
-                    {% else %}
-                      {% set tag = '' %}
-                      {% set field_raw = toks[0] | trim %}
-                    {% endif %}
-                    {% set raw = lbl | regex_replace('^[^:]+: ', '') | trim %}
-                    {% if raw | regex_search('^\\[[^\\]]+\\]\\.\\[[^\\]]+\\]\\.\\[[^\\]]+\\]$') %}
-                      {% set root = raw | regex_replace('^\\[([^\\]]+)\\].*$', '\\1') %}
-                      {% set key = raw | regex_replace('^\\[[^\\]]+\\]\\.\\[([^\\]]+)\\].*$', '\\1') %}
-                      {% set fld = raw | regex_replace('^.*\\.\\[([^\\]]+)\\]$', '\\1') %}
-                      {% if root == 'features' %}
-                        {% set rk = feature_name if key == 'feature_name' else key %}
-                        {% set resolved = lf_f.get(rk, {}).get(fld, raw) | string %}
-                      {% elif root == 'leaders' %}
-                        {% set rk = leader_entity_id if key == 'feature_leader' else key %}
-                        {% set resolved = lf_l.get(rk, {}).get(fld, raw) | string %}
-                      {% else %}{% set resolved = raw %}{% endif %}
-                    {% else %}{% set resolved = raw %}{% endif %}
-                    {% set pool_key = variant ~ '||' ~ tag %}
-                    {% set existing = ns.pools.get(pool_key, {}) %}
-                    {% set ns.pools = dict(ns.pools, **{pool_key: dict(existing, **{field_raw: resolved})}) %}
-                  {% endif %}
-                {% endfor %}
-                {{ ns.pools }}
-              # Legacy `<F>: <state_value>` shorthand on leaders.
-              # leader_feature_overrides (parsed above) lists the feature names
-              # whose `<F>: <current_value>` label matches the leader's
-              # current_value. We turn each into a feature action item targeting
-              # that feature with leader_enabled=true. These are replacement-style
-              # — they suppress the current feature's implicit feature item the
-              # same way an explicit Feature label does.
-              _shorthand_features: >-
-                {% set ns = namespace(items=[]) %}
-                {% for ovr in leader_feature_overrides %}
-                  {% set ovr_toggle = (ovr + ' Toggle: True') in all_leader_labels %}
-                  {% set ns.items = ns.items + [{
-                    'kind': 'feature',
-                    'replaces_implicit': true,
-                    'variant': 'normal',
-                    'tag': '',
-                    'ref': ovr,
-                    'shorthand': true,
-                    'shorthand_toggle': ovr_toggle
-                  }] %}
-                {% endfor %}
-                {{ ns.items }}
-              _has_replacement: >-
-                {{ (_label_actions + _shorthand_features)
-                   | selectattr('replaces_implicit', 'equalto', true)
-                   | list | length > 0 }}
-          - variables:
-              _action_list: >-
-                {%- set implicit = [] -%}
-                {%- if not _has_replacement -%}
-                  {%- set implicit = [{
-                    'kind': 'feature',
-                    'replaces_implicit': false,
-                    'variant': 'normal',
-                    'tag': '',
-                    'ref': '',
-                    'implicit': true
-                  }] -%}
-                {%- endif -%}
-                {{ _label_actions + _shorthand_features + implicit }}
-
-          # ─────────────────────────────────────────────────────────────
-          # Step 3 — Sort by (tag, variant). Step 4 — filter by state.
-          # ─────────────────────────────────────────────────────────────
-          - variables:
-              _variant_rank: >-
-                {{ {'enable': 0, 'normal': 1, 'disable': 2} }}
-              sorted_actions: >-
-                {%- set ns = namespace(annotated=[]) -%}
-                {%- for it in _action_list -%}
-                  {%- set tag = it.tag | default('') -%}
-                  {%- set tag_bucket = 1 if tag == '' else 0 -%}
-                  {%- set tag_key = tag if tag != '' else '~~' -%}
-                  {%- set variant_key = _variant_rank.get(it.variant | default('normal'), 1) -%}
-                  {%- set ns.annotated = ns.annotated + [
-                    dict(it, **{
-                      '_tag_bucket': tag_bucket,
-                      '_tag_key': tag_key,
-                      '_variant_key': variant_key
-                    })
-                  ] -%}
-                {%- endfor -%}
-                {{ ns.annotated
-                   | sort(attribute='_variant_key')
-                   | sort(attribute='_tag_key')
-                   | sort(attribute='_tag_bucket') }}
-              filtered_actions: >-
-                {%- set ns = namespace(out=[]) -%}
-                {%- for it in sorted_actions -%}
-                  {%- set v = it.variant | default('normal') -%}
-                  {%- if v == 'enable' and not (leader_enabled | bool) -%}
-                  {%- elif v == 'disable' and (leader_enabled | bool) -%}
-                  {%- else -%}
-                    {%- set ns.out = ns.out + [it] -%}
-                  {%- endif -%}
-                {%- endfor -%}
-                {{ ns.out }}
-              _scope_pfx: >-
-                {{ 'Area ' if resolved_scope == 'area' else ('Floor ' if resolved_scope == 'floor' else '') }}
-              scope_entity_set: >-
-                {% if resolved_scope == 'area' %}
-                  {% set area_ents = area_entities(resolved_area_id) | list %}
-                  {% set area_devs = area_devices(resolved_area_id) %}
-                  {% set ns = namespace(dev_ents=[]) %}
-                  {% for d in area_devs %}
-                    {% set ns.dev_ents = ns.dev_ents + device_entities(d) | list %}
-                  {% endfor %}
-                  {{ (area_ents + ns.dev_ents) | unique | list }}
-                {% elif resolved_scope == 'floor' %}
-                  {% set ns = namespace(ents=[]) %}
-                  {% for a in floor_areas(resolved_floor_id) %}
-                    {% set ns.ents = ns.ents + area_entities(a) | list %}
-                    {% for d in area_devices(a) %}
-                      {% set ns.ents = ns.ents + device_entities(d) | list %}
-                    {% endfor %}
-                  {% endfor %}
-                  {{ ns.ents | unique | list }}
-                {% else %}
-                  {{ [] }}
-                {% endif %}
-              _std_fields_base: >-
-                {{ {'leader_entity_id': leader_entity_id,
-                    'feature': feature_name,
-                    'leader_feature': feature_name,
-                    'leader_enabled': leader_enabled,
-                    'scope': resolved_scope,
-                    'scope_id': resolved_scope_id} }}
-
-          # ─────────────────────────────────────────────────────────────
-          # Step 5 — Execute the action loop.
-          # ─────────────────────────────────────────────────────────────
-          - repeat:
-              for_each: '{{ filtered_actions }}'
+          - choose:
+            # ───────── script kind ─────────
+            - conditions:
+                - condition: template
+                  value_template: '{{ _it.kind == "script" }}'
               sequence:
-              - variables:
-                  _it: '{{ repeat.item }}'
-                  _args: >-
-                    {{ _arg_pools.get(((_it.variant | default('normal')) ~ '||' ~ (_it.tag | default(''))), {}) }}
-
-              - choose:
-                # ───────── script kind ─────────
-                - conditions:
-                    - condition: template
-                      value_template: '{{ _it.kind == "script" }}'
-                  sequence:
-                  # Guard: skip + report when ref is empty / None. The parser
-                  # should never produce this, but a malformed label could.
-                  - if:
-                    - condition: template
-                      value_template: '{{ (_it.ref | default("") | string | trim) == "" }}'
-                    then:
-                    - action: script.labeled_feature_error_mode
-                      data:
-                        error_mode: '{{ feature_error_mode }}'
-                        source: Labeled Feature Leaders
-                        message: >-
-                          Empty script ref in action item (variant={{ _it.variant }},
-                          tag={{ _it.tag }}) for {{ leader_entity_id }} (feature: {{ feature_name }}).
-                    - stop: 'LF Leaders: empty script ref (handled per error_mode).'
-                  - if:
-                    - condition: template
-                      value_template: '{{ _it.ref.startswith("automation.") or _it.ref.startswith("scene.") }}'
-                    then:
-                    - action: '{{ _it.ref }}'
-                      data: {}
-                      continue_on_error: true
-                    else:
-                    # Pass every arg through to the script. HA does not
-                    # expose script field declarations as state
-                    # attributes (`state_attr(<script>, 'fields')` is
-                    # always None), so we can't validate arg names from
-                    # inside a template. Undeclared fields are silently
-                    # ignored by the script invocation; typo'd Arg
-                    # labels will simply not have an effect (rather
-                    # than raising an Error Mode warning).
-                    - variables:
-                        _all_args: '{{ _args or {} }}'
-                    - choose:
-                      - conditions:
-                          - condition: template
-                            value_template: '{{ _all_args | length == 0 }}'
-                        sequence:
-                        - action: '{{ _it.ref }}'
-                          data: '{{ _std_fields_base }}'
-                          continue_on_error: true
-                      default:
-                      - action: script.turn_on
-                        target:
-                          entity_id: '{{ _it.ref | trim }}'
-                        data:
-                          variables: '{{ _std_fields_base | combine(_all_args) }}'
-                        continue_on_error: true
-
-                # ───────── feature kind ─────────
-                # On a leader, every `feature` action item — implicit OR
-                # explicit — fans out to followers. The follower set is
-                # resolved per the target feature (`_target_feature`), which
-                # may be the leader's own feature_name (implicit + self
-                # Feature/Extra Feature) or a different feature name.
-                - conditions:
-                    - condition: template
-                      value_template: '{{ _it.kind == "feature" }}'
-                  sequence:
-                  - variables:
-                      _target_feature: >-
-                        {{ _it.ref if (_it.ref | default('') | trim != '') else feature_name }}
-                      # Shorthand items already carry their own toggle flag;
-                      # other items inherit the leader's toggle state.
-                      _it_toggle: >-
-                        {{ _it.shorthand_toggle if (_it.shorthand | default(false)) else leader_toggle }}
-                      _follower_label_name: >-
-                        {%- if resolved_scope == 'area' -%}Area Follower: {{ _target_feature }}
-                        {%- elif resolved_scope == 'floor' -%}Floor Follower: {{ _target_feature }}
-                        {%- else -%}Follower: {{ _target_feature }}{%- endif -%}
-                      _target_catalog: >-
-                        {% set catalog = state_attr('sensor.labeled_features_state', 'feature_meta') | default({}) %}
-                        {{ catalog.get(_target_feature, {}) }}
-                      _target_domain_label: '{{ _target_catalog.get("domain_label", "") }}'
-                      _provides_followers: >-
-                        {% if _target_domain_label == '' %}
-                          {{ [] }}
-                        {% else %}
-                          {% set bare_lbl = 'Provides: ' ~ _target_domain_label %}
-                          {% set scoped_lbl = _scope_pfx ~ 'Provides: ' ~ _target_domain_label %}
-                          {{ ((label_entities(bare_lbl) | list)
-                              + (label_entities(scoped_lbl) | list)) | unique | list }}
-                        {% endif %}
-                      _all_followers: >-
-                        {% set all_f = (label_entities(_follower_label_name) | list
-                                        + _provides_followers) | unique | list %}
-                        {% if scope_entity_set | length > 0 %}
-                          {{ all_f | select('in', scope_entity_set) | list }}
-                        {% else %}
-                          {{ all_f }}
-                        {% endif %}
-
-                  - repeat:
-                      for_each: '{{ _all_followers }}'
-                      sequence:
-                      - action: script.labeled_feature_follower
-                        data:
-                          follower_entity_id: '{{ repeat.item }}'
-                          feature: '{{ _target_feature }}'
-                          leader_entity_id: '{{ leader_entity_id }}'
-                          leader_enabled: '{{ leader_enabled }}'
-                          toggle: '{{ _it_toggle | default(false) }}'
-                          error_mode: '{{ feature_error_mode }}'
-                          scope: '{{ resolved_scope }}'
-                          scope_id: '{{ resolved_scope_id }}'
-                        continue_on_error: true
-
-              # ── Per-iteration error routing ──
               - if:
                 - condition: template
-                  value_template: '{{ error is defined }}'
+                  value_template: '{{ (_it.ref | default("") | string | trim) == "" }}'
                 then:
-                - if:
-                  - condition: template
-                    value_template: '{{ feature_error_mode == "log" }}'
-                  then:
-                  - action: system_log.write
+                - action: script.labeled_feature_error_mode
+                  data:
+                    error_mode: '{{ feature_error_mode }}'
+                    source: Labeled Feature Leaders
+                    message: >-
+                      Empty script ref in action item (variant={{ _it.variant }},
+                      tag={{ _it.tag }}) for {{ leader_entity_id }} (feature: {{ feature_name }}).
+                - stop: 'LF Leaders: empty script ref (handled per error_mode).'
+              - if:
+                - condition: template
+                  value_template: '{{ _it.ref.startswith("automation.") or _it.ref.startswith("scene.") }}'
+                then:
+                - action: '{{ _it.ref }}'
+                  data: {}
+                  continue_on_error: true
+                else:
+                - variables:
+                    _all_args: '{{ _args or {} }}'
+                - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: '{{ _all_args | length == 0 }}'
+                    sequence:
+                    - action: '{{ _it.ref }}'
+                      data: '{{ _std_fields_base }}'
+                      continue_on_error: true
+                  default:
+                  - action: script.turn_on
+                    target:
+                      entity_id: '{{ _it.ref | trim }}'
                     data:
-                      level: error
-                      message: >-
-                        Labeled Feature Leaders: action error (kind={{ _it.kind }},
-                        ref={{ _it.ref }}, tag={{ _it.tag }}, variant={{ _it.variant }})
-                        for {{ leader_entity_id }} (feature: {{ feature_name }}): {{ error }}
-                - if:
-                  - condition: template
-                    value_template: '{{ feature_error_mode == "alert" }}'
-                  then:
-                  - action: script.send_alert
+                      variables: '{{ _std_fields_base | combine(_all_args) }}'
+                    continue_on_error: true
+
+            # ───────── feature kind ─────────
+            - conditions:
+                - condition: template
+                  value_template: '{{ _it.kind == "feature" }}'
+              sequence:
+              - variables:
+                  _target_feature: >-
+                    {{ _it.ref if (_it.ref | default('') | trim != '') else feature_name }}
+                  _it_toggle: >-
+                    {{ _it.shorthand_toggle if (_it.shorthand | default(false)) else leader_toggle }}
+                  _follower_label_name: >-
+                    {%- if resolved_scope == 'area' -%}Area Follower: {{ _target_feature }}
+                    {%- elif resolved_scope == 'floor' -%}Floor Follower: {{ _target_feature }}
+                    {%- else -%}Follower: {{ _target_feature }}{%- endif -%}
+                  _target_catalog: >-
+                    {% set catalog = state_attr('sensor.labeled_features_state', 'feature_meta') | default({}) %}
+                    {{ catalog.get(_target_feature, {}) }}
+                  _target_domain_label: '{{ _target_catalog.get("domain_label", "") }}'
+                  _provides_followers: >-
+                    {% if _target_domain_label == '' %}
+                      {{ [] }}
+                    {% else %}
+                      {% set bare_lbl = 'Provides: ' ~ _target_domain_label %}
+                      {% set scoped_lbl = _scope_pfx ~ 'Provides: ' ~ _target_domain_label %}
+                      {{ ((label_entities(bare_lbl) | list)
+                          + (label_entities(scoped_lbl) | list)) | unique | list }}
+                    {% endif %}
+                  _all_followers: >-
+                    {% set all_f = (label_entities(_follower_label_name) | list
+                                    + _provides_followers) | unique | list %}
+                    {% if scope_entity_set | length > 0 %}
+                      {{ all_f | select('in', scope_entity_set) | list }}
+                    {% else %}
+                      {{ all_f }}
+                    {% endif %}
+
+              - repeat:
+                  for_each: '{{ _all_followers }}'
+                  sequence:
+                  - action: script.labeled_feature_follower
                     data:
-                      alert_severity: high
-                      alert_title: Labeled Feature Leaders Error
-                      alert_message: >-
-                        Action error (kind={{ _it.kind }}, ref={{ _it.ref }},
-                        tag={{ _it.tag }}) for {{ leader_entity_id }}
-                        (feature: {{ feature_name }}): {{ error }}
-                - if:
-                  - condition: template
-                    value_template: '{{ feature_error_mode == "stop" }}'
-                  then:
-                  - stop: 'Labeled Feature Leaders: halted on {{ _it.ref }} (feature: {{ feature_name }})'
-                    error: true
+                      follower_entity_id: '{{ repeat.item }}'
+                      feature: '{{ _target_feature }}'
+                      leader_entity_id: '{{ leader_entity_id }}'
+                      leader_enabled: '{{ leader_enabled }}'
+                      toggle: '{{ _it_toggle | default(false) }}'
+                      error_mode: '{{ feature_error_mode }}'
+                      scope: '{{ resolved_scope }}'
+                      scope_id: '{{ resolved_scope_id }}'
+                    continue_on_error: true
+
+          # ── Per-iteration error routing ──
+          - if:
+            - condition: template
+              value_template: '{{ error is defined }}'
+            then:
+            - if:
+              - condition: template
+                value_template: '{{ feature_error_mode == "log" }}'
+              then:
+              - action: system_log.write
+                data:
+                  level: error
+                  message: >-
+                    Labeled Feature Leaders: action error (kind={{ _it.kind }},
+                    ref={{ _it.ref }}, tag={{ _it.tag }}, variant={{ _it.variant }})
+                    for {{ leader_entity_id }} (feature: {{ feature_name }}): {{ error }}
+            - if:
+              - condition: template
+                value_template: '{{ feature_error_mode == "alert" }}'
+              then:
+              - action: script.send_alert
+                data:
+                  alert_severity: high
+                  alert_title: Labeled Feature Leaders Error
+                  alert_message: >-
+                    Action error (kind={{ _it.kind }}, ref={{ _it.ref }},
+                    tag={{ _it.tag }}) for {{ leader_entity_id }}
+                    (feature: {{ feature_name }}): {{ error }}
+            - if:
+              - condition: template
+                value_template: '{{ feature_error_mode == "stop" }}'
+              then:
+              - stop: 'Labeled Feature Leaders: halted on {{ _it.ref }} (feature: {{ feature_name }})'
+                error: true
 - id: sleep_timeout_cancel_restore
   alias: Sleep Timeout Cancel Restore
   description: 'Restores media player volumes when labeled_feature_sleep_timeout is

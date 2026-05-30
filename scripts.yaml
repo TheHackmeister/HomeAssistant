@@ -2462,32 +2462,32 @@ labeled_feature_follower:
       _arg_pools: >-
         {# Arg pool keyed by (variant, tag).
            Label shape: ^<sf> (Enable |Disable )?Arg( <tag>)? <field>: <value>$
-           When no tag, the field name is the first whitespace-delimited
-           token after 'Arg'. Substitutions on values follow the existing
-           [leaders|features].[k].[f] syntax. #}
-        {% set lf_leaders = state_attr('sensor.labeled_features_state', 'leaders') | default({}) %}
-        {% set lf_features = state_attr('sensor.labeled_features_state', 'features') | default({}) %}
+           Substitution syntax on values:
+             <attribute>.<dotted.path>
+           - must match ^[A-Za-z_][A-Za-z0-9_]*\.
+           - first segment is a top-level attribute on
+             sensor.labeled_features_state.
+           - remaining segments walk into nested dicts.
+           - empty segment ('..') is a literal '' key.
+           - special case: `leaders.<rest>` with non-eid first path
+             segment splices the leader_entity_id in. #}
+        {% set _sensor_attrs = states['sensor.labeled_features_state'].attributes
+                               if states['sensor.labeled_features_state'] is not none else {} %}
         {% set sf = scoped_feature %}
         {% set arg_re = '^' ~ sf ~ ' (Enable |Disable )?Arg(?: \\S+)? \\S+: .+$' %}
+        {% set sub_re = '^[A-Za-z_][A-Za-z0-9_]*\\.' %}
         {% set ns = namespace(pools={}) %}
         {% for lbl in follower_labels %}
           {% if lbl | regex_search(arg_re) %}
             {% set variant = 'enable' if (lbl | regex_search('^' ~ sf ~ ' Enable Arg'))
                              else ('disable' if (lbl | regex_search('^' ~ sf ~ ' Disable Arg'))
                                    else 'normal') %}
-            {# Strip prefix to a payload of the form "[<tag> ]<field>: <value>".
-               Use a variant-aware prefix to avoid eating part of the tag. #}
             {% if variant == 'normal' %}
               {% set after_arg = lbl | regex_replace('^' ~ sf ~ ' Arg ', '') %}
             {% else %}
               {% set vw = 'Enable' if variant == 'enable' else 'Disable' %}
               {% set after_arg = lbl | regex_replace('^' ~ sf ~ ' ' ~ vw ~ ' Arg ', '') %}
             {% endif %}
-            {# Tokens before the colon. Two valid shapes:
-                 'tag field: value'   -> two tokens
-                 'field: value'       -> one token
-               Detect by checking whether the first token contains the
-               colon as a suffix (single-token form) vs the second one. #}
             {% set head = after_arg | regex_replace(':.*$', '') %}
             {% set toks = head.split() %}
             {% if toks | length >= 2 %}
@@ -2498,19 +2498,28 @@ labeled_feature_follower:
               {% set field_raw = toks[0] | trim %}
             {% endif %}
             {% set raw = lbl | regex_replace('^[^:]+: ', '') | trim %}
-            {# Detect [root].[key].[field] substitution shape. #}
-            {% if raw | regex_search('^\\[[^\\]]+\\]\\.\\[[^\\]]+\\]\\.\\[[^\\]]+\\]$') %}
-              {% set root = raw | regex_replace('^\\[([^\\]]+)\\].*$', '\\1') %}
-              {% set key = raw | regex_replace('^\\[[^\\]]+\\]\\.\\[([^\\]]+)\\].*$', '\\1') %}
-              {% set fld = raw | regex_replace('^.*\\.\\[([^\\]]+)\\]$', '\\1') %}
-              {% if root == 'features' %}
-                {% set rk = feature_name if key == 'feature_name' else key %}
-                {% set resolved = lf_features.get(rk, {}).get(fld, raw) | string %}
-              {% elif root == 'leaders' %}
-                {% set rk = leader_entity_id if key == 'feature_leader' else key %}
-                {% set resolved = lf_leaders.get(rk, {}).get(fld, raw) | string %}
-              {% else %}{% set resolved = raw %}{% endif %}
-            {% else %}{% set resolved = raw %}{% endif %}
+            {% if raw | regex_search(sub_re) %}
+              {% set parts = raw.split('.') %}
+              {% set attr_name = parts[0] %}
+              {% set path = parts[1:] %}
+              {% set cur_ns = namespace(v=_sensor_attrs.get(attr_name, none)) %}
+              {% if attr_name == 'leaders' and path | length > 0
+                    and cur_ns.v is not none
+                    and (path[0] not in cur_ns.v)
+                    and (leader_entity_id | trim) != '' %}
+                {% set cur_ns.v = cur_ns.v.get(leader_entity_id, none) %}
+              {% endif %}
+              {% for seg in path %}
+                {% if cur_ns.v is mapping %}
+                  {% set cur_ns.v = cur_ns.v.get(seg, none) %}
+                {% else %}
+                  {% set cur_ns.v = none %}
+                {% endif %}
+              {% endfor %}
+              {% set resolved = (cur_ns.v if cur_ns.v is not none else raw) | string %}
+            {% else %}
+              {% set resolved = raw %}
+            {% endif %}
             {% set pool_key = variant ~ '||' ~ tag %}
             {% set existing = ns.pools.get(pool_key, {}) %}
             {% set ns.pools = dict(ns.pools, **{pool_key: dict(existing, **{field_raw: resolved})}) %}
@@ -3191,8 +3200,10 @@ labeled_feature_generics:
     feature:
       name: Feature
       description: 'Generic feature name (case-sensitive). Examples: ''Lights Off'',
-        ''Volume Up'', ''Media Pause'', ''Fan On'', ''Night''. See Labeled Feature
-        Generics docs for the full catalog.
+        ''Volume Up'', ''Media Pause'', ''Fan On'', ''Night''. ''Set Feature'' is
+        a special case that does not dispatch a domain action; it fires the
+        `labeled_feature_set` event so `sensor.labeled_features_state` records a
+        manual override. See Labeled Feature Generics docs for the full catalog.
 
         '
       required: true
@@ -3219,6 +3230,25 @@ labeled_feature_generics:
           - Fan Down
           - Ads
           - Night
+          - Set Feature
+    target_feature:
+      name: Target Feature
+      description: >
+        Only used when `feature` is `Set Feature`. The feature whose state to
+        write into `sensor.labeled_features_state.features`.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    enabled:
+      name: Enabled
+      description: >
+        Only used when `feature` is `Set Feature`. The value to record.
+      required: false
+      default: true
+      selector:
+        boolean: {}
+
     scope:
       name: Scope
       description: Scope of the feature (area, floor, or none).
@@ -3297,6 +3327,48 @@ labeled_feature_generics:
       selector:
         text: {}
   sequence:
+    # ── Step 0: Set Feature short-circuit ───────────────────────────────────
+    # Special-case feature: write directly into
+    # `sensor.labeled_features_state.features` by firing the
+    # `labeled_feature_set` event. The sensor's trigger-based template
+    # listens for that event and records the override; the leader
+    # automation then dispatches followers per usual.
+    - if:
+        - condition: template
+          value_template: '{{ (feature | trim) == "Set Feature" }}'
+      then:
+        - variables:
+            _tgt: '{{ target_feature | default("") | trim }}'
+            _scp_in: '{{ (scope | default("global") | lower) | trim }}'
+            _ena: '{{ (enabled | default(true)) | bool(true) }}'
+            _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        - if:
+            - condition: template
+              value_template: '{{ _tgt == "" or _scp_in not in ["area","floor","global"] }}'
+          then:
+            - action: script.labeled_feature_error_mode
+              data:
+                error_mode: '{{ _err_mode }}'
+                source: Labeled Feature Generics
+                message: >-
+                  Set Feature called with invalid target_feature ('{{ _tgt }}')
+                  or scope ('{{ _scp_in }}'). scope must be one of area/floor/global.
+            - if:
+                - condition: template
+                  value_template: '{{ _err_mode == "stop" }}'
+              then:
+                - stop: 'Labeled Feature Generics: invalid Set Feature args.'
+                  error: true
+            - stop: 'Set Feature: invalid args (handled per error_mode).'
+        - event: labeled_feature_set
+          event_data:
+            target_feature: '{{ _tgt }}'
+            scope: '{{ _scp_in }}'
+            scope_id: '{{ scope_id | default("") | string }}'
+            enabled: '{{ _ena }}'
+            timestamp: '{{ now().timestamp() }}'
+        - stop: 'Set Feature: event dispatched.'
+
     # ── Step 1: Resolve scope ids and scope entity set ──────────────────────
     - variables:
         _feature: '{{ feature | trim }}'
@@ -3314,6 +3386,7 @@ labeled_feature_generics:
           {%- elif leader_entity_id is defined and leader_entity_id != '' -%}
             {{ area_id(leader_entity_id) | default('') }}
           {%- else -%}{{ '' }}{%- endif -%}
+
         _resolved_floor_id: >-
           {%- if _scope != 'floor' -%}{{ '' }}
           {%- elif scope_id is defined and scope_id != '' -%}
