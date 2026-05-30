@@ -307,7 +307,11 @@ template:
           {% set _evtype = trigger.event.event_type | default('') %}
           {% set _is_state_changed = (_evtype == 'state_changed') %}
           {% set _changed_eid = trigger.event.data.entity_id | default('') if _is_state_changed else '' %}
-          {% set _prev_leaders = this.attributes.get('leaders', {}) | default({}) %}
+          {# Defensive: legacy snapshots may have a non-mapping
+             carried over from the old schema. Coerce to {} so
+             `.items()` is always safe. #}
+          {% set _prev_leaders_raw = this.attributes.get('leaders', {}) %}
+          {% set _prev_leaders = _prev_leaders_raw if _prev_leaders_raw is mapping else {} %}
           {% set ns = namespace(result={}) %}
           {# Carry every existing entry through, but only for entities
              that still carry the feature_leader label. Orphans drop. #}
@@ -391,7 +395,13 @@ template:
           {% set _is_state_changed = (_evtype == 'state_changed') %}
           {% set _is_manual = (_evtype == 'labeled_feature_set') %}
           {% set _changed_eid = trigger.event.data.entity_id | default('') if _is_state_changed else '' %}
-          {% set _prev_features = this.attributes.get('features', {}) | default({}) %}
+          {# Defensive: recorder may carry a legacy schema value
+             (string / list) that doesn't expose .items(). Treat any
+             non-mapping as empty so we rebuild from scratch. Same
+             rationale for inner scopes_map / sids dicts below — we
+             guard each .items() call. #}
+          {% set _prev_features_raw = this.attributes.get('features', {}) %}
+          {% set _prev_features = _prev_features_raw if _prev_features_raw is mapping else {} %}
           {% set _sensor_labels = labels('sensor.labeled_features_state') | map('label_name') | reject('none') | list %}
 
           {# Mode lookup helper macro replacement: we inline below. #}
@@ -497,17 +507,22 @@ template:
 
           {# Carry through all existing triples that are either:
              (a) still mapped to a leader, OR
-             (b) manual overrides (triggering_leader == '') #}
+             (b) manual overrides (triggering_leader == '')
+             Guard each level of `.items()` because legacy snapshots may
+             have stringy values stashed in places we expect dicts. #}
           {% for fname, scopes_map in _prev_features.items() %}
-            {% for scope_val, sids in (scopes_map | default({})).items() %}
-              {% for scope_id_val, entry in (sids | default({})).items() %}
+            {% set _sm = scopes_map if scopes_map is mapping else {} %}
+            {% for scope_val, sids in _sm.items() %}
+              {% set _sids = sids if sids is mapping else {} %}
+              {% for scope_id_val, entry in _sids.items() %}
+                {% set _entry = entry if entry is mapping else {} %}
                 {% set key = fname ~ '||' ~ scope_val ~ '||' ~ scope_id_val %}
                 {% set has_leader = key in tns.triples %}
-                {% set is_manual = (entry.get('triggering_leader', '') == '') %}
+                {% set is_manual = (_entry.get('triggering_leader', '') == '') %}
                 {% if has_leader or is_manual %}
                   {% set existing_f = ns.result.get(fname, {}) %}
                   {% set existing_s = existing_f.get(scope_val, {}) %}
-                  {% set existing_s = dict(existing_s, **{scope_id_val: entry}) %}
+                  {% set existing_s = dict(existing_s, **{scope_id_val: _entry}) %}
                   {% set existing_f = dict(existing_f, **{scope_val: existing_s}) %}
                   {% set ns.result = dict(ns.result, **{fname: existing_f}) %}
                 {% endif %}
