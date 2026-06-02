@@ -2454,19 +2454,34 @@
             {% endfor %}
             {{ ns.pools }}
           # Legacy `<F>: <state_value>` shorthand on leaders.
+          #
+          # NB: filter `ovr == feature_name`. The shorthand items carry
+          # `replaces_implicit: true` so they suppress the current
+          # feature's implicit dispatch. Without this guard, when one
+          # leader carries shorthand labels for *multiple* features
+          # (e.g. `Day: Day` and `Night: Night` on input_select.house_mode)
+          # the shorthand resolved for the leader's current state would
+          # also drop the implicit item on every *other* feature's
+          # triple flipping on the same tick — so a Night → Day transition
+          # would silently skip dispatching the Night feature with
+          # `leader_enabled = false`. The shorthand is conceptually about
+          # "when state == X, dispatch feature X", so only the matching
+          # feature's iteration should see the shorthand item.
           _shorthand_features: >-
             {% set ns = namespace(items=[]) %}
             {% for ovr in leader_feature_overrides %}
-              {% set ovr_toggle = (ovr + ' Toggle: True') in all_leader_labels %}
-              {% set ns.items = ns.items + [{
-                'kind': 'feature',
-                'replaces_implicit': true,
-                'variant': 'normal',
-                'tag': '',
-                'ref': ovr,
-                'shorthand': true,
-                'shorthand_toggle': ovr_toggle
-              }] %}
+              {% if ovr == feature_name %}
+                {% set ovr_toggle = (ovr + ' Toggle: True') in all_leader_labels %}
+                {% set ns.items = ns.items + [{
+                  'kind': 'feature',
+                  'replaces_implicit': true,
+                  'variant': 'normal',
+                  'tag': '',
+                  'ref': ovr,
+                  'shorthand': true,
+                  'shorthand_toggle': ovr_toggle
+                }] %}
+              {% endif %}
             {% endfor %}
             {{ ns.items }}
           _has_replacement: >-
