@@ -2996,7 +2996,7 @@ labeled_feature_sleep_timeout:
 
     Both values are read directly from
     `sensor.labeled_features_state.features[<feature>][<scope>][<scope_id>].enabled`,
-    keyed by the script's `night_feature` and `media_playing_feature`
+    keyed by the script's `feature_night` and `feature_media_playing`
     fields (defaults: `Night` / `Media Playing`).
 
     Behavior:
@@ -3018,11 +3018,16 @@ labeled_feature_sleep_timeout:
           7. Restore to snapshot
           8. Clear snapshot
 
-    `media_player` is required and trusted — the script does not run
-    Provides resolution. Declare your bedroom media player as the
-    `Media Playing` leader for the area (`Feature Leader`,
-    `Area Leader: Media Playing`, `Area Media Playing Enable: playing`)
-    and pass its entity_id as the `media_player` Arg on every dispatch.
+    The media player to act on is resolved from
+    `sensor.labeled_features_state.features[<feature_media_playing>][<scope>][<scope_id>].triggering_leader`
+    — i.e. whichever entity_id is currently registered as the
+    `Media Playing` leader for the dispatched scope. Declare your
+    bedroom media player as that leader
+    (`Feature Leader`, `Area Leader: Media Playing`,
+    `Area Media Playing Enable: playing`) and the script picks it up
+    automatically — no `media_player` Arg required on any dispatch.
+    Use the optional `media_player` field only to force a different
+    target (e.g. for manual test invocations).
 
     `mode: restart` so the script composes cleanly with rapid re-trigger
     (button mash, Night flip during fade, etc).
@@ -3035,19 +3040,20 @@ labeled_feature_sleep_timeout:
     original_volumes: {}
   fields:
     media_player:
-      name: Media Player
+      name: Media Player (Override)
       description: >
-        Required. The single media_player entity_id to fade, mute,
-        seek, and restore. Declare this same entity as the
-        `Media Playing` leader for the area
-        (`Feature Leader` + `Area Leader: Media Playing` +
-        `Area Media Playing Enable: playing`) so the script also fires
-        when playback transitions in/out.
-      required: true
+        Optional. When set, overrides the automatic resolution and the
+        script targets this entity_id directly. Leave empty (the
+        normal case) and the script reads
+        `sensor.labeled_features_state.features[<feature_media_playing>][<scope>][<scope_id>].triggering_leader`
+        — which is the entity_id of the bedroom media player you
+        labeled `Area Leader: Media Playing`.
+      required: false
+      default: ''
       selector:
         entity:
           domain: media_player
-    night_feature:
+    feature_night:
       name: Night Feature Name
       description: >
         Feature name to read out of
@@ -3057,7 +3063,7 @@ labeled_feature_sleep_timeout:
       default: Night
       selector:
         text: {}
-    media_playing_feature:
+    feature_media_playing:
       name: Media Playing Feature Name
       description: >
         Feature name to read out of
@@ -3175,35 +3181,53 @@ labeled_feature_sleep_timeout:
                       'original_volumes') | default({}) }}
 
   # ── Step 1: normalize inputs and read the gate signals fresh.
+  #            The media player target is resolved from the
+  #            `Media Playing` feature's `triggering_leader` — i.e.
+  #            whichever entity_id is currently labeled
+  #            `Area Leader: Media Playing` in this scope. The
+  #            `media_player` field is honored as an override when set.
   - variables:
       _err_mode: '{{ (error_mode | default("log") | lower) }}'
-      _mp: '{{ media_player | default("") | trim }}'
       _scope: '{{ (scope | default("area") | lower) }}'
       _scope_id: '{{ scope_id | default("") | string }}'
-      _night_feature: '{{ night_feature | default("Night") | trim }}'
-      _media_playing_feature: >-
-        {{ media_playing_feature | default("Media Playing") | trim }}
+      _feature_night: '{{ feature_night | default("Night") | trim }}'
+      _feature_media_playing: >-
+        {{ feature_media_playing | default("Media Playing") | trim }}
       _features: >-
         {{ state_attr('sensor.labeled_features_state', 'features')
            | default({}) }}
   - variables:
+      _night_entry: >-
+        {{ _features.get(_feature_night, {})
+                    .get(_scope, {})
+                    .get(_scope_id, {}) }}
+      _media_playing_entry: >-
+        {{ _features.get(_feature_media_playing, {})
+                    .get(_scope, {})
+                    .get(_scope_id, {}) }}
       _night_enabled: >-
-        {{ _features.get(_night_feature, {})
-                    .get(_scope, {})
-                    .get(_scope_id, {})
-                    .get('enabled', false) | bool(false) }}
+        {{ _night_entry.get('enabled', false) | bool(false) }}
       _media_playing_enabled: >-
-        {{ _features.get(_media_playing_feature, {})
-                    .get(_scope, {})
-                    .get(_scope_id, {})
-                    .get('enabled', false) | bool(false) }}
+        {{ _media_playing_entry.get('enabled', false) | bool(false) }}
+      # `_mp` resolution order:
+      #   1. explicit `media_player` field (override path)
+      #   2. `triggering_leader` from the Media Playing triple — this
+      #      is the entity_id of the bedroom media player labeled
+      #      `Area Leader: Media Playing`.
+      _mp: >-
+        {%- set override = media_player | default('') | trim -%}
+        {%- if override != '' -%}{{ override }}
+        {%- else -%}
+          {{ _media_playing_entry.get('triggering_leader', '') | trim }}
+        {%- endif -%}
       _should_run: >-
         {{ _mp != ''
            and _night_enabled
            and _media_playing_enabled }}
 
-  # ── Step 2: media_player required guard. Routed through the
-  #            shared Error Mode helper so missing wiring is surfaced
+  # ── Step 2: media_player resolution guard.
+  #            Routed through the shared Error Mode helper so a
+  #            misconfigured Media Playing leader is surfaced
   #            consistently with the rest of the stack.
   - if:
     - condition: template
@@ -3214,16 +3238,21 @@ labeled_feature_sleep_timeout:
         error_mode: '{{ _err_mode }}'
         source: Labeled Feature Sleep Timeout
         message: >-
-          Sleep Timeout dispatched without a `media_player` arg
-          (scope={{ _scope }}, scope_id={{ _scope_id }},
-          feature={{ feature | default('') }}).
+          Sleep Timeout could not resolve a media_player — no entity is
+          registered as the `{{ _feature_media_playing }}` leader for
+          scope '{{ _scope }}' / scope_id '{{ _scope_id }}', and no
+          explicit `media_player` override was passed. Make sure the
+          bedroom media player is labeled
+          `(Area|Floor|)Leader: {{ _feature_media_playing }}` and that
+          its `Enable:` label has fired at least once (so the sensor
+          has a `triggering_leader` to read).
     - if:
       - condition: template
         value_template: '{{ _err_mode == "stop" }}'
       then:
-      - stop: 'Labeled Feature Sleep Timeout: missing media_player.'
+      - stop: 'Labeled Feature Sleep Timeout: cannot resolve media_player.'
         error: true
-    - stop: 'Sleep Timeout: missing media_player (handled per error_mode).'
+    - stop: 'Sleep Timeout: cannot resolve media_player (handled per error_mode).'
 
   # ── Step 3: Cancel-restore branch.
   #            Idempotent — if no snapshot exists this is a no-op.
