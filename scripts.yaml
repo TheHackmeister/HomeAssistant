@@ -3186,44 +3186,55 @@ labeled_feature_sleep_timeout:
   #            whichever entity_id is currently labeled
   #            `Area Leader: Media Playing` in this scope. The
   #            `media_player` field is honored as an override when set.
+  # Note: dict-typed assignments use single-quoted scalars rather than
+  # `>-` folded literals. HA's template engine resolves both shapes to
+  # the same string, but `>-` introduces folded newlines that combine
+  # poorly with auto-native deserialization — the same workaround the
+  # leaders automation uses for `trigger.to_state.attributes.features`.
+  # Each downstream lookup also guards `is mapping` defensively so a
+  # legacy snapshot or upstream type drift can't crash the template.
   - variables:
       _err_mode: '{{ (error_mode | default("log") | lower) }}'
       _scope: '{{ (scope | default("area") | lower) }}'
       _scope_id: '{{ scope_id | default("") | string }}'
       _feature_night: '{{ feature_night | default("Night") | trim }}'
-      _feature_media_playing: >-
-        {{ feature_media_playing | default("Media Playing") | trim }}
-      _features: >-
-        {{ state_attr('sensor.labeled_features_state', 'features')
-           | default({}) }}
+      _feature_media_playing: '{{ feature_media_playing | default("Media Playing") | trim }}'
+      _features_raw: "{{ state_attr('sensor.labeled_features_state', 'features') | default({}) }}"
   - variables:
-      _night_entry: >-
-        {{ _features.get(_feature_night, {})
-                    .get(_scope, {})
-                    .get(_scope_id, {}) }}
-      _media_playing_entry: >-
-        {{ _features.get(_feature_media_playing, {})
-                    .get(_scope, {})
-                    .get(_scope_id, {}) }}
-      _night_enabled: >-
-        {{ _night_entry.get('enabled', false) | bool(false) }}
-      _media_playing_enabled: >-
-        {{ _media_playing_entry.get('enabled', false) | bool(false) }}
+      _features: '{{ _features_raw if _features_raw is mapping else {} }}'
+  - variables:
+      _night_feature_map_raw: '{{ _features.get(_feature_night, {}) }}'
+      _media_playing_feature_map_raw: '{{ _features.get(_feature_media_playing, {}) }}'
+  - variables:
+      _night_feature_map: '{{ _night_feature_map_raw if _night_feature_map_raw is mapping else {} }}'
+      _media_playing_feature_map: '{{ _media_playing_feature_map_raw if _media_playing_feature_map_raw is mapping else {} }}'
+  - variables:
+      _night_scope_map_raw: '{{ _night_feature_map.get(_scope, {}) }}'
+      _media_playing_scope_map_raw: '{{ _media_playing_feature_map.get(_scope, {}) }}'
+  - variables:
+      _night_scope_map: '{{ _night_scope_map_raw if _night_scope_map_raw is mapping else {} }}'
+      _media_playing_scope_map: '{{ _media_playing_scope_map_raw if _media_playing_scope_map_raw is mapping else {} }}'
+  - variables:
+      _night_entry_raw: '{{ _night_scope_map.get(_scope_id, {}) }}'
+      _media_playing_entry_raw: '{{ _media_playing_scope_map.get(_scope_id, {}) }}'
+  - variables:
+      _night_entry: '{{ _night_entry_raw if _night_entry_raw is mapping else {} }}'
+      _media_playing_entry: '{{ _media_playing_entry_raw if _media_playing_entry_raw is mapping else {} }}'
+  - variables:
+      _night_enabled: '{{ _night_entry.get("enabled", false) | bool(false) }}'
+      _media_playing_enabled: '{{ _media_playing_entry.get("enabled", false) | bool(false) }}'
+      _media_playing_leader: '{{ _media_playing_entry.get("triggering_leader", "") | string | trim }}'
+      _media_playing_triple_exists: '{{ _media_playing_entry | length > 0 }}'
+  - variables:
       # `_mp` resolution order:
       #   1. explicit `media_player` field (override path)
       #   2. `triggering_leader` from the Media Playing triple — this
       #      is the entity_id of the bedroom media player labeled
       #      `Area Leader: Media Playing`.
-      _mp: >-
-        {%- set override = media_player | default('') | trim -%}
-        {%- if override != '' -%}{{ override }}
-        {%- else -%}
-          {{ _media_playing_entry.get('triggering_leader', '') | trim }}
-        {%- endif -%}
-      _should_run: >-
-        {{ _mp != ''
-           and _night_enabled
-           and _media_playing_enabled }}
+      _media_player_override: '{{ media_player | default("") | string | trim }}'
+      _mp: '{{ _media_player_override if _media_player_override != "" else _media_playing_leader }}'
+  - variables:
+      _should_run: '{{ _mp != "" and _night_enabled and _media_playing_enabled }}'
 
   # ── Step 2: media_player resolution guard.
   #            Routed through the shared Error Mode helper so a
@@ -3238,14 +3249,14 @@ labeled_feature_sleep_timeout:
         error_mode: '{{ _err_mode }}'
         source: Labeled Feature Sleep Timeout
         message: >-
-          Sleep Timeout could not resolve a media_player — no entity is
-          registered as the `{{ _feature_media_playing }}` leader for
-          scope '{{ _scope }}' / scope_id '{{ _scope_id }}', and no
-          explicit `media_player` override was passed. Make sure the
-          bedroom media player is labeled
-          `(Area|Floor|)Leader: {{ _feature_media_playing }}` and that
-          its `Enable:` label has fired at least once (so the sensor
-          has a `triggering_leader` to read).
+          Sleep Timeout could not resolve a media_player.
+          override={{ _media_player_override or '(empty)' }};
+          features[{{ _feature_media_playing }}][{{ _scope }}][{{ _scope_id }}]
+          triple_exists={{ _media_playing_triple_exists }},
+          triggering_leader={{ _media_playing_leader or '(empty)' }}.
+          If triple_exists=False, label your media_player
+          `(Area|Floor|)Leader: {{ _feature_media_playing }}` and make sure
+          its `Enable:` label has fired at least once.
     - if:
       - condition: template
         value_template: '{{ _err_mode == "stop" }}'
