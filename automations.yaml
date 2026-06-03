@@ -2710,44 +2710,6 @@
               then:
               - stop: 'Labeled Feature Leaders: halted on {{ _it.ref }} (feature: {{ feature_name }})'
                 error: true
-- id: sleep_timeout_cancel_restore
-  alias: Sleep Timeout Cancel Restore
-  description: 'Restores media player volumes when labeled_feature_sleep_timeout is
-    cancelled externally before completing. Triggered when the script goes from on
-    to off while script.labeled_feature_sleep_timeout still had a non-empty original_volumes
-    attribute (read from trigger.from_state.attributes.original_volumes). Unmutes
-    players first since cancellation may have occurred after the mute step.
-
-    '
-  triggers:
-  - trigger: state
-    entity_id: script.labeled_feature_sleep_timeout
-    from: 'on'
-    to: 'off'
-  conditions:
-  - condition: template
-    value_template: '{{ trigger.from_state.attributes.original_volumes | default({})
-      | length > 0 }}'
-  actions:
-  - variables:
-      stored_volumes: '{{ trigger.from_state.attributes.original_volumes | default({})
-        }}'
-  - action: media_player.volume_mute
-    target:
-      entity_id: '{{ stored_volumes.keys() | list }}'
-    data:
-      is_volume_muted: false
-    continue_on_error: true
-  - repeat:
-      for_each: '{{ stored_volumes.keys() | list }}'
-      sequence:
-      - action: media_player.volume_set
-        target:
-          entity_id: '{{ repeat.item }}'
-        data:
-          volume_level: '{{ stored_volumes[repeat.item] }}'
-        continue_on_error: true
-  mode: single
 - id: '1777371930626'
   alias: Buttons Bedroom 2
   description: ''

@@ -2974,63 +2974,319 @@ labeled_feature_follower:
             error: true
 labeled_feature_sleep_timeout:
   alias: Labeled Feature Sleep Timeout
-  description: "Single-run sleep-timeout script for the Labeled Feature Button system.
-    Uses mode: restart so that calling it again (e.g. after any media interaction
-    in night mode) resets the full countdown from the beginning.\nSequence (per the
-    Label Based Features documentation):\n  1. Wait sleep_timeout_minutes (default
-    15 min)\n  2. Halve the volume on each area media player\n  3. Wait 1 minute\n
-    \ 4. Mute volume\n  5. Seek back 30 s every 30 s × 20 iterations (≈ 10 min) —
-    keeps the\n     playback position from advancing so the content is still \"live\"
-    on unmute\n  6. Unmute volume\n  7. Restore each player to its original volume
-    level\n\nCall script.turn_on (or homeassistant.turn_on) to start/restart the timer.
-    Call homeassistant.turn_off targeting this script to cancel and restore.\nNote:
-    Because mode is restart only one countdown runs at a time per HA instance. Create
-    separate label/blueprint configurations for each user who needs independent sleep-timeout
-    behaviour.\n"
+  description: >
+    Sleep-timeout script for the Labeled Feature system. Designed to be
+    dispatched via the standard Leader/Follower dispatch loop from any of
+    three entry points:
+
+      1. A button-press Leader (`Area Leader: Sleep Timer`) — primary
+         trigger; the user explicitly arms the timer.
+      2. A `Night` follower wiring (`Area Follower: Night` +
+         `Area Night Script: script.labeled_feature_sleep_timeout`) —
+         catches the case where Night is toggled off while a fade is in
+         flight, with no button press.
+      3. A `Media Playing` follower wiring (`Area Follower: Media Playing`
+         + `Area Media Playing Script: …`) — same idea, for when the
+         user pauses / stops media manually.
+
+    Gate rule (re-evaluated fresh on every dispatch — `leader_enabled`
+    from the dispatch loop is intentionally ignored):
+
+        should_run = night_enabled AND media_playing_enabled
+
+    Both values are read directly from
+    `sensor.labeled_features_state.features[<feature>][<scope>][<scope_id>].enabled`,
+    keyed by the script's `night_feature` and `media_playing_feature`
+    fields (defaults: `Night` / `Media Playing`).
+
+    Behavior:
+
+      - should_run == false  → cancel-restore (idempotent: if no snapshot
+                               is stored, no-op). Clears the snapshot at
+                               the end.
+      - should_run == true   → snapshot the media player's current volume
+                               (if no snapshot is already stored — so a
+                               `mode: restart` mid-fade preserves the
+                               original level), then run the full fade:
+
+          1. Wait `sleep_timeout_minutes` (default 15 min)
+          2. Halve the volume
+          3. Wait 1 min
+          4. Mute
+          5. Seek back 30 s every 30 s × 20 iterations (~10 min)
+          6. Unmute
+          7. Restore to snapshot
+          8. Clear snapshot
+
+    `media_player` is required and trusted — the script does not run
+    Provides resolution. Declare your bedroom media player as the
+    `Media Playing` leader for the area (`Feature Leader`,
+    `Area Leader: Media Playing`, `Area Media Playing Enable: playing`)
+    and pass its entity_id as the `media_player` Arg on every dispatch.
+
+    `mode: restart` so the script composes cleanly with rapid re-trigger
+    (button mash, Night flip during fade, etc).
   mode: restart
   variables:
+    # Surface `original_volumes` as a script state attribute so a
+    # `mode: restart` mid-fade can re-read its own previous snapshot in
+    # step 0 of `sequence:` below and preserve the original level
+    # across the restart.
     original_volumes: {}
   fields:
-    area_media_players:
-      name: Area Media Players
-      description: 'List of media player entity IDs in the resolved area to fade and
-        mute. Passed automatically by labeled_feature_button.
-
-        '
+    media_player:
+      name: Media Player
+      description: >
+        Required. The single media_player entity_id to fade, mute,
+        seek, and restore. Declare this same entity as the
+        `Media Playing` leader for the area
+        (`Feature Leader` + `Area Leader: Media Playing` +
+        `Area Media Playing Enable: playing`) so the script also fires
+        when playback transitions in/out.
       required: true
       selector:
-        object: {}
+        entity:
+          domain: media_player
+    night_feature:
+      name: Night Feature Name
+      description: >
+        Feature name to read out of
+        `sensor.labeled_features_state.features` for the Night gate
+        check. Default: `Night`.
+      required: false
+      default: Night
+      selector:
+        text: {}
+    media_playing_feature:
+      name: Media Playing Feature Name
+      description: >
+        Feature name to read out of
+        `sensor.labeled_features_state.features` for the
+        media-playing gate check. Default: `Media Playing`.
+      required: false
+      default: Media Playing
+      selector:
+        text: {}
     sleep_timeout_minutes:
       name: Sleep Timeout Minutes
-      description: How long to wait before beginning the fade-out sequence (default
-        15).
+      description: How long to wait before beginning the fade-out
+        sequence (default 15).
       required: false
       default: 15
       selector:
         number:
           min: 1
           max: 120
+    # ── Standard pass-through fields populated by the dispatch loop.
+    #    Declared here so the loop's typo-tolerant arg pass-through
+    #    actually lands them on this script.
+    scope:
+      name: Scope
+      description: Passed by the leader automation. Used to look up the
+        Night / Media Playing feature state in the sensor.
+      required: false
+      default: area
+      selector:
+        select:
+          options:
+            - area
+            - floor
+            - none
+    scope_id:
+      name: Scope ID
+      description: Passed by the leader automation. The resolved
+        area_id / floor_id for the gating sensor lookup.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    leader_entity_id:
+      name: Leader Entity ID
+      description: Pass-through; informational only.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    follower_entity_id:
+      name: Follower Entity ID
+      description: Pass-through; informational only.
+      required: false
+      default: ''
+      selector:
+        entity: {}
+    feature:
+      name: Feature
+      description: Pass-through; the dispatched feature name
+        (`Sleep Timer` / `Night` / `Media Playing` depending on entry
+        point).
+      required: false
+      default: ''
+      selector:
+        text: {}
+    leader_feature:
+      name: Leader Feature
+      description: Pass-through; same as `feature` in this dispatch
+        loop.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    leader_enabled:
+      name: Leader Enabled
+      description: Pass-through. Intentionally NOT used as the gate —
+        the script re-reads Night and Media Playing fresh from the
+        sensor on every dispatch.
+      required: false
+      default: true
+      selector:
+        boolean: {}
+    toggle:
+      name: Toggle
+      description: Pass-through; ignored (not meaningful here).
+      required: false
+      default: false
+      selector:
+        boolean: {}
+    error_mode:
+      name: Error Mode
+      description: silent | log | alert | stop. Used for the
+        "media_player not set" guard and similar.
+      required: false
+      default: log
+      selector:
+        select:
+          custom_value: true
+          options:
+            - silent
+            - log
+            - alert
+            - stop
   sequence:
+  # ── Step 0: read the previously-stored snapshot off our own state
+  #            attribute. On a fresh first call this is {} (the
+  #            script just turned 'on' for the first time). On a
+  #            mode:restart re-entry mid-fade, the previous run's
+  #            snapshot is still here — restart kills the in-flight
+  #            sequence without unwinding script-state attributes
+  #            populated by the top-level `variables:` step.
   - variables:
-      original_volumes: "{% set ns = namespace(d={}) %} {% for mp in area_media_players
-        %}\n  {% set vol = state_attr(mp, 'volume_level') | float(0.5) %}\n  {% set
-        ns.d = dict(ns.d, **{mp: vol}) %}\n{% endfor %} {{ ns.d }}"
+      original_volumes: >-
+        {{ state_attr('script.labeled_feature_sleep_timeout',
+                      'original_volumes') | default({}) }}
+
+  # ── Step 1: normalize inputs and read the gate signals fresh.
+  - variables:
+      _err_mode: '{{ (error_mode | default("log") | lower) }}'
+      _mp: '{{ media_player | default("") | trim }}'
+      _scope: '{{ (scope | default("area") | lower) }}'
+      _scope_id: '{{ scope_id | default("") | string }}'
+      _night_feature: '{{ night_feature | default("Night") | trim }}'
+      _media_playing_feature: >-
+        {{ media_playing_feature | default("Media Playing") | trim }}
+      _features: >-
+        {{ state_attr('sensor.labeled_features_state', 'features')
+           | default({}) }}
+  - variables:
+      _night_enabled: >-
+        {{ _features.get(_night_feature, {})
+                    .get(_scope, {})
+                    .get(_scope_id, {})
+                    .get('enabled', false) | bool(false) }}
+      _media_playing_enabled: >-
+        {{ _features.get(_media_playing_feature, {})
+                    .get(_scope, {})
+                    .get(_scope_id, {})
+                    .get('enabled', false) | bool(false) }}
+      _should_run: >-
+        {{ _mp != ''
+           and _night_enabled
+           and _media_playing_enabled }}
+
+  # ── Step 2: media_player required guard. Routed through the
+  #            shared Error Mode helper so missing wiring is surfaced
+  #            consistently with the rest of the stack.
+  - if:
+    - condition: template
+      value_template: '{{ _mp == "" }}'
+    then:
+    - action: script.labeled_feature_error_mode
+      data:
+        error_mode: '{{ _err_mode }}'
+        source: Labeled Feature Sleep Timeout
+        message: >-
+          Sleep Timeout dispatched without a `media_player` arg
+          (scope={{ _scope }}, scope_id={{ _scope_id }},
+          feature={{ feature | default('') }}).
+    - if:
+      - condition: template
+        value_template: '{{ _err_mode == "stop" }}'
+      then:
+      - stop: 'Labeled Feature Sleep Timeout: missing media_player.'
+        error: true
+    - stop: 'Sleep Timeout: missing media_player (handled per error_mode).'
+
+  # ── Step 3: Cancel-restore branch.
+  #            Idempotent — if no snapshot exists this is a no-op.
+  #            Always clears the snapshot at the end so the next
+  #            fresh run re-snapshots cleanly.
+  - if:
+    - condition: template
+      value_template: '{{ not _should_run }}'
+    then:
+    - if:
+      - condition: template
+        value_template: '{{ original_volumes | length > 0 }}'
+      then:
+      # Unmute first — cancellation may have arrived after the mute
+      # step but before restore, so we need to clear the muted flag
+      # before setting the volume.
+      - action: media_player.volume_mute
+        target:
+          entity_id: '{{ original_volumes.keys() | list }}'
+        data:
+          is_volume_muted: false
+        continue_on_error: true
+      - repeat:
+          for_each: '{{ original_volumes.keys() | list }}'
+          sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              volume_level: '{{ original_volumes[repeat.item] }}'
+            continue_on_error: true
+    # Clear the snapshot so the next fresh full-run re-snapshots.
+    - variables:
+        original_volumes: {}
+    - stop: >-
+        Sleep Timeout: cancel-restore
+        (night={{ _night_enabled }}, playing={{ _media_playing_enabled }}).
+
+  # ── Step 4: Snapshot if empty.
+  #            On a `mode: restart` mid-fade this stays non-empty so
+  #            the original level is preserved across the restart.
+  - if:
+    - condition: template
+      value_template: '{{ original_volumes | length == 0 }}'
+    then:
+    - variables:
+        original_volumes: >-
+          {{ {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
+
+  # ── Step 5: Fade sequence.
   - delay:
       minutes: '{{ sleep_timeout_minutes | default(15) | int }}'
-  - repeat:
-      for_each: '{{ area_media_players }}'
-      sequence:
-      - action: media_player.volume_set
-        target:
-          entity_id: '{{ repeat.item }}'
-        data:
-          volume_level: '{{ (original_volumes.get(repeat.item, 0.5) / 2) | round(2)
-            }}'
+  - action: media_player.volume_set
+    target:
+      entity_id: '{{ _mp }}'
+    data:
+      volume_level: >-
+        {{ (original_volumes[_mp] / 2) | round(2) }}
   - delay:
       minutes: 1
   - action: media_player.volume_mute
     target:
-      entity_id: '{{ area_media_players }}'
+      entity_id: '{{ _mp }}'
     data:
       is_volume_muted: true
   - delay:
@@ -3040,29 +3296,28 @@ labeled_feature_sleep_timeout:
       sequence:
       - delay:
           seconds: 30
-      - if:
-        - condition: template
-          value_template: '{{ area_media_players | length > 0 }}'
-        then:
-        - action: media_player.media_seek
-          target:
-            entity_id: '{{ area_media_players | first }}'
-          data:
-            seek_position: "{{ [state_attr(area_media_players | first,\n    'media_position')
-              | float(0) - 30, 0] | max }}"
+      - action: media_player.media_seek
+        target:
+          entity_id: '{{ _mp }}'
+        data:
+          seek_position: >-
+            {{ [state_attr(_mp, 'media_position') | float(0) - 30, 0]
+               | max }}
   - action: media_player.volume_mute
     target:
-      entity_id: '{{ area_media_players }}'
+      entity_id: '{{ _mp }}'
     data:
       is_volume_muted: false
-  - repeat:
-      for_each: '{{ area_media_players }}'
-      sequence:
-      - action: media_player.volume_set
-        target:
-          entity_id: '{{ repeat.item }}'
-        data:
-          volume_level: '{{ original_volumes.get(repeat.item, 0.5) }}'
+  - action: media_player.volume_set
+    target:
+      entity_id: '{{ _mp }}'
+    data:
+      volume_level: '{{ original_volumes[_mp] }}'
+
+  # ── Step 6: Natural completion — clear snapshot so the next fresh
+  #            invocation re-snapshots from the current volume.
+  - variables:
+      original_volumes: {}
 labeled_feature_error_mode:
   alias: Labeled Feature Error Mode
   description: 'Shared helper for the Labeled Feature system''s Error Mode dispatch.
