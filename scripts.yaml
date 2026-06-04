@@ -3244,32 +3244,54 @@ labeled_feature_sleep_timeout:
   - variables:
       _should_run: '{{ _mp != "" and _night_enabled and _media_playing_enabled }}'
 
-  # ── Step 1b: Media-Playing-when-in-flight guard.
-  #            The Media Playing follower wiring exists so that *pausing
-  #            mid-fade* runs cancel-restore. But that same wiring would
-  #            also re-trigger this script on *Play resuming* after the
-  #            user cancelled via Night-off — which would re-arm the
-  #            timer and surprise the user.
+  # ── Step 1b: Universal restore-and-continue on re-trigger.
+  #            ANY dispatch arriving while a fade is in flight is
+  #            treated as user intervention. We:
+  #              1. Restore the snapshotted volume on every entity
+  #                 captured in `original_volumes`.
+  #              2. Clear the snapshot (in-script local + the script
+  #                 entity's state attribute, so a follow-up
+  #                 `mode: restart` re-entry doesn't see a stale
+  #                 snapshot).
+  #              3. Fall through to the normal gate evaluation.
   #
-  #            The rule: Media Playing dispatches are only honored when
-  #            a fade is currently in flight (i.e. `original_volumes`
-  #            from step 0 is non-empty — that's our "script already
-  #            running with state" proxy). Without an in-flight fade,
-  #            Media Playing dispatches short-circuit silently.
+  #            Concrete behavior per entry-point:
+  #              - Sleep Timer (button) mid-fade: volume bounces back to
+  #                original, gate is still `Night AND Media Playing`,
+  #                fade re-arms fresh — the natural "reset the timer"
+  #                gesture.
+  #              - Night-off mid-fade: volume restored, gate now `false`,
+  #                falls through to the Step 3 cancel-restore branch
+  #                (which is a no-op because the snapshot is already
+  #                cleared), and stops cleanly.
+  #              - Media Playing -> false mid-fade: same as Night-off.
+  #              - Media Playing -> true (fresh arm via the bedroom
+  #                speaker coming online): snapshot is empty so this
+  #                block is skipped entirely; we drop straight into
+  #                the gate which arms the fade.
   #
-  #            Sleep Timer (button) and Night (follower) entry points
-  #            are unaffected — they always evaluate the gate.
-  - variables:
-      _entry_point: '{{ (feature | default("") | trim) }}'
-      _fade_in_flight: '{{ original_volumes | length > 0 }}'
+  #            This replaces the previous Media-Playing-in-flight
+  #            guard, which was actually blocking the primary arming
+  #            path (button press → follower turns on media →
+  #            Media Playing flips false → true → script dispatched
+  #            with `_entry_point == "Media Playing"` and no snapshot
+  #            yet, so the guard silently stopped the script before it
+  #            could arm).
   - if:
     - condition: template
-      value_template: >-
-        {{ _entry_point == _feature_media_playing and not _fade_in_flight }}
+      value_template: '{{ original_volumes | length > 0 }}'
     then:
-    - stop: >-
-        Sleep Timeout: Media Playing entry point ignored — no fade in
-        flight (entry_point={{ _entry_point }}, in_flight={{ _fade_in_flight }}).
+    - repeat:
+        for_each: '{{ original_volumes.keys() | list }}'
+        sequence:
+        - action: media_player.volume_set
+          target:
+            entity_id: '{{ repeat.item }}'
+          data:
+            volume_level: '{{ original_volumes[repeat.item] }}'
+          continue_on_error: true
+    - variables:
+        original_volumes: {}
 
   # ── Step 2: media_player resolution guard.
   #            Routed through the shared Error Mode helper so a
