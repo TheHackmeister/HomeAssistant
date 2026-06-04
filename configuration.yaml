@@ -221,6 +221,8 @@ template:
         # of the label still fire one cleanup tick).
       - trigger: event
         event_type: labeled_feature_set
+      - trigger: event
+        event_type: labeled_feature_snapshot_set
     # Gate the firehose of `state_changed` events down to ones that
     # could actually affect this sensor's render. We deliberately do
     # NOT reference `this.attributes.*` here — in HA trigger-based
@@ -241,7 +243,7 @@ template:
       - condition: template
         value_template: >
           {% set evtype = trigger.event.event_type %}
-          {% if evtype == 'labeled_feature_set' %}
+          {% if evtype in ['labeled_feature_set', 'labeled_feature_snapshot_set'] %}
             true
           {% else %}
             {% set eid = trigger.event.data.entity_id | default('') %}
@@ -649,6 +651,46 @@ template:
           {% endif %}
 
           {{ ns.result }}
+
+        # ── snapshots ──────────────────────────────────────────────────
+        # Generic persisted-state surface for scripts that need their
+        # state to survive `mode: restart`. Keyed by snapshot_name (a
+        # short identifier the script picks, e.g. `sleep_timeout`) →
+        # arbitrary mapping payload (the script decides the schema).
+        #
+        # Mutation path: scripts fire the `labeled_feature_snapshot_set`
+        # event with `{snapshot_name, payload}`. This template merges
+        # (or, when payload is empty/null, removes) the entry on the
+        # next tick.
+        #
+        # `state_changed` and `labeled_feature_set` ticks carry the
+        # existing snapshots dict through unchanged.
+        snapshots: >
+          {% set _evtype = trigger.event.event_type | default('') %}
+          {% set _is_snap = (_evtype == 'labeled_feature_snapshot_set') %}
+          {% set _prev_raw = this.attributes.get('snapshots', {}) %}
+          {% set _prev = _prev_raw if _prev_raw is mapping else {} %}
+          {% if not _is_snap %}
+            {{ _prev }}
+          {% else %}
+            {% set _sname = trigger.event.data.snapshot_name | default('') | trim %}
+            {% set _payload_raw = trigger.event.data.payload | default(none) %}
+            {% if _sname == '' %}
+              {{ _prev }}
+            {% else %}
+              {% set _payload = _payload_raw if _payload_raw is mapping else {} %}
+              {% set _ns = namespace(out={}) %}
+              {% for k, v in _prev.items() %}
+                {% if k != _sname %}
+                  {% set _ns.out = dict(_ns.out, **{k: v}) %}
+                {% endif %}
+              {% endfor %}
+              {% if _payload_raw is mapping and _payload | length > 0 %}
+                {% set _ns.out = dict(_ns.out, **{_sname: _payload}) %}
+              {% endif %}
+              {{ _ns.out }}
+            {% endif %}
+          {% endif %}
 
     - default_entity_id: sensor.house_home_count
       name: 'House: Home Count'

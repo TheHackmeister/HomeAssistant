@@ -3032,12 +3032,6 @@ labeled_feature_sleep_timeout:
     `mode: restart` so the script composes cleanly with rapid re-trigger
     (button mash, Night flip during fade, etc).
   mode: restart
-  variables:
-    # Surface `original_volumes` as a script state attribute so a
-    # `mode: restart` mid-fade can re-read its own previous snapshot in
-    # step 0 of `sequence:` below and preserve the original level
-    # across the restart.
-    original_volumes: {}
   fields:
     media_player:
       name: Media Player (Override)
@@ -3168,25 +3162,30 @@ labeled_feature_sleep_timeout:
             - alert
             - stop
   sequence:
-  # ── Step 0: read the previously-stored snapshot off our own state
-  #            attribute. On a fresh first call this is {} (the
-  #            script just turned 'on' for the first time). On a
-  #            mode:restart re-entry mid-fade, the previous run's
-  #            snapshot is still here — restart kills the in-flight
-  #            sequence without unwinding script-state attributes
-  #            populated by the top-level `variables:` step.
+  # ── Step 0: read the previously-stored snapshot from
+  #            `sensor.labeled_features_state.snapshots.sleep_timeout`.
+  #            This is the shared persisted-state surface used by any
+  #            long-running script that needs its state to survive
+  #            `mode: restart` re-entries. Writes go out via
+  #            `script.labeled_feature_generics` (`feature: Set
+  #            Snapshot`, `snapshot_name: sleep_timeout`, `payload:
+  #            {...}`); the trigger-based template sensor merges the
+  #            payload into its `snapshots` attribute on the next tick.
+  #
+  #            We deliberately do NOT use a script local `variables:`
+  #            initializer or read `state_attr(...)` on this script
+  #            itself — HA does not reliably expose script `variables:`
+  #            assignments as state attributes across `mode: restart`,
+  #            so any snapshot stored there gets clobbered to `{}` on
+  #            re-entry.
   - variables:
-      # `state_attr(...) | default({})` does NOT convert `None` to `{}` —
-      # `default()` only fires when the value is *undefined*, and `None`
-      # is a defined value. That's how `original_volumes` ended up as
-      # literal `None` mid-fade, raising
-      #   'None' has no attribute 'media_player.<id>'
-      # on step-5's `original_volumes[_mp] / 2`. The `or {}` idiom
-      # short-circuits `None` (and any other falsy value) to an empty
-      # dict, which is what the snapshot logic below actually expects.
-      original_volumes: >-
-        {{ state_attr('script.labeled_feature_sleep_timeout',
-                      'original_volumes') or {} }}
+      _snapshots_raw: "{{ state_attr('sensor.labeled_features_state', 'snapshots') | default({}) }}"
+  - variables:
+      _snapshots: '{{ _snapshots_raw if _snapshots_raw is mapping else {} }}'
+  - variables:
+      _original_volumes_raw: '{{ _snapshots.get("sleep_timeout", {}) }}'
+  - variables:
+      original_volumes: '{{ _original_volumes_raw if _original_volumes_raw is mapping else {} }}'
 
   # ── Step 1: normalize inputs and read the gate signals fresh.
   #            The media player target is resolved from the
@@ -3290,6 +3289,13 @@ labeled_feature_sleep_timeout:
           data:
             volume_level: '{{ original_volumes[repeat.item] }}'
           continue_on_error: true
+    # Clear the persisted snapshot via the shared `Set Snapshot` event
+    # path — empty payload means "drop this snapshot entry."
+    - action: script.labeled_feature_generics
+      data:
+        feature: Set Snapshot
+        snapshot_name: sleep_timeout
+        payload: {}
     - variables:
         original_volumes: {}
 
@@ -3352,7 +3358,13 @@ labeled_feature_sleep_timeout:
             data:
               volume_level: '{{ original_volumes[repeat.item] }}'
             continue_on_error: true
-    # Clear the snapshot so the next fresh full-run re-snapshots.
+    # Clear the persisted snapshot so the next fresh full-run
+    # re-snapshots cleanly.
+    - action: script.labeled_feature_generics
+      data:
+        feature: Set Snapshot
+        snapshot_name: sleep_timeout
+        payload: {}
     - variables:
         original_volumes: {}
     - stop: >-
@@ -3360,26 +3372,24 @@ labeled_feature_sleep_timeout:
         (night={{ _night_enabled }}, playing={{ _media_playing_enabled }}).
 
   # ── Step 4: Snapshot if empty.
-  #            On a `mode: restart` mid-fade this stays non-empty so
-  #            the original level is preserved across the restart.
-  #
-  #            NOTE: `variables:` inside an `if:` / `then:` block is
-  #            scoped to that block in HA and does not propagate out
-  #            to subsequent top-level steps. That's the second half
-  #            of the bug that caused the runtime error — even after
-  #            fixing step-0's `default({})` -> `or {}` so we get a
-  #            proper empty dict, an `if:`-scoped re-assignment of
-  #            `original_volumes` here would not be visible to the
-  #            step-5 `media_player.volume_set` template.
-  #
-  #            The fix is a top-level `variables:` block with an
-  #            inline conditional expression — the canonical HA
-  #            "set if missing" pattern at sequence scope.
+  #            On a `mode: restart` mid-fade Step 0 reads the previously-
+  #            persisted snapshot from
+  #            `sensor.labeled_features_state.snapshots.sleep_timeout`, so
+  #            `original_volumes` is already non-empty and this is a no-op.
+  #            Otherwise we capture the current volume_level for _mp,
+  #            publish it via `Set Snapshot` so the next `mode: restart`
+  #            re-entry can read it back, and update the local var for
+  #            the rest of the fade.
   - variables:
       original_volumes: >-
         {{ original_volumes
            if (original_volumes | length > 0)
            else {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
+  - action: script.labeled_feature_generics
+    data:
+      feature: Set Snapshot
+      snapshot_name: sleep_timeout
+      payload: '{{ original_volumes }}'
 
   # ── Step 5: Fade sequence.
   #
@@ -3460,6 +3470,11 @@ labeled_feature_sleep_timeout:
 
   # ── Step 6: Natural completion — clear snapshot so the next fresh
   #            invocation re-snapshots from the current volume.
+  - action: script.labeled_feature_generics
+    data:
+      feature: Set Snapshot
+      snapshot_name: sleep_timeout
+      payload: {}
   - variables:
       original_volumes: {}
 labeled_feature_error_mode:
@@ -3630,6 +3645,7 @@ labeled_feature_generics:
           - Ads
           - Night
           - Set Feature
+          - Set Snapshot
     target_feature:
       name: Target Feature
       description: >
@@ -3639,6 +3655,29 @@ labeled_feature_generics:
       default: ''
       selector:
         text: {}
+    snapshot_name:
+      name: Snapshot Name
+      description: >
+        Only used when `feature` is `Set Snapshot`. The key under
+        `sensor.labeled_features_state.snapshots` to write to (e.g.
+        `sleep_timeout`). Picking a short, script-specific identifier is
+        the convention.
+      required: false
+      default: ''
+      selector:
+        text: {}
+    payload:
+      name: Snapshot Payload
+      description: >
+        Only used when `feature` is `Set Snapshot`. The mapping payload
+        to store under `snapshots[<snapshot_name>]`. Pass an empty dict
+        (`{}`) to clear / remove the entry. Schema is whatever the
+        calling script wants to persist (e.g. `{media_player.x: 0.45}`
+        for sleep_timeout's per-target volume snapshot).
+      required: false
+      default: {}
+      selector:
+        object: {}
     enabled:
       name: Enabled
       description: >
@@ -3767,6 +3806,48 @@ labeled_feature_generics:
             enabled: '{{ _ena }}'
             timestamp: '{{ now().timestamp() }}'
         - stop: 'Set Feature: event dispatched.'
+
+    # ── Step 0b: Set Snapshot short-circuit ─────────────────────────────────
+    # Generic persisted-state writer. Fires the
+    # `labeled_feature_snapshot_set` event so that
+    # `sensor.labeled_features_state.snapshots[<snapshot_name>]` reflects
+    # `payload` (a mapping). Passing an empty mapping clears the entry.
+    # Used by long-running scripts (e.g. `labeled_feature_sleep_timeout`)
+    # that need their snapshot to survive `mode: restart` re-entries.
+    - if:
+        - condition: template
+          value_template: '{{ (feature | trim) == "Set Snapshot" }}'
+      then:
+        - variables:
+            _sname: '{{ snapshot_name | default("") | trim }}'
+            _payload_raw: '{{ payload | default({}) }}'
+            _err_mode: '{{ (error_mode | default("log") | lower) }}'
+        - variables:
+            _payload: '{{ _payload_raw if _payload_raw is mapping else {} }}'
+        - if:
+            - condition: template
+              value_template: '{{ _sname == "" }}'
+          then:
+            - action: script.labeled_feature_error_mode
+              data:
+                error_mode: '{{ _err_mode }}'
+                source: Labeled Feature Generics
+                message: >-
+                  Set Snapshot called without a snapshot_name. Provide a
+                  short, script-specific identifier (e.g. `sleep_timeout`).
+            - if:
+                - condition: template
+                  value_template: '{{ _err_mode == "stop" }}'
+              then:
+                - stop: 'Labeled Feature Generics: missing Set Snapshot snapshot_name.'
+                  error: true
+            - stop: 'Set Snapshot: missing snapshot_name (handled per error_mode).'
+        - event: labeled_feature_snapshot_set
+          event_data:
+            snapshot_name: '{{ _sname }}'
+            payload: '{{ _payload }}'
+            timestamp: '{{ now().timestamp() }}'
+        - stop: 'Set Snapshot: event dispatched.'
 
     # ── Step 1: Resolve scope ids and scope entity set ──────────────────────
     - variables:
