@@ -3312,33 +3312,18 @@ labeled_feature_sleep_timeout:
       - condition: template
         value_template: '{{ original_volumes | length > 0 }}'
       then:
-      # Unmute first — cancellation may have arrived after the mute
-      # step but before restore, so we need to clear the muted flag
-      # before setting the volume.
-      #
-      # Capability-aware: per-target, if the integration doesn't
-      # advertise SUPPORT_VOLUME_MUTE (bit 0x04 of supported_features)
-      # we skip the unmute call entirely. The follow-up volume_set
-      # restores the original level either way, and on integrations
-      # without mute support we use volume_set: 0 in the fade itself
-      # (see steps 4 / 6 below) — so there's nothing to "un-mute".
+      # Restore the snapshot. We use `volume_set` exclusively (no
+      # `volume_mute`) because the fade also uses `volume_set: 0`
+      # instead of `volume_mute` (see Step 5). So whatever the
+      # current volume is — original, halved, or 0 — `volume_set` to
+      # the snapshot lands us back at the original level on every
+      # integration regardless of whether it advertises
+      # SUPPORT_VOLUME_MUTE. Simpler than the capability check and
+      # bulletproof against integrations that misadvertise mute
+      # support (e.g. some lnxlink / MQTT players).
       - repeat:
           for_each: '{{ original_volumes.keys() | list }}'
           sequence:
-          - variables:
-              _restore_supports_mute: >-
-                {{ (state_attr(repeat.item, 'supported_features') | int(0))
-                   | bitwise_and(4) > 0 }}
-          - if:
-            - condition: template
-              value_template: '{{ _restore_supports_mute }}'
-            then:
-            - action: media_player.volume_mute
-              target:
-                entity_id: '{{ repeat.item }}'
-              data:
-                is_volume_muted: false
-              continue_on_error: true
           - action: media_player.volume_set
             target:
               entity_id: '{{ repeat.item }}'
@@ -3376,20 +3361,29 @@ labeled_feature_sleep_timeout:
 
   # ── Step 5: Fade sequence.
   #
-  # Capability detection for the mute leg. Some media_player integrations
-  # (notably some MQTT players and lnxlink in certain configs) don't
-  # expose `media_player.volume_mute`. We check the SUPPORT_VOLUME_MUTE
-  # bit (0x04) of `supported_features` and route the "mute" / "unmute"
-  # steps to `volume_set: 0` / `volume_set: <snapshot>` when the service
-  # isn't available. Audible result is the same — silent during the
-  # seek-back hold, restored at the end — without raising a runtime
-  # error on the unsupported service call.
+  # No `volume_mute` calls anywhere — we use `volume_set: 0` for the
+  # "mute" step and `volume_set: <snapshot>` for the restore. This is
+  # simpler than capability-checking `SUPPORT_VOLUME_MUTE` and works on
+  # every integration regardless of whether it correctly advertises
+  # mute support (some MQTT players and lnxlink configs claim to
+  # support it but the underlying device rejects the call). The
+  # audible result is identical: silent during the seek-back hold,
+  # restored to the original level at the end.
+  #
+  # Seek-back loop: see how `labeled_feature_generics` handles
+  # `media_seek_back` (bitwise_and(2) on supported_features → silent
+  # fallback to `media_player.media_previous_track`). We do the same
+  # here. The loop ticks 20× at 0.5 s — fast enough to keep the player
+  # from advancing through the queue during the brief silent hold,
+  # not so slow that any seek failure stalls the script.
   - variables:
-      _mp_supports_mute: >-
+      _seek_supports: >-
         {{ (state_attr(_mp, 'supported_features') | int(0))
-           | bitwise_and(4) > 0 }}
+           | bitwise_and(2) > 0 }}
+  # 5.1: Wait `sleep_timeout_minutes` before starting the fade.
   - delay:
       minutes: '{{ sleep_timeout_minutes | default(15) | int }}'
+  # 5.2: Halve the volume.
   - action: media_player.volume_set
     target:
       entity_id: '{{ _mp }}'
@@ -3398,49 +3392,44 @@ labeled_feature_sleep_timeout:
         {{ (original_volumes[_mp] / 2) | round(2) }}
   - delay:
       minutes: 1
-  # Step 4: "Mute" — capability-aware. If the target supports
-  # volume_mute we use it; otherwise drop volume to 0 (silent).
-  - if:
-    - condition: template
-      value_template: '{{ _mp_supports_mute }}'
-    then:
-    - action: media_player.volume_mute
-      target:
-        entity_id: '{{ _mp }}'
-      data:
-        is_volume_muted: true
-    else:
-    - action: media_player.volume_set
-      target:
-        entity_id: '{{ _mp }}'
-      data:
-        volume_level: 0
+  # 5.3: "Mute" via volume_set: 0 (works on every integration).
+  - action: media_player.volume_set
+    target:
+      entity_id: '{{ _mp }}'
+    data:
+      volume_level: 0
   - delay:
       minutes: 1
+  # 5.4: Seek-back loop — 20 × 0.5 s with 30 s of back-step each
+  # iteration. This pins the player's cursor in roughly the same
+  # spot during the brief mute hold so the resume doesn't land
+  # somewhere unexpected. Matches the generics pattern: silently
+  # falls back to `media_previous_track` when SUPPORT_SEEK is clear.
   - repeat:
       count: 20
       sequence:
       - delay:
-          seconds: 30
-      - action: media_player.media_seek
-        target:
-          entity_id: '{{ _mp }}'
-        data:
-          seek_position: >-
-            {{ [state_attr(_mp, 'media_position') | float(0) - 30, 0]
-               | max }}
-  # Step 6: "Unmute" — capability-aware. The mute fallback (volume 0)
-  # is naturally undone by the final volume_set to the snapshot, so we
-  # only need to call volume_mute when the target actually supports it.
-  - if:
-    - condition: template
-      value_template: '{{ _mp_supports_mute }}'
-    then:
-    - action: media_player.volume_mute
-      target:
-        entity_id: '{{ _mp }}'
-      data:
-        is_volume_muted: false
+          milliseconds: 500
+      - if:
+        - condition: template
+          value_template: '{{ _seek_supports }}'
+        then:
+        - action: media_player.media_seek
+          target:
+            entity_id: '{{ _mp }}'
+          data:
+            seek_position: >-
+              {{ [state_attr(_mp, 'media_position') | float(0) - 30, 0]
+                 | max }}
+          continue_on_error: true
+        else:
+        - action: media_player.media_previous_track
+          target:
+            entity_id: '{{ _mp }}'
+          continue_on_error: true
+  # 5.5: Restore the snapshot. This is also what "unmutes" the player
+  # when the mute step was `volume_set: 0`. No separate volume_mute
+  # call needed.
   - action: media_player.volume_set
     target:
       entity_id: '{{ _mp }}'
