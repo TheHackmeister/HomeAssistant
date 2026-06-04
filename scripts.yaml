@@ -3497,9 +3497,20 @@ labeled_feature_sleep_timeout:
           target:
             entity_id: '{{ _mp }}'
           continue_on_error: true
-  # 5.5: Restore the snapshot. This is also what "unmutes" the player
-  # when the mute step was `volume_set: 0`. No separate volume_mute
-  # call needed.
+  # 5.5: Pause the player before restoring volume — by the time we get
+  # here we've seek-back'd well into the past, and the user explicitly
+  # interacted (or the gate would have cancelled) so the desired
+  # end-state is silent + paused, not silent-then-resume-mid-show.
+  # The restore in 5.6 still un-zeroes the volume so the next manual
+  # play resumes at the right level.
+  - action: media_player.media_pause
+    target:
+      entity_id: '{{ _mp }}'
+    continue_on_error: true
+  # 5.6: Restore the snapshot's volume on the (now-paused) player.
+  # This also "unmutes" the player — the previous `volume_set: 0`
+  # is naturally undone by writing the snapshotted level. No separate
+  # `volume_mute` call needed.
   - action: media_player.volume_set
     target:
       entity_id: '{{ _mp }}'
@@ -4333,7 +4344,7 @@ labeled_feature_generics:
                         value_template: '{{ repeat.index <= 200 }}'
                     sequence:
                       - variables:
-                          _vol_start: "{{ [_vol_start + 0.07, 1.0] | min }}"
+                          _vol_start: "{{ [_vol_start + 0.05, 1.0] | min }}"
                       - action: media_player.volume_set
                         target:
                           entity_id: '{{ _media_target }}'
@@ -4341,14 +4352,14 @@ labeled_feature_generics:
                           volume_level: '{{ _vol_start }}'
                       - wait_template: '{{ states(_hold_eid) != _hold_initial }}'
                         timeout:
-                          milliseconds: 300
+                          milliseconds: 500
                         continue_on_timeout: true
               else:
                 - action: media_player.volume_set
                   target:
                     entity_id: '{{ _media_target }}'
                   data:
-                    volume_level: '{{ [_vol_start + 0.07, 1.0] | min }}'
+                    volume_level: '{{ [_vol_start + 0.05, 1.0] | min }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "volume_down" }}'
@@ -4371,7 +4382,7 @@ labeled_feature_generics:
                         value_template: '{{ repeat.index <= 200 }}'
                     sequence:
                       - variables:
-                          _vol_start: "{{ [_vol_start - 0.07, 0.0] | max }}"
+                          _vol_start: "{{ [_vol_start - 0.05, 0.0] | max }}"
                       - action: media_player.volume_set
                         target:
                           entity_id: '{{ _media_target }}'
@@ -4379,14 +4390,14 @@ labeled_feature_generics:
                           volume_level: '{{ _vol_start }}'
                       - wait_template: '{{ states(_hold_eid) != _hold_initial }}'
                         timeout:
-                          milliseconds: 300
+                          milliseconds: 500
                         continue_on_timeout: true
               else:
                 - action: media_player.volume_set
                   target:
                     entity_id: '{{ _media_target }}'
                   data:
-                    volume_level: '{{ [_vol_start - 0.07, 0.0] | max }}'
+                    volume_level: '{{ [_vol_start - 0.05, 0.0] | max }}'
         - conditions:
             - condition: template
               value_template: '{{ feature_meta.kind == "light_on" }}'
