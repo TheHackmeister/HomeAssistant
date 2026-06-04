@@ -2322,6 +2322,41 @@
                 | select('match', '^' + pfx + '(silent|log|alert|stop)$')
                 | first | default('') %}
             {{ match | regex_replace('^.+: ', '') | default(automation_error_mode, true) }}"
+          # Script Call Mode — resolved from labels on
+          # `sensor.labeled_features_state` (NOT the leader entity).
+          # Priority (highest first):
+          #   1. `<scope_prefix><F> Script Call Mode: <X>`
+          #   2. `<F> Script Call Mode: <X>`
+          #   3. `Script Call Mode: <X>`               (sensor-wide default)
+          #   4. Hardcoded fallback: Blocking
+          # `<X>` ∈ `Blocking | NonBlocking` (case-insensitive match).
+          # Affects only the `script.*` dispatch branch below — when
+          # NonBlocking, the script is fired via `script.turn_on` so
+          # the leader automation's queued iteration doesn't wait for
+          # the script to complete. Safe only for scripts whose mode is
+          # `parallel` or `restart` (otherwise script.turn_on still
+          # blocks). `automation.*` and `scene.*` refs are unaffected.
+          feature_script_call_mode: >-
+            {% set sensor_labels = labels('sensor.labeled_features_state')
+                | map('label_name') | reject('none') | list %}
+            {% set scoped_pfx = scoped_feature_leader ~ ' Script Call Mode: ' %}
+            {% set bare_pfx = feature_name ~ ' Script Call Mode: ' %}
+            {% set global_pfx = 'Script Call Mode: ' %}
+            {% set scoped_match = sensor_labels
+                | select('match', '^' ~ scoped_pfx ~ '(?i)(blocking|nonblocking)$')
+                | first | default('') %}
+            {% set bare_match = sensor_labels
+                | select('match', '^' ~ bare_pfx ~ '(?i)(blocking|nonblocking)$')
+                | first | default('') %}
+            {% set global_match = sensor_labels
+                | select('match', '^' ~ global_pfx ~ '(?i)(blocking|nonblocking)$')
+                | first | default('') %}
+            {% set picked = scoped_match if scoped_match != ''
+                else (bare_match if bare_match != ''
+                else (global_match if global_match != '' else '')) %}
+            {% set normalized = (picked | regex_replace('^.+: ', '') | lower) %}
+            {{ 'nonblocking' if normalized == 'nonblocking'
+                else ('blocking' if normalized == 'blocking' else 'blocking') }}
           leader_feature_overrides: "{% set cv = leader_current_value | trim %}
             {% if cv != '' and (leader_entity_id | trim) != '' %}
               {% set ns = namespace(features=[]) %}
@@ -2603,27 +2638,54 @@
                 - condition: template
                   value_template: '{{ _it.ref.startswith("automation.") or _it.ref.startswith("scene.") }}'
                 then:
+                # `automation.*` / `scene.*` refs are unaffected by
+                # Script Call Mode. `automation.trigger` returns
+                # quickly; `scene.turn_on` is inherently fire-and-
+                # forget. Both are safe to invoke directly.
                 - action: '{{ _it.ref }}'
                   data: {}
                   continue_on_error: true
                 else:
+                # `script.*` ref. Branch on Script Call Mode:
+                #   - blocking (default): invoke directly so the
+                #     outer for_each iteration awaits completion.
+                #     Preserves current semantics — any downstream
+                #     work that depends on the script having finished
+                #     keeps working.
+                #   - nonblocking: invoke via `script.turn_on`, which
+                #     fire-and-forgets when the target script's mode
+                #     is `parallel` or `restart`. Required for long-
+                #     running scripts (e.g. `labeled_feature_sleep_timeout`
+                #     with its 15-minute delay) so they don't block
+                #     the leader automation's queued iteration.
                 - variables:
                     _all_args: '{{ _args or {} }}'
-                - choose:
-                  - conditions:
-                      - condition: template
-                        value_template: '{{ _all_args | length == 0 }}'
-                    sequence:
-                    - action: '{{ _it.ref }}'
-                      data: '{{ _std_fields_base }}'
-                      continue_on_error: true
-                  default:
+                - if:
+                  - condition: template
+                    value_template: '{{ feature_script_call_mode == "nonblocking" }}'
+                  then:
                   - action: script.turn_on
                     target:
                       entity_id: '{{ _it.ref | trim }}'
                     data:
-                      variables: '{{ _std_fields_base | combine(_all_args) }}'
+                      variables: '{{ _std_fields_base | combine(_all_args | default({})) }}'
                     continue_on_error: true
+                  else:
+                  - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: '{{ _all_args | length == 0 }}'
+                      sequence:
+                      - action: '{{ _it.ref }}'
+                        data: '{{ _std_fields_base }}'
+                        continue_on_error: true
+                    default:
+                    - action: script.turn_on
+                      target:
+                        entity_id: '{{ _it.ref | trim }}'
+                      data:
+                        variables: '{{ _std_fields_base | combine(_all_args) }}'
+                      continue_on_error: true
 
             # ───────── feature kind ─────────
             - conditions:

@@ -2349,6 +2349,33 @@ labeled_feature_follower:
         {% if from_label != '' %}{{ from_label }}
         {% elif (error_mode | default('') | lower) != '' %}{{ error_mode | lower }}
         {% else %}log{% endif %}
+      # Script Call Mode — resolved from labels on
+      # `sensor.labeled_features_state` (NOT the follower entity).
+      # Same 3-tier priority and semantics as in
+      # `automation.labeled_feature_leaders`. Affects only the
+      # `script.*` dispatch branch below. See that automation's
+      # comment for the full design rationale.
+      follower_script_call_mode: >-
+        {% set sensor_labels = labels('sensor.labeled_features_state')
+            | map('label_name') | reject('none') | list %}
+        {% set scoped_pfx = scoped_feature ~ ' Script Call Mode: ' %}
+        {% set bare_pfx = feature_name ~ ' Script Call Mode: ' %}
+        {% set global_pfx = 'Script Call Mode: ' %}
+        {% set scoped_match = sensor_labels
+            | select('match', '^' ~ scoped_pfx ~ '(?i)(blocking|nonblocking)$')
+            | first | default('') %}
+        {% set bare_match = sensor_labels
+            | select('match', '^' ~ bare_pfx ~ '(?i)(blocking|nonblocking)$')
+            | first | default('') %}
+        {% set global_match = sensor_labels
+            | select('match', '^' ~ global_pfx ~ '(?i)(blocking|nonblocking)$')
+            | first | default('') %}
+        {% set picked = scoped_match if scoped_match != ''
+            else (bare_match if bare_match != ''
+            else (global_match if global_match != '' else '')) %}
+        {% set normalized = (picked | regex_replace('^.+: ', '') | lower) %}
+        {{ 'nonblocking' if normalized == 'nonblocking'
+            else ('blocking' if normalized == 'blocking' else 'blocking') }}
       follower_inverted: '{{ (scoped_feature + " Invert: True") in follower_labels }}'
       follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled }}'
       follower_toggle: '{{ (toggle | default(false) | bool) or ((scoped_feature + " Toggle: True") in follower_labels) }}'
@@ -2630,34 +2657,53 @@ labeled_feature_follower:
             - condition: template
               value_template: '{{ _it.ref.startswith("automation.") or _it.ref.startswith("scene.") }}'
             then:
+            # `automation.*` / `scene.*` refs unaffected by Script Call
+            # Mode (same as in the leaders automation).
             - action: '{{ _it.ref }}'
               data: {}
               continue_on_error: true
             else:
-            # Pass every arg through to the script. HA does not expose
-            # script field declarations as state attributes
-            # (`state_attr(<script>, 'fields')` is always None), so we
-            # can't validate arg names from inside a template.
-            # Undeclared fields are silently ignored by the script
-            # invocation; typo'd Arg labels will simply not have an
-            # effect (rather than raising an Error Mode warning).
+            # `script.*` ref. Branch on follower_script_call_mode:
+            #   - blocking (default): invoke directly so the outer
+            #     for_each iteration awaits completion.
+            #   - nonblocking: invoke via `script.turn_on`, which is
+            #     fire-and-forget when the target script's mode is
+            #     parallel or restart.
             - variables:
                 _all_args: '{{ _args or {} }}'
-            - choose:
-              - conditions:
-                  - condition: template
-                    value_template: '{{ _all_args | length == 0 }}'
-                sequence:
-                - action: '{{ _it.ref }}'
-                  data: '{{ _std_fields_base }}'
-                  continue_on_error: true
-              default:
+            - if:
+              - condition: template
+                value_template: '{{ follower_script_call_mode == "nonblocking" }}'
+              then:
+              # Pass every arg through to the script. HA does not
+              # expose script field declarations as state attributes
+              # (`state_attr(<script>, 'fields')` is always None), so
+              # we can't validate arg names from inside a template.
+              # Undeclared fields are silently ignored by the script
+              # invocation; typo'd Arg labels will simply not have an
+              # effect (rather than raising an Error Mode warning).
               - action: script.turn_on
                 target:
                   entity_id: '{{ _it.ref | trim }}'
                 data:
-                  variables: '{{ _std_fields_base | combine(_all_args) }}'
+                  variables: '{{ _std_fields_base | combine(_all_args | default({})) }}'
                 continue_on_error: true
+              else:
+              - choose:
+                - conditions:
+                    - condition: template
+                      value_template: '{{ _all_args | length == 0 }}'
+                  sequence:
+                  - action: '{{ _it.ref }}'
+                    data: '{{ _std_fields_base }}'
+                    continue_on_error: true
+                default:
+                - action: script.turn_on
+                  target:
+                    entity_id: '{{ _it.ref | trim }}'
+                  data:
+                    variables: '{{ _std_fields_base | combine(_all_args) }}'
+                  continue_on_error: true
 
         # ───────── feature kind ─────────
         - conditions:
