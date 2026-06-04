@@ -2726,17 +2726,43 @@
               - repeat:
                   for_each: '{{ _all_followers }}'
                   sequence:
-                  - action: script.labeled_feature_follower
-                    data:
-                      follower_entity_id: '{{ repeat.item }}'
-                      feature: '{{ _target_feature }}'
-                      leader_entity_id: '{{ leader_entity_id }}'
-                      leader_enabled: '{{ leader_enabled }}'
-                      toggle: '{{ _it_toggle | default(false) }}'
-                      error_mode: '{{ feature_error_mode }}'
-                      scope: '{{ resolved_scope }}'
-                      scope_id: '{{ resolved_scope_id }}'
-                    continue_on_error: true
+                  # Per-follower dispatch honors Script Call Mode too.
+                  # `script.labeled_feature_follower` is mode:parallel,
+                  # so script.turn_on fire-and-forgets cleanly. Default
+                  # (Blocking) preserves historical await-each behavior;
+                  # NonBlocking unblocks the leader's outer for_each so
+                  # fan-out to many followers doesn't serialize behind
+                  # the slowest follower's work.
+                  - if:
+                    - condition: template
+                      value_template: '{{ feature_script_call_mode == "NonBlocking" }}'
+                    then:
+                    - action: script.turn_on
+                      target:
+                        entity_id: script.labeled_feature_follower
+                      data:
+                        variables:
+                          follower_entity_id: '{{ repeat.item }}'
+                          feature: '{{ _target_feature }}'
+                          leader_entity_id: '{{ leader_entity_id }}'
+                          leader_enabled: '{{ leader_enabled }}'
+                          toggle: '{{ _it_toggle | default(false) }}'
+                          error_mode: '{{ feature_error_mode }}'
+                          scope: '{{ resolved_scope }}'
+                          scope_id: '{{ resolved_scope_id }}'
+                      continue_on_error: true
+                    else:
+                    - action: script.labeled_feature_follower
+                      data:
+                        follower_entity_id: '{{ repeat.item }}'
+                        feature: '{{ _target_feature }}'
+                        leader_entity_id: '{{ leader_entity_id }}'
+                        leader_enabled: '{{ leader_enabled }}'
+                        toggle: '{{ _it_toggle | default(false) }}'
+                        error_mode: '{{ feature_error_mode }}'
+                        scope: '{{ resolved_scope }}'
+                        scope_id: '{{ resolved_scope_id }}'
+                      continue_on_error: true
 
           # ── Per-iteration error routing ──
           - if:
