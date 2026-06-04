@@ -3176,9 +3176,17 @@ labeled_feature_sleep_timeout:
   #            sequence without unwinding script-state attributes
   #            populated by the top-level `variables:` step.
   - variables:
+      # `state_attr(...) | default({})` does NOT convert `None` to `{}` —
+      # `default()` only fires when the value is *undefined*, and `None`
+      # is a defined value. That's how `original_volumes` ended up as
+      # literal `None` mid-fade, raising
+      #   'None' has no attribute 'media_player.<id>'
+      # on step-5's `original_volumes[_mp] / 2`. The `or {}` idiom
+      # short-circuits `None` (and any other falsy value) to an empty
+      # dict, which is what the snapshot logic below actually expects.
       original_volumes: >-
         {{ state_attr('script.labeled_feature_sleep_timeout',
-                      'original_volumes') | default({}) }}
+                      'original_volumes') or {} }}
 
   # ── Step 1: normalize inputs and read the gate signals fresh.
   #            The media player target is resolved from the
@@ -3305,13 +3313,24 @@ labeled_feature_sleep_timeout:
   # ── Step 4: Snapshot if empty.
   #            On a `mode: restart` mid-fade this stays non-empty so
   #            the original level is preserved across the restart.
-  - if:
-    - condition: template
-      value_template: '{{ original_volumes | length == 0 }}'
-    then:
-    - variables:
-        original_volumes: >-
-          {{ {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
+  #
+  #            NOTE: `variables:` inside an `if:` / `then:` block is
+  #            scoped to that block in HA and does not propagate out
+  #            to subsequent top-level steps. That's the second half
+  #            of the bug that caused the runtime error — even after
+  #            fixing step-0's `default({})` -> `or {}` so we get a
+  #            proper empty dict, an `if:`-scoped re-assignment of
+  #            `original_volumes` here would not be visible to the
+  #            step-5 `media_player.volume_set` template.
+  #
+  #            The fix is a top-level `variables:` block with an
+  #            inline conditional expression — the canonical HA
+  #            "set if missing" pattern at sequence scope.
+  - variables:
+      original_volumes: >-
+        {{ original_volumes
+           if (original_volumes | length > 0)
+           else {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
 
   # ── Step 5: Fade sequence.
   - delay:
