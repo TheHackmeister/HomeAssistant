@@ -2362,20 +2362,20 @@ labeled_feature_follower:
         {% set bare_pfx = feature_name ~ ' Script Call Mode: ' %}
         {% set global_pfx = 'Script Call Mode: ' %}
         {% set scoped_match = sensor_labels
-            | select('match', '^' ~ scoped_pfx ~ '(?i)(blocking|nonblocking)$')
+            | select('match', '^' ~ scoped_pfx ~ '(Blocking|NonBlocking)$')
             | first | default('') %}
         {% set bare_match = sensor_labels
-            | select('match', '^' ~ bare_pfx ~ '(?i)(blocking|nonblocking)$')
+            | select('match', '^' ~ bare_pfx ~ '(Blocking|NonBlocking)$')
             | first | default('') %}
         {% set global_match = sensor_labels
-            | select('match', '^' ~ global_pfx ~ '(?i)(blocking|nonblocking)$')
+            | select('match', '^' ~ global_pfx ~ '(Blocking|NonBlocking)$')
             | first | default('') %}
         {% set picked = scoped_match if scoped_match != ''
             else (bare_match if bare_match != ''
             else (global_match if global_match != '' else '')) %}
-        {% set normalized = (picked | regex_replace('^.+: ', '') | lower) %}
-        {{ 'nonblocking' if normalized == 'nonblocking'
-            else ('blocking' if normalized == 'blocking' else 'blocking') }}
+        {% set normalized = picked | regex_replace('^.+: ', '') %}
+        {{ 'NonBlocking' if normalized == 'NonBlocking'
+            else ('Blocking' if normalized == 'Blocking' else 'Blocking') }}
       follower_inverted: '{{ (scoped_feature + " Invert: True") in follower_labels }}'
       follower_enabled: '{{ (not leader_enabled) if follower_inverted else leader_enabled }}'
       follower_toggle: '{{ (toggle | default(false) | bool) or ((scoped_feature + " Toggle: True") in follower_labels) }}'
@@ -2673,7 +2673,7 @@ labeled_feature_follower:
                 _all_args: '{{ _args or {} }}'
             - if:
               - condition: template
-                value_template: '{{ follower_script_call_mode == "nonblocking" }}'
+                value_template: '{{ follower_script_call_mode == "NonBlocking" }}'
               then:
               # Pass every arg through to the script. HA does not
               # expose script field declarations as state attributes

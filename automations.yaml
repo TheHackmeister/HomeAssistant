@@ -2343,20 +2343,20 @@
             {% set bare_pfx = feature_name ~ ' Script Call Mode: ' %}
             {% set global_pfx = 'Script Call Mode: ' %}
             {% set scoped_match = sensor_labels
-                | select('match', '^' ~ scoped_pfx ~ '(?i)(blocking|nonblocking)$')
+                | select('match', '^' ~ scoped_pfx ~ '(Blocking|NonBlocking)$')
                 | first | default('') %}
             {% set bare_match = sensor_labels
-                | select('match', '^' ~ bare_pfx ~ '(?i)(blocking|nonblocking)$')
+                | select('match', '^' ~ bare_pfx ~ '(Blocking|NonBlocking)$')
                 | first | default('') %}
             {% set global_match = sensor_labels
-                | select('match', '^' ~ global_pfx ~ '(?i)(blocking|nonblocking)$')
+                | select('match', '^' ~ global_pfx ~ '(Blocking|NonBlocking)$')
                 | first | default('') %}
             {% set picked = scoped_match if scoped_match != ''
                 else (bare_match if bare_match != ''
                 else (global_match if global_match != '' else '')) %}
-            {% set normalized = (picked | regex_replace('^.+: ', '') | lower) %}
-            {{ 'nonblocking' if normalized == 'nonblocking'
-                else ('blocking' if normalized == 'blocking' else 'blocking') }}
+            {% set normalized = picked | regex_replace('^.+: ', '') %}
+            {{ 'NonBlocking' if normalized == 'NonBlocking'
+                else ('Blocking' if normalized == 'Blocking' else 'Blocking') }}
           leader_feature_overrides: "{% set cv = leader_current_value | trim %}
             {% if cv != '' and (leader_entity_id | trim) != '' %}
               {% set ns = namespace(features=[]) %}
@@ -2662,7 +2662,7 @@
                     _all_args: '{{ _args or {} }}'
                 - if:
                   - condition: template
-                    value_template: '{{ feature_script_call_mode == "nonblocking" }}'
+                    value_template: '{{ feature_script_call_mode == "NonBlocking" }}'
                   then:
                   - action: script.turn_on
                     target:
