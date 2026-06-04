@@ -3243,61 +3243,99 @@ labeled_feature_sleep_timeout:
   - variables:
       _should_run: '{{ _mp != "" and _night_enabled and _media_playing_enabled }}'
 
-  # ── Step 1b: Universal restore-and-continue on re-trigger.
-  #            ANY dispatch arriving while a fade is in flight is
-  #            treated as user intervention. We:
-  #              1. Restore the snapshotted volume on every entity
-  #                 captured in `original_volumes`.
-  #              2. Clear the snapshot (in-script local + the script
-  #                 entity's state attribute, so a follow-up
-  #                 `mode: restart` re-entry doesn't see a stale
-  #                 snapshot).
-  #              3. Fall through to the normal gate evaluation.
+  # ── Step 1b: Re-trigger prelude — two branches.
   #
-  #            Concrete behavior per entry-point:
-  #              - Sleep Timer (button) mid-fade: volume bounces back to
-  #                original, gate is still `Night AND Media Playing`,
-  #                fade re-arms fresh — the natural "reset the timer"
-  #                gesture.
-  #              - Night-off mid-fade: volume restored, gate now `false`,
-  #                falls through to the Step 3 cancel-restore branch
-  #                (which is a no-op because the snapshot is already
-  #                cleared), and stops cleanly.
-  #              - Media Playing -> false mid-fade: same as Night-off.
-  #              - Media Playing -> true (fresh arm via the bedroom
-  #                speaker coming online): snapshot is empty so this
-  #                block is skipped entirely; we drop straight into
-  #                the gate which arms the fade.
+  # ANY dispatch arriving while a fade is in flight is treated as user
+  # intervention, but the right response depends on *what the user did*:
   #
-  #            This replaces the previous Media-Playing-in-flight
-  #            guard, which was actually blocking the primary arming
-  #            path (button press → follower turns on media →
-  #            Media Playing flips false → true → script dispatched
-  #            with `_entry_point == "Media Playing"` and no snapshot
-  #            yet, so the guard silently stopped the script before it
-  #            could arm).
-  - if:
-    - condition: template
-      value_template: '{{ original_volumes | length > 0 }}'
-    then:
-    - repeat:
-        for_each: '{{ original_volumes.keys() | list }}'
-        sequence:
-        - action: media_player.volume_set
-          target:
-            entity_id: '{{ repeat.item }}'
-          data:
-            volume_level: '{{ original_volumes[repeat.item] }}'
-          continue_on_error: true
-    # Clear the persisted snapshot via the shared `Set Snapshot` event
-    # path — empty payload means "drop this snapshot entry."
-    - action: script.labeled_feature_generics
-      data:
-        feature: Set Snapshot
-        snapshot_name: sleep_timeout
-        payload: {}
-    - variables:
-        original_volumes: {}
+  #   Branch A — stepping interaction (Volume Up/Down hold, Lights
+  #              Up/Down hold, etc):
+  #     The user is actively dialing the volume (or brightness). The
+  #     `Volume Up` hold loop inside `labeled_feature_generics` is
+  #     running `media_player.volume_set` against the same player every
+  #     300ms. If we restored to the snapshotted "original" we'd race
+  #     with those writes and the volume would bounce. Instead we
+  #     **re-baseline the snapshot to the current `volume_level`**:
+  #     the user's new "original" is wherever they're dialing to. Idle
+  #     restore-on-cancel paths (Night-off, Media-off) will then
+  #     correctly restore to this new baseline, not the pre-hold value.
+  #     One-tick-behind is fine — by the next Sleep Timer dispatch
+  #     (typically the *_long_release event ~50–150ms after the
+  #     physical release) the integration's echo has settled.
+  #
+  #   Branch B — discrete event (button short press, Night flip, Media
+  #              Playing flip):
+  #     Restore the snapshotted volume, clear the snapshot, and fall
+  #     through to the gate. This is the existing "reset the timer"
+  #     / "cancel the timer" semantic depending on what the gate then
+  #     evaluates to.
+  #
+  # The classifier is `_is_stepping`, which matches the canonical
+  # hold-in-progress / just-released event names emitted by the IKEA
+  # button families currently wired: `*_long_press`, `*_long_release`,
+  # `volume_up_hold`, `volume_down_hold`, `brightness_move_up`,
+  # `brightness_move_down`, `brightness_stop`. The regex
+  # `(long_press|long_release|hold|_move_)` covers all of those.
+  #
+  # On a state-domain leader (`input_boolean.night_mode`,
+  # `media_player.bedroom_main_audio`) `_trigger_state` is `on`/`off`/
+  # `playing`/`paused`/etc and never matches → Branch B runs (correct).
+  - variables:
+      _trigger_state: >-
+        {{ states(leader_entity_id) | lower
+           if (leader_entity_id | default('') | trim) != '' else '' }}
+      _is_stepping: >-
+        {{ _trigger_state | regex_search('(long_press|long_release|hold|_move_)')
+           is not none }}
+  - choose:
+    # ── Branch A — stepping in progress: re-baseline snapshot ────────
+    - conditions:
+      - condition: template
+        value_template: '{{ original_volumes | length > 0 and _is_stepping }}'
+      sequence:
+      # Re-read each snapshotted entity's current volume_level. The hold
+      # loop in `labeled_feature_generics` writes the new absolute value
+      # every 300ms; we're one tick behind it at most, which is fine —
+      # the user's net interaction (start → hold → release) re-baselines
+      # at both press-start and press-release, so the release dispatch
+      # always carries the final committed value.
+      - variables:
+          original_volumes: >-
+            {% set ns = namespace(out={}) %}
+            {% for eid in original_volumes.keys() %}
+              {% set ns.out = dict(ns.out,
+                **{eid: state_attr(eid, 'volume_level') | float(original_volumes[eid])}) %}
+            {% endfor %}
+            {{ ns.out }}
+      - action: script.labeled_feature_generics
+        data:
+          feature: Set Snapshot
+          snapshot_name: sleep_timeout
+          payload: '{{ original_volumes }}'
+
+    # ── Branch B — discrete re-trigger: restore + clear ─────────────
+    - conditions:
+      - condition: template
+        value_template: '{{ original_volumes | length > 0 }}'
+      sequence:
+      - repeat:
+          for_each: '{{ original_volumes.keys() | list }}'
+          sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: '{{ repeat.item }}'
+            data:
+              volume_level: '{{ original_volumes[repeat.item] }}'
+            continue_on_error: true
+      # Clear the persisted snapshot via the shared `Set Snapshot` event
+      # path — empty payload means "drop this snapshot entry."
+      - action: script.labeled_feature_generics
+        data:
+          feature: Set Snapshot
+          snapshot_name: sleep_timeout
+          payload: {}
+      - variables:
+          original_volumes: {}
 
   # ── Step 2: media_player resolution guard.
   #            Routed through the shared Error Mode helper so a
