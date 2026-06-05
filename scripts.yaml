@@ -3307,12 +3307,25 @@ labeled_feature_sleep_timeout:
            is not none }}
 
   # ── Step 1c: Button-1 short-press in Night mode → disable Area Screen.
-  # Per the Label Based Features doc's "Manual Overrides — Set Feature"
-  # entry: dispatching script.labeled_feature_generics with
-  # `feature: Set Feature` fires the labeled_feature_set event, the
-  # state sensor records the override, and the leaders automation fans
-  # it out to every Area Follower: Screen exactly as if a Screen leader
-  # had driven the change.
+  # Dispatches `feature: Screen` directly through labeled_feature_generics
+  # rather than going through `Set Feature`. Rationale:
+  #
+  # The `Set Feature` path writes a manual-override entry into
+  # `sensor.labeled_features_state.features.Screen.<scope>.<scope_id>`
+  # and relies on `automation.labeled_feature_leaders` re-dispatching on
+  # the attribute change. That automation's dispatch predicate gates out
+  # repeat manual overrides (no `triggering_leader`, so it can't take
+  # the button-bump branch) once the entry is already `enabled: false`.
+  # Subsequent presses would no-op.
+  #
+  # Going direct via `feature: Screen` resolves followers through the
+  # standard `(Area )Follower: Screen` / `(Area )Provides: Screen`
+  # mechanism and dispatches per-entity through script.labeled_feature_follower
+  # every time — no sensor state in the loop, so repeat presses fire
+  # every time.
+  #
+  # `leader_enabled: false` + `toggle: false` forces the "disable" path
+  # in each follower's labels (vs. the dots_1_short_release toggle).
   #
   # This runs alongside (not instead of) the normal Sleep Timeout
   # behavior — no `stop:` here. We fall through into the existing Branch
@@ -3331,11 +3344,13 @@ labeled_feature_sleep_timeout:
     then:
       - action: script.labeled_feature_generics
         data:
-          feature: Set Feature
-          target_feature: Screen
+          feature: Screen
           scope: '{{ _scope }}'
           scope_id: '{{ _scope_id }}'
-          enabled: false
+          follower_entity_id: '{{ follower_entity_id | default("") }}'
+          leader_entity_id: '{{ leader_entity_id | default("") }}'
+          leader_enabled: false
+          toggle: false
           error_mode: '{{ _err_mode }}'
 
   - choose:
