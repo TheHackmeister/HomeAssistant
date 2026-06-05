@@ -3280,10 +3280,28 @@ labeled_feature_sleep_timeout:
   # On a state-domain leader (`input_boolean.night_mode`,
   # `media_player.bedroom_main_audio`) `_trigger_state` is `on`/`off`/
   # `playing`/`paused`/etc and never matches → Branch B runs (correct).
+  #
+  # NOTE: we read the trigger state from
+  # `sensor.labeled_features_state.leaders[<eid>].current_value`, NOT
+  # from `states(eid)` directly. For `event`-domain entities (every IKEA
+  # button entity in this house), `states()` returns the ISO timestamp
+  # of the last event, not the event name. The sensor stores the
+  # actual event name in `current_value` via the
+  # `attributes.event_type | default(state)` accessor (see
+  # configuration.yaml). Reading `states()` here would never match the
+  # stepping regex on a button leader, causing every hold to fall
+  # through to Branch B (restore) and producing the volume-bouncing-
+  # at-start-of-hold bug.
   - variables:
-      _trigger_state: >-
-        {{ states(leader_entity_id) | lower
-           if (leader_entity_id | default('') | trim) != '' else '' }}
+      _leaders_raw: "{{ state_attr('sensor.labeled_features_state', 'leaders') | default({}) }}"
+  - variables:
+      _leaders: '{{ _leaders_raw if _leaders_raw is mapping else {} }}'
+  - variables:
+      _leader_entry_raw: '{{ _leaders.get(leader_entity_id, {}) }}'
+  - variables:
+      _leader_entry: '{{ _leader_entry_raw if _leader_entry_raw is mapping else {} }}'
+  - variables:
+      _trigger_state: '{{ _leader_entry.get("current_value", "") | string | lower }}'
       _is_stepping: >-
         {{ _trigger_state | regex_search('(long_press|long_release|hold|_move_)')
            is not none }}
@@ -3418,6 +3436,7 @@ labeled_feature_sleep_timeout:
   #            publish it via `Set Snapshot` so the next `mode: restart`
   #            re-entry can read it back, and update the local var for
   #            the rest of the fade.
+  #
   - variables:
       original_volumes: >-
         {{ original_volumes
