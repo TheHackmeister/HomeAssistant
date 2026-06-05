@@ -2887,6 +2887,36 @@ labeled_feature_follower:
               - action: '{{ follower_domain }}.turn_{{ "on" if follower_enabled else "off" }}'
                 target:
                   entity_id: '{{ follower_entity_id }}'
+            # ── button.* / scene.* — momentary trigger domains.
+            # These entities are stateless triggers, not stateful on/off
+            # targets. `homeassistant.turn_on/off` against `button.*`
+            # silently does nothing (the catch-all domain branch below
+            # would otherwise hit this case and no-op).
+            #
+            # Semantics:
+            #   - follower_enabled == true  → press / activate (button.press / scene.turn_on)
+            #   - follower_enabled == false → no-op (you can't "un-press" a button)
+            #
+            # Toggle mode is handled higher up in the Toggle path —
+            # buttons land in `_toggle_unsupported_domains` and route
+            # through Error Mode. (If a user explicitly wants Toggle
+            # semantics on a momentary entity they should remove it
+            # from the unsupported list, but the default is to refuse.)
+            - if:
+              - condition: template
+                value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain == "button" and follower_enabled }}'
+              then:
+              - action: button.press
+                target:
+                  entity_id: '{{ follower_entity_id }}'
+            - if:
+              - condition: template
+                value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain == "scene" and follower_enabled }}'
+              then:
+              - action: scene.turn_on
+                target:
+                  entity_id: '{{ follower_entity_id }}'
+
             - if:
               - condition: template
                 value_template: '{{ follower_target_value == "" and not follower_toggle and follower_domain == "media_player" }}'
