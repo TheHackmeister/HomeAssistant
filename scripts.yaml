@@ -3161,6 +3161,37 @@ labeled_feature_sleep_timeout:
             - log
             - alert
             - stop
+    screen_off_event:
+      name: Screen-Off Event
+      description: >
+        Button event name that triggers the auxiliary "disable Area
+        Screen" dispatch (Step 1c). When the dispatched leader's
+        `sensor.labeled_features_state.leaders[<eid>].current_value`
+        matches this string (case-insensitive) AND the Night gate
+        passes, this script dispatches `feature: Screen` through
+        `script.labeled_feature_generics` with `leader_enabled: false`
+        and `toggle: false` to force every `(Area )Follower: Screen`
+        entity into its disable path. Runs alongside (not instead of)
+        the normal Sleep Timeout arm/cancel/restore flow.
+
+        Set to an empty string to disable Step 1c entirely.
+      required: false
+      default: '1_short_release'
+      selector:
+        text: {}
+    screen_off_feature:
+      name: Screen-Off Feature
+      description: >
+        Feature name dispatched by the Step 1c auxiliary "disable
+        screens" path. Defaults to `Screen` — the user-defined feature
+        name labeled on screen entities as
+        `(Area )Follower: Screen` (and optionally
+        `(Area )Screen Disable: …`). Override to retarget the
+        Night-press behavior at a different labeled feature.
+      required: false
+      default: Screen
+      selector:
+        text: {}
   sequence:
   # ── Step 0: read the previously-stored snapshot from
   #            `sensor.labeled_features_state.snapshots.sleep_timeout`.
@@ -3306,26 +3337,27 @@ labeled_feature_sleep_timeout:
         {{ _trigger_state | regex_search('(long_press|long_release|hold|_move_)')
            is not none }}
 
-  # ── Step 1c: Button-1 short-press in Night mode → disable Area Screen.
-  # Dispatches `feature: Screen` directly through labeled_feature_generics
-  # rather than going through `Set Feature`. Rationale:
+  # ── Step 1c: Configured button event in Night mode → disable Area Screen.
+  # Dispatches `feature: <screen_off_feature>` directly through
+  # labeled_feature_generics rather than going through `Set Feature`.
+  # Rationale:
   #
   # The `Set Feature` path writes a manual-override entry into
-  # `sensor.labeled_features_state.features.Screen.<scope>.<scope_id>`
-  # and relies on `automation.labeled_feature_leaders` re-dispatching on
-  # the attribute change. That automation's dispatch predicate gates out
+  # `sensor.labeled_features_state.features.<F>.<scope>.<scope_id>` and
+  # relies on `automation.labeled_feature_leaders` re-dispatching on the
+  # attribute change. That automation's dispatch predicate gates out
   # repeat manual overrides (no `triggering_leader`, so it can't take
   # the button-bump branch) once the entry is already `enabled: false`.
   # Subsequent presses would no-op.
   #
-  # Going direct via `feature: Screen` resolves followers through the
-  # standard `(Area )Follower: Screen` / `(Area )Provides: Screen`
-  # mechanism and dispatches per-entity through script.labeled_feature_follower
+  # Going direct via `feature: <F>` resolves followers through the
+  # standard `(Area )Follower: <F>` / `(Area )Provides: <F>` mechanism
+  # and dispatches per-entity through script.labeled_feature_follower
   # every time — no sensor state in the loop, so repeat presses fire
   # every time.
   #
   # `leader_enabled: false` + `toggle: false` forces the "disable" path
-  # in each follower's labels (vs. the dots_1_short_release toggle).
+  # in each follower's labels.
   #
   # This runs alongside (not instead of) the normal Sleep Timeout
   # behavior — no `stop:` here. We fall through into the existing Branch
@@ -3333,18 +3365,26 @@ labeled_feature_sleep_timeout:
   # continues to work exactly as before. The Screen-disable just
   # piggybacks on the same dispatch.
   #
-  # Matches `1_short_release` only (exact, lowercased). `_trigger_state`
-  # is sourced from `sensor.labeled_features_state.leaders[<eid>].current_value`
-  # so it carries the raw button event name (not the ISO timestamp that
-  # `states()` returns for event-domain entities).
+  # `_trigger_state` is sourced from
+  # `sensor.labeled_features_state.leaders[<eid>].current_value` so it
+  # carries the raw button event name (not the ISO timestamp that
+  # `states()` returns for event-domain entities). The match is
+  # case-insensitive. Set `screen_off_event` to an empty string on the
+  # dispatch to disable this branch entirely.
+  - variables:
+      _screen_off_event: '{{ (screen_off_event | default("1_short_release") | string | lower | trim) }}'
+      _screen_off_feature: '{{ (screen_off_feature | default("Screen") | string | trim) }}'
   - if:
       - condition: template
         value_template: >-
-          {{ _trigger_state == "1_short_release" and _night_enabled }}
+          {{ _screen_off_event != ""
+             and _screen_off_feature != ""
+             and _trigger_state == _screen_off_event
+             and _night_enabled }}
     then:
       - action: script.labeled_feature_generics
         data:
-          feature: Screen
+          feature: '{{ _screen_off_feature }}'
           scope: '{{ _scope }}'
           scope_id: '{{ _scope_id }}'
           follower_entity_id: '{{ follower_entity_id | default("") }}'
@@ -4585,18 +4625,49 @@ labeled_feature_generics:
               target:
                 entity_id: '{{ final_targets }}'
       default:
-        - action: script.labeled_feature_error_mode
-          data:
-            error_mode: '{{ _err_mode }}'
-            source: Labeled Feature Generics
-            message: "Unknown feature '{{ _feature }}'."
-        - if:
-            - condition: template
-              value_template: '{{ _err_mode == "stop" }}'
-          then:
-            - stop: "Labeled Feature Generics: unknown feature '{{ _feature }}'."
-              error: true
+        # ── Unknown / label-only feature fan-out ────────────────────────────
+        # `feature_meta.kind == 'unknown'` means the feature isn't in the
+        # built-in catalog (configuration.yaml `feature_meta` attr) —
+        # i.e. a user-declared feature like `Screen`, `TV Input`,
+        # `Bright`, `Accent`. The dispatch-by-kind switch above has no
+        # branch for these, so historically generics raised "unknown
+        # feature" here.
+        #
+        # New behavior: treat unknown features as a "fan out to
+        # followers" request. The Provides resolver already ran above
+        # and collapsed every `(scope_prefix)Follower: <F>` /
+        # `(scope_prefix)Provides: <F>` / bare `<F>` label into
+        # `final_targets`. We just need to dispatch each one through
+        # `script.labeled_feature_follower` with the same field shape
+        # the leader automation would use.
+        #
+        # This is what makes the `dots_1_short_release` symfonisk path
+        # (`feature: Screen`, `toggle: true`) and the sleep-timeout
+        # Step 1c path (`feature: Screen`, `leader_enabled: false`,
+        # `toggle: false`) work without needing per-feature entries in
+        # `feature_meta`. The follower script owns the per-entity
+        # Enable/Disable label resolution and direct-action dispatch.
+        #
+        # `leader_enabled` and `toggle` are passed through from the
+        # caller verbatim — the follower handles Invert and per-entity
+        # Toggle labels itself, so generics doesn't need to second-guess
+        # the inputs.
+        - repeat:
+            for_each: '{{ final_targets }}'
+            sequence:
+              - action: script.labeled_feature_follower
+                data:
+                  follower_entity_id: '{{ repeat.item }}'
+                  feature: '{{ _feature }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ (leader_enabled | default(true)) | bool(true) }}'
+                  toggle: '{{ _toggle }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  error_mode: '{{ _err_mode }}'
+                continue_on_error: true
 labeled_feature_somrig:
+
   alias: Labeled Feature Somrig
   description: >
     Maps IKEA Somrig (and other 2-button) device events into one or more calls
