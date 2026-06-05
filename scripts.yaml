@@ -4262,6 +4262,35 @@ labeled_feature_generics:
                 - action: homeassistant.toggle
                   target:
                     entity_id: '{{ final_targets }}'
+            # ── Unknown / label-only feature toggle fan-out ──────────────
+            # Mirrors the non-toggle unknown-feature branch below: when
+            # the feature isn't in the built-in catalog (i.e. user-
+            # declared like `Night` / `Screen` / `TV Input`), fan out
+            # to followers via `script.labeled_feature_follower` with
+            # `toggle: true`. The follower owns per-entity toggle
+            # semantics (media_player.toggle / homeassistant.toggle /
+            # `Toggle: True` labels), so generics doesn't need to
+            # second-guess. This is what lets user-declared features
+            # opt into toggle semantics without per-feature catalog
+            # entries.
+            - conditions:
+                - condition: template
+                  value_template: '{{ feature_meta.kind == "unknown" }}'
+              sequence:
+                - repeat:
+                    for_each: '{{ final_targets }}'
+                    sequence:
+                      - action: script.labeled_feature_follower
+                        data:
+                          follower_entity_id: '{{ repeat.item }}'
+                          feature: '{{ _feature }}'
+                          leader_entity_id: '{{ leader_entity_id | default("") }}'
+                          leader_enabled: '{{ (leader_enabled | default(true)) | bool(true) }}'
+                          toggle: true
+                          scope: '{{ _scope }}'
+                          scope_id: '{{ scope_id | default("") }}'
+                          error_mode: '{{ _err_mode }}'
+                        continue_on_error: true
           default:
             - action: script.labeled_feature_error_mode
               data:
@@ -4277,6 +4306,7 @@ labeled_feature_generics:
                     Labeled Feature Generics: invalid toggle for '{{ _feature }}'.
                   error: true
         - stop: 'Toggle path complete.'
+
 
     # ── Step 7: Non-toggle dispatch by feature kind ─────────────────────────
     #
