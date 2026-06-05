@@ -5067,6 +5067,9 @@ labeled_feature_somrig:
                     error_mode: '{{ _err_mode }}'
 
         # ────────────── 2_double_press ──────────────
+        # Playing → Media Seek Forward (honors caller-passed toggle).
+        # Not Playing → Night (always toggle:true — the press semantics
+        # are explicitly "flip night mode", not "set to enabled").
         - conditions:
             - condition: template
               value_template: '{{ mapped_event == "2_double_press" }}'
@@ -5080,8 +5083,9 @@ labeled_feature_somrig:
                 follower_entity_id: '{{ follower_entity_id | default("") }}'
                 leader_entity_id: '{{ leader_entity_id | default("") }}'
                 leader_enabled: '{{ leader_enabled | default(true) }}'
-                toggle: '{{ _toggle_in }}'
+                toggle: '{{ true if not media_playing else _toggle_in }}'
                 error_mode: '{{ _err_mode }}'
+
 
         # ────────────── 1_long_press ──────────────
         # The 300ms repeat-while-held loop now lives inside
