@@ -3305,6 +3305,39 @@ labeled_feature_sleep_timeout:
       _is_stepping: >-
         {{ _trigger_state | regex_search('(long_press|long_release|hold|_move_)')
            is not none }}
+
+  # ── Step 1c: Button-1 short-press in Night mode → disable Area Screen.
+  # Per the Label Based Features doc's "Manual Overrides — Set Feature"
+  # entry: dispatching script.labeled_feature_generics with
+  # `feature: Set Feature` fires the labeled_feature_set event, the
+  # state sensor records the override, and the leaders automation fans
+  # it out to every Area Follower: Screen exactly as if a Screen leader
+  # had driven the change.
+  #
+  # This runs alongside (not instead of) the normal Sleep Timeout
+  # behavior — no `stop:` here. We fall through into the existing Branch
+  # A/B prelude and the gate so the fade arm/cancel/restore logic
+  # continues to work exactly as before. The Screen-disable just
+  # piggybacks on the same dispatch.
+  #
+  # Matches `1_short_release` only (exact, lowercased). `_trigger_state`
+  # is sourced from `sensor.labeled_features_state.leaders[<eid>].current_value`
+  # so it carries the raw button event name (not the ISO timestamp that
+  # `states()` returns for event-domain entities).
+  - if:
+      - condition: template
+        value_template: >-
+          {{ _trigger_state == "1_short_release" and _night_enabled }}
+    then:
+      - action: script.labeled_feature_generics
+        data:
+          feature: Set Feature
+          target_feature: Screen
+          scope: '{{ _scope }}'
+          scope_id: '{{ _scope_id }}'
+          enabled: false
+          error_mode: '{{ _err_mode }}'
+
   - choose:
     # ── Branch A — stepping in progress: re-baseline snapshot ────────
     - conditions:
