@@ -3634,17 +3634,15 @@ labeled_feature_sleep_timeout:
           target:
             entity_id: '{{ _mp }}'
           continue_on_error: true
-  # 5.5: Pause the player before restoring volume — by the time we get
-  # here we've seek-back'd well into the past, and the user explicitly
-  # interacted (or the gate would have cancelled) so the desired
-  # end-state is silent + paused, not silent-then-resume-mid-show.
-  # The restore in 5.6 still un-zeroes the volume so the next manual
-  # play resumes at the right level.
-  - action: media_player.media_pause
-    target:
-      entity_id: '{{ _mp }}'
-    continue_on_error: true
-  # 5.6: Restore the snapshot's volume on the (now-paused) player.
+  # 5.5: Restore the snapshot's volume FIRST, while the player is
+  # still in its playing state. This guarantees the volume_set lands
+  # and is committed by every integration — several integrations
+  # (Music Assistant, Squeezebox, lnxlink, some MQTT players) drop or
+  # ignore volume changes once the player is paused, which caused the
+  # restore in the old "pause-then-restore" ordering to silently
+  # no-op and leave the player at volume_set: 0 (Step 5.3's mute) on
+  # the next manual play.
+  #
   # This also "unmutes" the player — the previous `volume_set: 0`
   # is naturally undone by writing the snapshotted level. No separate
   # `volume_mute` call needed.
@@ -3653,6 +3651,16 @@ labeled_feature_sleep_timeout:
       entity_id: '{{ _mp }}'
     data:
       volume_level: '{{ original_volumes[_mp] }}'
+    continue_on_error: true
+  # 5.6: Now pause the player. By this point we've seek-back'd well
+  # into the past, and the user explicitly interacted (or the gate
+  # would have cancelled) so the desired end-state is silent +
+  # paused at the restored volume — so the next manual play resumes
+  # at the right level rather than at the muted/halved level.
+  - action: media_player.media_pause
+    target:
+      entity_id: '{{ _mp }}'
+    continue_on_error: true
 
   # ── Step 6: Natural completion — clear snapshot so the next fresh
   #            invocation re-snapshots from the current volume.
