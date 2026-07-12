@@ -12,6 +12,8 @@
 .ha_run.lock
 
 custom_components/*
+!custom_components/labeled_features/
+**/__pycache__/*
 www/community/*
 
 # Ignore folders.
