@@ -816,6 +816,27 @@ sensor:
     team_abbrev: col
 
 rest_command:
+
+  print_label:
+    url: https://brother-ptouch-automation.spencerslab.com/print
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: >
+      {"template": "{{ label_template }}", "fields": {{ fields }}, "send": true}
+
+  render_label:
+    url: https://brother-ptouch-automation.spencerslab.com/render
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: >
+      {"template": "{{ label_template }}", "fields": {{ fields }}}
+
+  label_printer_health:
+    url: https://brother-ptouch-automation.spencerslab.com/health
+    method: GET
+
   healthchecksio:
     url: https://hc-ping.com/89ba143b-b5bc-4074-bf95-b0897ec23102
     method: GET
