@@ -200,6 +200,14 @@ class LabeledFeaturesStateSensor(_BaseLabeledSensor):
 
         self._resubscribe_leaders()
 
+        # Seed leaders/features from the current registry + states so a
+        # fresh entry doesn't sit empty until every leader changes state.
+        try:
+            self._snapshot = self._engine.seed(self._snapshot)
+        except Exception as err:  # noqa: BLE001
+            await self._report_error(f"initial seed failed: {err}")
+        self.async_write_ha_state()
+
         # Custom events.
         self.async_on_remove(
             self.hass.bus.async_listen(self._set_event, self._handle_manual_set)
@@ -233,16 +241,24 @@ class LabeledFeaturesStateSensor(_BaseLabeledSensor):
                 self.hass, leaders, self._handle_leader_change
             )
 
-    @callback
-    def _handle_registry_update(self, _event: Event) -> None:
+    async def _handle_registry_update(self, _event: Event) -> None:
         self._resubscribe_leaders()
+        # Re-seed so newly labeled leaders appear immediately.
+        try:
+            self._snapshot = self._engine.seed(self._snapshot)
+        except Exception as err:  # noqa: BLE001
+            await self._report_error(f"registry re-seed failed: {err}")
+            return
+        self.async_write_ha_state()
 
     async def _handle_leader_change(self, event: Event) -> None:
         entity_id = event.data.get("entity_id")
-        old_state = event.data.get("old_state")
         new_state = event.data.get("new_state")
-        # Gate: reject events without a real prior state (boot restore, etc).
-        if old_state is None or str(old_state.state).lower() in (
+        # Gate: skip pure restore echoes (no meaningful new state). Events
+        # whose *old* state is unknown/unavailable are still processed so the
+        # first change after a restart isn't swallowed — the engine treats
+        # the missing previous value as "".
+        if new_state is None or str(new_state.state).lower() in (
             "unknown",
             "unavailable",
             "none",

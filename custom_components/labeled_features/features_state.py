@@ -183,8 +183,95 @@ class FeaturesEngine:
             modes[key] = mode
         return modes
 
+    # ── initial seed ─────────────────────────────────────────────────────
+    def seed(self, prev: FeaturesSnapshot) -> FeaturesSnapshot:
+        """Populate leaders/features from the current registry + states.
+
+        The legacy YAML sensor accumulated its attributes organically over
+        months of leader events (with recorder restore). A fresh config
+        entry starts from nothing, so this seeds the baseline:
+
+          * every entity carrying the gate label becomes a ``leaders`` entry
+            with its current value;
+          * every (feature, scope, scope_id) triple is evaluated once to
+            populate ``features``.
+
+        Restored/previous entries win where they still apply, so manual
+        overrides and snapshots survive restarts and re-seeds.
+        """
+        leaders_now = self._leader_entities()
+
+        # Leaders: keep restored entries for still-labeled leaders; seed
+        # any newly discovered ones from their current state.
+        leaders: dict[str, dict[str, Any]] = {
+            eid: dat for eid, dat in prev.leaders.items() if eid in leaders_now
+        }
+        for eid in leaders_now:
+            if eid in leaders:
+                continue
+            st = self._hass.states.get(eid)
+            cv_raw = _leader_value(st)
+            skip = bool(_INITIAL_PRESS_RE.search(cv_raw)) or _is_unreal(cv_raw)
+            leaders[eid] = {
+                "current_value": "" if skip else cv_raw,
+                "previous_value": "",
+                "last_changed_timestamp": (
+                    st.last_changed.timestamp()
+                    if (st is not None and st.last_changed is not None)
+                    else _now_ts()
+                ),
+            }
+
+        triples = self._build_triples(leaders_now)
+        modes = self._modes_for(triples)
+
+        # Features: carry restored entries that still have a leader (or are
+        # manual); evaluate any triple that has no entry yet.
+        features = self._carry_features(prev.features, triples)
+        for key, leaders_list in triples.items():
+            fname, scope_val, scope_id_val = key.split("||")
+            if scope_id_val in features.get(fname, {}).get(scope_val, {}):
+                continue
+            scope_pfx = (
+                "Area " if scope_val == "area" else "Floor " if scope_val == "floor" else ""
+            )
+            mode = modes.get(key, "leader")
+            values: list[bool] = []
+            latest_eid = leaders_list[0]
+            latest_ts = -1.0
+            for eid in leaders_list:
+                st = self._hass.states.get(eid)
+                cv = _leader_value(st)
+                values.append(self._eval_leader(eid, scope_pfx, fname, cv, ""))
+                ts = leaders.get(eid, {}).get("last_changed_timestamp", 0) or 0
+                if ts > latest_ts:
+                    latest_ts = ts
+                    latest_eid = eid
+            if mode == "all":
+                enabled = all(values)
+            elif mode == "any":
+                enabled = any(values)
+            else:  # leader mode: use the most recently changed leader
+                idx = leaders_list.index(latest_eid)
+                enabled = values[idx]
+            features.setdefault(fname, {}).setdefault(scope_val, {})[
+                scope_id_val
+            ] = {
+                "enabled": enabled,
+                "mode": mode,
+                "last_changed_timestamp": (
+                    latest_ts if latest_ts > 0 else _now_ts()
+                ),
+                "triggering_leader": latest_eid,
+            }
+
+        return FeaturesSnapshot(
+            leaders=leaders, features=features, snapshots=prev.snapshots
+        )
+
     # ── reducers ────────────────────────────────────────────────────────
     def reduce_state_changed(
+
         self,
         prev: FeaturesSnapshot,
         entity_id: str,

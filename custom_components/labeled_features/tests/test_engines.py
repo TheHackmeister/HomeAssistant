@@ -166,7 +166,101 @@ def test_snapshot_set_and_clear(fake_registry):
     assert "sleep_timeout" not in cleared.snapshots
 
 
+def test_seed_populates_leaders_and_features(fake_registry):
+    hass = FakeHass()
+    store = fake_registry
+    eid1 = "binary_sensor.front_door"
+    eid2 = "input_select.house_mode"
+    store["label_entities"]["feature_leader"] = [eid1, eid2]
+    store["entity_labels"][eid1] = ["Leader: Open Door"]
+    store["entity_labels"][eid2] = ["Leader: Night", "Night Enable: Sleeping"]
+    hass.states.set(FakeState(eid1, "on"))
+    hass.states.set(FakeState(eid2, "Sleeping"))
+
+    engine = FeaturesEngine(hass, "feature_leader", "sensor.labeled_features_state")
+    snap = engine.seed(FeaturesSnapshot())
+
+    assert set(snap.leaders) == {eid1, eid2}
+    assert snap.leaders[eid1]["current_value"] == "on"
+    assert snap.leaders[eid2]["current_value"] == "Sleeping"
+    assert snap.features["Open Door"]["global"][""]["enabled"] is True
+    assert snap.features["Night"]["global"][""]["enabled"] is True
+
+
+def test_seed_preserves_manual_override(fake_registry):
+    hass = FakeHass()
+    store = fake_registry
+    eid = "binary_sensor.front_door"
+    store["label_entities"]["feature_leader"] = [eid]
+    store["entity_labels"][eid] = ["Leader: Open Door"]
+    hass.states.set(FakeState(eid, "off"))
+
+    prev = FeaturesSnapshot(
+        features={
+            "Open Door": {
+                "global": {
+                    "": {
+                        "enabled": True,
+                        "mode": "leader",
+                        "last_changed_timestamp": 42.0,
+                        "triggering_leader": "",  # manual
+                    }
+                }
+            }
+        },
+        snapshots={"sleep_timeout": {"volume": 0.4}},
+    )
+    engine = FeaturesEngine(hass, "feature_leader", "sensor.labeled_features_state")
+    snap = engine.seed(prev)
+
+    # Manual override wins over the seeded (off → False) evaluation.
+    entry = snap.features["Open Door"]["global"][""]
+    assert entry["enabled"] is True
+    assert entry["triggering_leader"] == ""
+    # Snapshots pass through untouched.
+    assert snap.snapshots == {"sleep_timeout": {"volume": 0.4}}
+
+
+def test_seed_skips_unreal_current_value(fake_registry):
+    hass = FakeHass()
+    store = fake_registry
+    eid = "sensor.flaky"
+    store["label_entities"]["feature_leader"] = [eid]
+    store["entity_labels"][eid] = ["Leader: Flaky"]
+    hass.states.set(FakeState(eid, "unavailable"))
+
+    engine = FeaturesEngine(hass, "feature_leader", "sensor.labeled_features_state")
+    snap = engine.seed(FeaturesSnapshot())
+    assert snap.leaders[eid]["current_value"] == ""
+
+
+def test_reseed_picks_up_new_leader(fake_registry):
+    hass = FakeHass()
+    store = fake_registry
+    eid1 = "binary_sensor.front_door"
+    store["label_entities"]["feature_leader"] = [eid1]
+    store["entity_labels"][eid1] = ["Leader: Open Door"]
+    hass.states.set(FakeState(eid1, "on"))
+
+    engine = FeaturesEngine(hass, "feature_leader", "sensor.labeled_features_state")
+    snap = engine.seed(FeaturesSnapshot())
+    assert set(snap.leaders) == {eid1}
+
+    # A second entity gets labeled later.
+    eid2 = "binary_sensor.back_door"
+    store["label_entities"]["feature_leader"] = [eid1, eid2]
+    store["entity_labels"][eid2] = ["Leader: Back Door"]
+    hass.states.set(FakeState(eid2, "off"))
+
+    snap2 = engine.seed(snap)
+    assert set(snap2.leaders) == {eid1, eid2}
+    assert snap2.features["Back Door"]["global"][""]["enabled"] is False
+    # Existing seeded entries carry through untouched.
+    assert snap2.leaders[eid1] == snap.leaders[eid1]
+
+
 def test_area_label_map_area_scope(fake_registry):
+
     hass = FakeHass()
     store = fake_registry
     store["label_areas"]["feature_leader"] = ["tv_room"]
