@@ -823,7 +823,7 @@ rest_command:
     headers:
       Content-Type: application/json
     payload: >
-      {"template": "{{ label_template }}", "fields": {{ fields }}, "send": true}
+      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | default(12) | int }}, "fields": {{ fields }}, "send": true}
 
   render_label:
     url: https://brother-ptouch-automation.spencerslab.com/render
@@ -831,7 +831,7 @@ rest_command:
     headers:
       Content-Type: application/json
     payload: >
-      {"template": "{{ label_template }}", "fields": {{ fields }}}
+      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | default(12) | int }}, "fields": {{ fields }}}
 
   label_printer_health:
     url: https://brother-ptouch-automation.spencerslab.com/health

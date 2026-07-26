@@ -6957,3 +6957,308 @@ labeled_feature_symfonisk:
 
         # All other events (*_initial_press, *_long_release) have no
         # `choose:` branch and fall through silently.
+print_label:
+  alias: 'Label: Print'
+  description: >-
+    Generic label printer for the Brother P-Touch service. Pick a template,
+    fill in the common fields (name/date/icon), and optionally merge in
+    arbitrary extra fields. Set send=true to actually print, false to dry-run
+    render. Template list captured from GET /templates on 2026-07-26 — update
+    the select options if the API adds templates.
+  mode: single
+  icon: mdi:label-printer
+  fields:
+    template:
+      name: Template
+      description: Label template (category/name)
+      required: true
+      selector:
+        select:
+          options:
+            - kitchen/pantry_jar
+            - kitchen/spice
+            - kitchen/leftover
+            - kitchen/freezer
+            - electronics/component_bin
+            - electronics/cable_flag
+            - electronics/psu_polarity
+            - three_d_printing/filament_spool
+            - three_d_printing/print_bin
+            - three_d_printing/tool_tag
+            - utility/qr
+            - utility/image
+            - garden/seed_packet
+            - garden/plant_tag
+            - garden/row_marker
+            - networking/patch_port
+            - networking/rack_unit
+            - networking/wap_location
+            - workshop/hazard
+            - workshop/tool_id
+            - workshop/torque_cal
+            - workshop/first_aid
+            - home_inventory/moving_box
+            - home_inventory/warranty
+            - home_inventory/storage_bin
+            - media/bookshelf_tag
+            - media/archive_box
+            - media/cd_record
+            - pet/collar_backup
+            - pet/med_schedule
+            - pet/food_bowl
+            - travel/luggage_tag
+            - travel/gear_bag
+            - travel/power_bank
+            - calibration/instrument_cal
+            - calibration/cert_id
+            - calibration/thermometer_cal
+    tape_mm:
+      name: Tape width (mm)
+      description: Loaded tape width
+      required: true
+      default: '24'
+      selector:
+        select:
+          options:
+            - '3.5'
+            - '12'
+            - '18'
+            - '24'
+    send:
+      name: Send to printer
+      description: >-
+        true = actually print (POST /print with send:true). false = dry-run
+        render (POST /render, returns PNG).
+      required: true
+      default: false
+      selector:
+        boolean: {}
+    name:
+      name: Name / primary text
+      description: >-
+        Generic primary text. Mapped per-template (e.g. -> variety for
+        garden/seed_packet, -> contents for kitchen/leftover). Ignored for
+        templates with no obvious primary field; use extra_fields there.
+      required: false
+      selector:
+        text: {}
+    date:
+      name: Date
+      description: >-
+        Generic date string. Mapped per-template (e.g. -> purchased for
+        kitchen/pantry_jar, -> sow_by for garden/seed_packet). Free text
+        because some templates want YYYY-MM or YYYY.
+      required: false
+      selector:
+        text: {}
+    icon:
+      name: Icon
+      description: Lucide icon name. Passed as 'icon'.
+      required: false
+      selector:
+        select:
+          options:
+            - antenna
+            - apple
+            - arrow-right
+            - arrow-up-right
+            - banana
+            - barcode
+            - battery
+            - beef
+            - biohazard
+            - bluetooth
+            - book
+            - bookmark
+            - box
+            - briefcase
+            - cable
+            - calendar
+            - carrot
+            - cat
+            - check
+            - chef-hat
+            - cherry
+            - circle
+            - clipboard-check
+            - clock
+            - coffee
+            - cog
+            - compass
+            - cookie
+            - cpu
+            - croissant
+            - dog
+            - drill
+            - droplets
+            - egg
+            - file-text
+            - fish
+            - flame
+            - flower-2
+            - gauge
+            - globe
+            - grape
+            - hammer
+            - hard-drive
+            - heart
+            - info
+            - key
+            - leaf
+            - lock
+            - luggage
+            - map
+            - map-pin
+            - milk
+            - monitor
+            - network
+            - package
+            - paintbrush
+            - paw-print
+            - pill
+            - plane
+            - plug
+            - printer
+            - qr-code
+            - router
+            - ruler
+            - salad
+            - scale
+            - scissors
+            - server
+            - server-cog
+            - shield
+            - signal
+            - snowflake
+            - sprout
+            - square
+            - star
+            - sun
+            - syringe
+            - tag
+            - tent
+            - thermometer
+            - tree-pine
+            - triangle
+            - usb
+            - utensils
+            - wheat
+            - wifi
+            - wrench
+            - x
+            - zap
+    extra_fields:
+      name: Extra fields
+      description: >-
+        Arbitrary dict merged into the API 'fields' object. Wins on key
+        collision with name/date/icon mappings.
+      required: false
+      default: {}
+      selector:
+        object: {}
+  sequence:
+    - variables:
+        name_map:
+          kitchen/pantry_jar: name
+          kitchen/spice: name
+          kitchen/leftover: contents
+          kitchen/freezer: contents
+          electronics/component_bin: value
+          electronics/cable_flag: title
+          electronics/psu_polarity: null
+          three_d_printing/filament_spool: material
+          three_d_printing/print_bin: part
+          three_d_printing/tool_tag: tool
+          utility/qr: data
+          utility/image: path
+          garden/seed_packet: variety
+          garden/plant_tag: name
+          garden/row_marker: crop
+          networking/patch_port: port
+          networking/rack_unit: device
+          networking/wap_location: name
+          workshop/hazard: text
+          workshop/tool_id: name
+          workshop/torque_cal: tool
+          workshop/first_aid: kit
+          home_inventory/moving_box: contents
+          home_inventory/warranty: item
+          home_inventory/storage_bin: contents
+          media/bookshelf_tag: title
+          media/archive_box: label
+          media/cd_record: title
+          pet/collar_backup: name
+          pet/med_schedule: pet
+          pet/food_bowl: pet
+          travel/luggage_tag: name
+          travel/gear_bag: bag
+          travel/power_bank: capacity_mah
+          calibration/instrument_cal: instrument
+          calibration/cert_id: cert_no
+          calibration/thermometer_cal: instrument
+        date_map:
+          kitchen/pantry_jar: purchased
+          kitchen/spice: best_by
+          kitchen/leftover: cooked
+          kitchen/freezer: frozen
+          electronics/component_bin: null
+          electronics/cable_flag: date
+          electronics/psu_polarity: null
+          three_d_printing/filament_spool: opened
+          three_d_printing/print_bin: null
+          three_d_printing/tool_tag: null
+          utility/qr: null
+          utility/image: null
+          garden/seed_packet: sow_by
+          garden/plant_tag: planted
+          garden/row_marker: null
+          networking/patch_port: null
+          networking/rack_unit: null
+          networking/wap_location: null
+          workshop/hazard: null
+          workshop/tool_id: null
+          workshop/torque_cal: last_cal
+          workshop/first_aid: expires
+          home_inventory/moving_box: null
+          home_inventory/warranty: expires
+          home_inventory/storage_bin: null
+          media/bookshelf_tag: null
+          media/archive_box: retain_until
+          media/cd_record: year
+          pet/collar_backup: null
+          pet/med_schedule: null
+          pet/food_bowl: null
+          travel/luggage_tag: null
+          travel/gear_bag: null
+          travel/power_bank: charged
+          calibration/instrument_cal: next_due
+          calibration/cert_id: null
+          calibration/thermometer_cal: checked
+        name_key: '{{ name_map.get(template) }}'
+        date_key: '{{ date_map.get(template) }}'
+        fields: >-
+          {% set f = (extra_fields | default({}, true)) | dictsort %}
+          {% set f = dict(f) %}
+          {% if name is defined and name and name_key and name_key not in f %}
+            {% set f = dict(f, **{name_key: name}) %}
+          {% endif %}
+          {% if date is defined and date and date_key and date_key not in f %}
+            {% set f = dict(f, **{date_key: date}) %}
+          {% endif %}
+          {% if icon is defined and icon and 'icon' not in f %}
+            {% set f = dict(f, **{'icon': icon}) %}
+          {% endif %}
+          {{ f }}
+    - if: '{{ send }}'
+      then:
+        - action: rest_command.print_label
+          data:
+            label_template: '{{ template }}'
+            tape_mm: '{{ tape_mm | int }}'
+            fields: '{{ fields | to_json }}'
+      else:
+        - action: rest_command.render_label
+          data:
+            label_template: '{{ template }}'
+            tape_mm: '{{ tape_mm | int }}'
+            fields: '{{ fields | to_json }}'
