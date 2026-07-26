@@ -911,11 +911,11 @@ shell_command:
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
   save_label_preview: >
     mkdir -p /config/www/labels &&
-    curl -s -X POST
-    -H "Content-Type: application/json"
-    -d '{"template": "{{ label_template }}", "tape_mm": {{ tape_mm | int }}, "fields": {{ fields }}}'
-    https://brother-ptouch-automation.spencerslab.com/render
-    -o "/config/www/labels/{{ filename }}"
+    python3 /config/scripts/save_label_preview.py
+    "{{ label_template }}"
+    "{{ tape_mm | int }}"
+    '{{ fields }}'
+    "{{ filename }}"
 
 #compensation:
 #device_tracker:
