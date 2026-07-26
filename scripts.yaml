@@ -6968,7 +6968,7 @@ print_label:
   mode: single
   icon: mdi:label-printer
   fields:
-    template:
+    label_template:
       name: Template
       description: Label template (category/name)
       required: true
@@ -7234,8 +7234,8 @@ print_label:
           calibration/instrument_cal: next_due
           calibration/cert_id: null
           calibration/thermometer_cal: checked
-        name_key: '{{ name_map.get(template) }}'
-        date_key: '{{ date_map.get(template) }}'
+        name_key: '{{ name_map.get(label_template) }}'
+        date_key: '{{ date_map.get(label_template) }}'
         fields: >-
           {% set f = (extra_fields | default({}, true)) | dictsort %}
           {% set f = dict(f) %}
@@ -7253,12 +7253,12 @@ print_label:
       then:
         - action: rest_command.print_label
           data:
-            label_template: '{{ template }}'
+            label_template: '{{ label_template }}'
             tape_mm: '{{ tape_mm | int }}'
             fields: '{{ fields | to_json }}'
       else:
         - action: rest_command.render_label
           data:
-            label_template: '{{ template }}'
+            label_template: '{{ label_template }}'
             tape_mm: '{{ tape_mm | int }}'
             fields: '{{ fields | to_json }}'
