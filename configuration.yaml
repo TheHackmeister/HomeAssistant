@@ -917,11 +917,6 @@ shell_command:
     https://brother-ptouch-automation.spencerslab.com/render
     -o "/config/www/labels/{{ filename }}"
 
-camera:
-  - platform: local_file
-    file_path: /config/www/labels/preview.png
-    name: Label Preview
-
 #compensation:
 #device_tracker:
 #  - platform: ping

@@ -7299,13 +7299,13 @@ print_label:
         - action: rest_command.print_label
           data:
             label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | int }}'
+            tape_mm: '{{ tape_mm | default("24") | int }}'
             fields: '{{ fields | to_json }}'
       else:
         - action: shell_command.save_label_preview
           data:
             label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | int }}'
+            tape_mm: '{{ tape_mm | default("24") | int }}'
             fields: '{{ fields | to_json }}'
             filename: '{{ preview_path | default("preview.png") }}'
 preview_label:
@@ -7512,7 +7512,7 @@ preview_label:
     - action: script.print_label
       data:
         label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm }}'
+        tape_mm: '{{ tape_mm | default("24") }}'
         send: false
         name: '{{ name | default("") }}'
         date: '{{ date | default("") }}'
@@ -7724,7 +7724,7 @@ print_label_send:
     - action: script.print_label
       data:
         label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm }}'
+        tape_mm: '{{ tape_mm | default("24") }}'
         send: true
         name: '{{ name | default("") }}'
         date: '{{ date | default("") }}'

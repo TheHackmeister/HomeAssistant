@@ -28,10 +28,6 @@ views:
               perform_action: script.print_label_send
       - type: grid
         cards:
-          - type: picture-entity
-            entity: camera.label_preview
-            name: Preview (camera)
-            show_state: false
           - type: picture
             image: /local/labels/preview.png
-            title: Preview (static)
+            title: Preview
