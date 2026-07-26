@@ -769,6 +769,15 @@ scene: !include scenes.yaml
 frontend:
   themes: !include_dir_merge_named themes
 
+lovelace:
+  dashboards:
+    label-printer:
+      mode: yaml
+      filename: dashboards/label-printer.yaml
+      title: Label Printer
+      icon: mdi:label-printer
+      show_in_sidebar: true
+
 # panel_iframe:
 #   router:
 #     title: "Router"
@@ -900,6 +909,18 @@ rest_command:
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
+  save_label_preview: >
+    mkdir -p /config/www/labels &&
+    curl -s -X POST
+    -H "Content-Type: application/json"
+    -d '{"template": "{{ label_template }}", "tape_mm": {{ tape_mm | int }}, "fields": {{ fields }}}'
+    https://brother-ptouch-automation.spencerslab.com/render
+    -o "/config/www/labels/{{ filename }}"
+
+camera:
+  - platform: local_file
+    file_path: /config/www/labels/preview.png
+    name: Label Preview
 
 #compensation:
 #device_tracker:

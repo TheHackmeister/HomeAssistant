@@ -1,0 +1,41 @@
+views:
+  - type: sections
+    max_columns: 2
+    title: Label Printer
+    path: label-printer
+    sections:
+      - type: grid
+        cards:
+          - type: markdown
+            content: >-
+              ## Label Printer
+
+              **Step 1:** Preview a label — pick a template, fill in the
+              fields, and dry-run. The preview on the right updates.
+
+              **Step 2:** Once the preview looks right, print the same label.
+          - type: button
+            name: Preview Label
+            icon: mdi:image-search
+            tap_action:
+              action: perform-action
+              perform_action: script.print_label
+              data:
+                send: false
+          - type: button
+            name: Print Label
+            icon: mdi:printer
+            tap_action:
+              action: perform-action
+              perform_action: script.print_label
+              data:
+                send: true
+      - type: grid
+        cards:
+          - type: picture-entity
+            entity: camera.label_preview
+            name: Preview (camera)
+            show_state: false
+          - type: picture
+            image: /local/labels/preview.png
+            title: Preview (static)
