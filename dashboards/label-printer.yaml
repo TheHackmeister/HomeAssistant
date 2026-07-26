@@ -19,17 +19,13 @@ views:
             icon: mdi:image-search
             tap_action:
               action: perform-action
-              perform_action: script.print_label
-              data:
-                send: false
+              perform_action: script.preview_label
           - type: button
             name: Print Label
             icon: mdi:printer
             tap_action:
               action: perform-action
-              perform_action: script.print_label
-              data:
-                send: true
+              perform_action: script.print_label_send
       - type: grid
         cards:
           - type: picture-entity
