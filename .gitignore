@@ -11,6 +11,8 @@
 
 .ha_run.lock
 
+.agents/skills/
+
 custom_components/*
 !custom_components/labeled_features/
 **/__pycache__/*
