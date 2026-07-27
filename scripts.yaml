@@ -3472,6 +3472,7 @@ labeled_feature_sleep_timeout:
           payload: {}
       - variables:
           original_volumes: {}
+      - stop: 'Sleep Timeout: re-trigger reset (button pressed mid-fade).'
 
   # ── Step 2: media_player resolution guard.
   #            Routed through the shared Error Mode helper so a
