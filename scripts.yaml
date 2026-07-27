@@ -3042,11 +3042,21 @@ labeled_feature_sleep_timeout:
           1. Wait `sleep_timeout_minutes` (default 15 min)
           2. Halve the volume
           3. Wait 1 min
-          4. Mute
-          5. Seek back 30 s every 30 s × 20 iterations (~10 min)
-          6. Unmute
-          7. Restore to snapshot
-          8. Clear snapshot
+          4. "Mute" via volume_set: 0
+          5. Wait 1 min
+          6. Seek back 30 s every 0.5 s × 20 iterations (~10 s)
+          7. Restore to snapshot (pre-pause)
+          8. Pause (SUPPORT_PAUSE check + 5 s state verification +
+             optional `pause_fallback` dispatch on failure)
+          9. Restore to snapshot again (post-pause)
+          10. Clear snapshot
+
+    Re-trigger prelude: any dispatch arriving while a fade is in flight
+    restores the snapshotted volume but KEEPS the snapshot as the
+    baseline for discrete events (stepping/hold events re-baseline
+    instead) — a mid-fade reset therefore always re-arms at the true
+    original volume rather than re-reading a possibly-stale
+    `volume_level` echo.
 
     The media player to act on is resolved from
     `sensor.labeled_features_state.features[<feature_media_playing>][<scope>][<scope_id>].triggering_leader`
@@ -3191,6 +3201,22 @@ labeled_feature_sleep_timeout:
             - log
             - alert
             - stop
+    pause_fallback:
+      name: Pause Fallback Entity
+      description: >
+        Optional. Entity dispatched when the target player does not
+        advertise SUPPORT_PAUSE, or when the post-pause state
+        verification fails (e.g. lnxlink-style players where
+        `media_player.media_pause` is unreliable). `button.*` entities
+        are pressed; `script.*` entities are turned on — e.g.
+        `button.spencer_laptop_playpause`. Toggle-style fallbacks are
+        deliberately not supported: a toggle would resume an
+        already-paused player. Leave empty to only surface the failure
+        via `error_mode`.
+      required: false
+      default: ''
+      selector:
+        entity: {}
     screen_off_event:
       name: Screen-Off Event
       description: >
@@ -3326,10 +3352,17 @@ labeled_feature_sleep_timeout:
   #
   #   Branch B — discrete event (button short press, Night flip, Media
   #              Playing flip):
-  #     Restore the snapshotted volume, clear the snapshot, and fall
-  #     through to the gate. This is the existing "reset the timer"
-  #     / "cancel the timer" semantic depending on what the gate then
-  #     evaluates to.
+  #     Restore the snapshotted volume and fall through to the gate,
+  #     KEEPING the snapshot as the baseline — no clear, and no
+  #     `volume_level` re-read. Re-reading immediately after the
+  #     restore would race the integration's state echo (lnxlink /
+  #     MQTT players can lag seconds behind a volume_set) and could
+  #     capture the still-halved / still-muted level as the new
+  #     "original", progressively corrupting the baseline toward 0
+  #     on every reset press. The gate then decides the semantic:
+  #     "reset the timer" (re-arm at the true original baseline —
+  #     Step 4 becomes a no-op) or "cancel the timer" (Step 3
+  #     restores again, idempotently, and clears the snapshot).
   #
   # The classifier is `_is_stepping`, which matches the canonical
   # hold-in-progress / just-released event names emitted by the IKEA
@@ -3449,11 +3482,18 @@ labeled_feature_sleep_timeout:
           snapshot_name: sleep_timeout
           payload: '{{ original_volumes }}'
 
-    # ── Branch B — discrete re-trigger: restore + clear ─────────────
+    # ── Branch B — discrete re-trigger: restore (keep baseline) ─────
     - conditions:
       - condition: template
         value_template: '{{ original_volumes | length > 0 }}'
       sequence:
+      # Restore the snapshotted volume(s), but deliberately KEEP the
+      # snapshot — do NOT clear it and do NOT re-read `volume_level`
+      # downstream. (The previous clear + Step-4 re-snapshot raced the
+      # integration's state echo and could bake the halved/muted level
+      # in as the new baseline.) Gate true → Step 4 is a no-op and the
+      # re-armed fade reuses this true original baseline. Gate false →
+      # Step 3 restores again (idempotent) and clears the snapshot.
       - repeat:
           for_each: '{{ original_volumes.keys() | list }}'
           sequence:
@@ -3463,15 +3503,6 @@ labeled_feature_sleep_timeout:
             data:
               volume_level: '{{ original_volumes[repeat.item] }}'
             continue_on_error: true
-      # Clear the persisted snapshot via the shared `Set Snapshot` event
-      # path — empty payload means "drop this snapshot entry."
-      - action: script.labeled_feature_generics
-        data:
-          feature: Set Snapshot
-          snapshot_name: sleep_timeout
-          payload: {}
-      - variables:
-          original_volumes: {}
 
   # ── Step 2: media_player resolution guard.
   #            Routed through the shared Error Mode helper so a
@@ -3545,21 +3576,31 @@ labeled_feature_sleep_timeout:
         Sleep Timeout: cancel-restore
         (night={{ _night_enabled }}, playing={{ _media_playing_enabled }}).
 
-  # ── Step 4: Snapshot if empty.
+  # ── Step 4: Snapshot if the current target isn't baselined yet.
   #            On a `mode: restart` mid-fade Step 0 reads the previously-
   #            persisted snapshot from
   #            `sensor.labeled_features_state.snapshots.sleep_timeout`, so
-  #            `original_volumes` is already non-empty and this is a no-op.
-  #            Otherwise we capture the current volume_level for _mp,
-  #            publish it via `Set Snapshot` so the next `mode: restart`
-  #            re-entry can read it back, and update the local var for
-  #            the rest of the fade.
+  #            `original_volumes` is already non-empty. (Branch B
+  #            deliberately keeps that snapshot, so a mid-fade reset
+  #            re-arms at the true original baseline — never a stale
+  #            `volume_level` re-read.) The keep-test is key-aware
+  #            (`_mp in original_volumes`) rather than length-aware:
+  #            when the Media Playing `triggering_leader` changed
+  #            mid-fade, the kept snapshot is keyed to the OLD player
+  #            — a length-only test would no-op here and Step 5.2's
+  #            `original_volumes[_mp]` would raise on the missing key,
+  #            aborting the fade. Instead we merge the current player's
+  #            baseline in alongside; the old player's entry is kept so
+  #            cancel paths still restore it. On a genuinely fresh run
+  #            (empty snapshot) the merge degenerates to capturing
+  #            `_mp`'s current volume_level alone.
   #
   - variables:
       original_volumes: >-
         {{ original_volumes
-           if (original_volumes | length > 0)
-           else {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
+           if (_mp in original_volumes)
+           else dict(original_volumes,
+             **{_mp: state_attr(_mp, 'volume_level') | float(0.5)}) }}
   - action: script.labeled_feature_generics
     data:
       feature: Set Snapshot
@@ -3652,14 +3693,93 @@ labeled_feature_sleep_timeout:
     data:
       volume_level: '{{ original_volumes[_mp] }}'
     continue_on_error: true
-  # 5.6: Now pause the player. By this point we've seek-back'd well
-  # into the past, and the user explicitly interacted (or the gate
-  # would have cancelled) so the desired end-state is silent +
-  # paused at the restored volume — so the next manual play resumes
-  # at the right level rather than at the muted/halved level.
-  - action: media_player.media_pause
+  # 5.6: Pause the player — guarded. `media_player.media_pause` is
+  # only attempted when the target advertises SUPPORT_PAUSE (bit
+  # 0x01); afterwards we wait up to 5 s for the state to actually
+  # land in a non-playing resting state. When pause is unsupported
+  # (e.g. lnxlink-style players where media_pause is unreliable) or
+  # the verification fails, the failure is surfaced through the
+  # shared Error Mode helper and the optional `pause_fallback`
+  # entity is dispatched (button.* → press, script.* → turn on).
+  # Toggle-style fallbacks are deliberately never used — a toggle
+  # would resume an already-paused player.
+  #
+  # By this point we've seek-back'd well into the past, and the gate
+  # has remained true for the full timeout window, so the desired
+  # end-state is silent + paused at the restored volume — not
+  # silent-then-resume-mid-show.
+  - variables:
+      _pause_supported: >-
+        {{ (state_attr(_mp, 'supported_features') | int(0))
+           | bitwise_and(1) > 0 }}
+      _pause_fallback: '{{ (pause_fallback | default("") | string | trim) }}'
+  - if:
+    - condition: template
+      value_template: '{{ _pause_supported }}'
+    then:
+    - action: media_player.media_pause
+      target:
+        entity_id: '{{ _mp }}'
+      continue_on_error: true
+    - wait_template: '{{ states(_mp) in [''paused'', ''idle'', ''off'', ''standby''] }}'
+      timeout:
+        seconds: 5
+      continue_on_timeout: true
+  - variables:
+      _pause_landed: '{{ states(_mp) in [''paused'', ''idle'', ''off'', ''standby''] }}'
+  - if:
+    - condition: template
+      value_template: '{{ not _pause_landed }}'
+    then:
+    - action: script.labeled_feature_error_mode
+      data:
+        error_mode: '{{ _err_mode }}'
+        source: Labeled Feature Sleep Timeout
+        message: >-
+          Pause did not land on {{ _mp }}
+          (SUPPORT_PAUSE advertised={{ _pause_supported }},
+          current state={{ states(_mp) }}).
+    - if:
+      - condition: template
+        value_template: '{{ _pause_fallback != "" }}'
+      then:
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ _pause_fallback.startswith("button.") }}'
+          sequence:
+          - action: button.press
+            target:
+              entity_id: '{{ _pause_fallback }}'
+            continue_on_error: true
+        - conditions:
+          - condition: template
+            value_template: '{{ _pause_fallback.startswith("script.") }}'
+          sequence:
+          - action: script.turn_on
+            target:
+              entity_id: '{{ _pause_fallback }}'
+            continue_on_error: true
+        default:
+        - action: script.labeled_feature_error_mode
+          data:
+            error_mode: '{{ _err_mode }}'
+            source: Labeled Feature Sleep Timeout
+            message: >-
+              pause_fallback '{{ _pause_fallback }}' is not a button.* or
+              script.* entity; not dispatched.
+  # 5.7: Restore the snapshot's volume AGAIN, after the pause
+  # (belt-and-suspenders). Integrations that only accept volume
+  # writes while playing already got the 5.5 restore; integrations
+  # that dropped or clamped the write while playing-muted get a
+  # second chance now that the player is paused. Where a paused
+  # player rejects volume_set this is a harmless no-op
+  # (continue_on_error) and the 5.5 restore still stands.
+  - action: media_player.volume_set
     target:
       entity_id: '{{ _mp }}'
+    data:
+      volume_level: '{{ original_volumes[_mp] }}'
     continue_on_error: true
 
   # ── Step 6: Natural completion — clear snapshot so the next fresh
