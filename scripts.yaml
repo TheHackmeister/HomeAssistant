@@ -3449,7 +3449,12 @@ labeled_feature_sleep_timeout:
           snapshot_name: sleep_timeout
           payload: '{{ original_volumes }}'
 
-    # ── Branch B — discrete re-trigger: restore + clear ─────────────
+    # ── Branch B — discrete re-trigger: restore only ─────────────
+    # Restore the snapshotted volume but DO NOT clear the snapshot.
+    # The snapshot must persist so that if the script restarts again
+    # (e.g., another button press during fade), the restarted instance
+    # can read the original volume and restore it. The snapshot is only
+    # cleared when the gate cancels (Step 3) or the fade completes (Step 6).
     - conditions:
       - condition: template
         value_template: '{{ original_volumes | length > 0 }}'
@@ -3463,15 +3468,6 @@ labeled_feature_sleep_timeout:
             data:
               volume_level: '{{ original_volumes[repeat.item] }}'
             continue_on_error: true
-      # Clear the persisted snapshot via the shared `Set Snapshot` event
-      # path — empty payload means "drop this snapshot entry."
-      - action: script.labeled_feature_generics
-        data:
-          feature: Set Snapshot
-          snapshot_name: sleep_timeout
-          payload: {}
-      - variables:
-          original_volumes: {}
 
   # ── Step 2: media_player resolution guard.
   #            Routed through the shared Error Mode helper so a
@@ -3550,6 +3546,10 @@ labeled_feature_sleep_timeout:
   #            persisted snapshot from
   #            `sensor.labeled_features_state.snapshots.sleep_timeout`, so
   #            `original_volumes` is already non-empty and this is a no-op.
+  #            On a discrete re-trigger (Branch B), the snapshot is kept
+  #            intact so the restarted instance preserves the original
+  #            volume baseline. Only cleared on cancel (Step 3) or
+  #            completion (Step 6).
   #            Otherwise we capture the current volume_level for _mp,
   #            publish it via `Set Snapshot` so the next `mode: restart`
   #            re-entry can read it back, and update the local var for
