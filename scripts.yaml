@@ -3247,6 +3247,18 @@ labeled_feature_sleep_timeout:
       _original_volumes_raw: '{{ _snapshots.get("sleep_timeout", {}) }}'
   - variables:
       original_volumes: '{{ _original_volumes_raw if _original_volumes_raw is mapping else {} }}'
+  # ── Diagnostic: log what Step 0 read so we can confirm the snapshot
+  #    is visible on restart. Remove after confirming the fix.
+  - action: system_log.write
+    data:
+      level: info
+      message: >-
+        Sleep Timeout Step 0:
+        snapshots_is_mapping={{ _snapshots_raw is mapping }},
+        snapshots_keys={{ _snapshots.keys() | list }},
+        original_volumes_is_mapping={{ _original_volumes_raw is mapping }},
+        original_volumes={{ original_volumes }},
+        original_volumes_length={{ original_volumes | length }}
 
   # ── Step 1: normalize inputs and read the gate signals fresh.
   #            The media player target is resolved from the
@@ -3478,6 +3490,14 @@ labeled_feature_sleep_timeout:
       - condition: template
         value_template: '{{ original_volumes | length > 0 }}'
       sequence:
+      # ── Diagnostic: log Branch B entry. Remove after confirming the fix.
+      - action: system_log.write
+        data:
+          level: info
+          message: >-
+            Sleep Timeout Branch B: restoring snapshot
+            original_volumes={{ original_volumes }},
+            current_volumes={% set ns = namespace(out={}) %}{% for eid in original_volumes.keys() %}{% set ns.out = dict(ns.out, **{eid: state_attr(eid, 'volume_level')}) %}{% endfor %}{{ ns.out }}
       - repeat:
           for_each: '{{ original_volumes.keys() | list }}'
           sequence:
@@ -3577,6 +3597,13 @@ labeled_feature_sleep_timeout:
       feature: Set Snapshot
       snapshot_name: sleep_timeout
       payload: '{{ original_volumes }}'
+  # ── Diagnostic: confirm what was written. Remove after confirming the fix.
+  - action: system_log.write
+    data:
+      level: info
+      message: >-
+        Sleep Timeout Step 4: wrote snapshot original_volumes={{ original_volumes }},
+        _mp={{ _mp }}, current_volume={{ state_attr(_mp, 'volume_level') }}
 
   # ── Step 5: Fade sequence.
   #
@@ -3664,6 +3691,14 @@ labeled_feature_sleep_timeout:
     data:
       volume_level: '{{ original_volumes[_mp] }}'
     continue_on_error: true
+  # ── Diagnostic: confirm the restore target. Remove after confirming the fix.
+  - action: system_log.write
+    data:
+      level: info
+      message: >-
+        Sleep Timeout Step 5.5: restoring volume to {{ original_volumes[_mp] }},
+        original_volumes={{ original_volumes }},
+        current_volume_before={{ state_attr(_mp, 'volume_level') }}
   # 5.6: Now pause the player. By this point we've seek-back'd well
   # into the past, and the user explicitly interacted (or the gate
   # would have cancelled) so the desired end-state is silent +
