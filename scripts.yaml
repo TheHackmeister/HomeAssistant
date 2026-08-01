@@ -3245,8 +3245,35 @@ labeled_feature_sleep_timeout:
       _snapshots: '{{ _snapshots_raw if _snapshots_raw is mapping else {} }}'
   - variables:
       _original_volumes_raw: '{{ _snapshots.get("sleep_timeout", {}) }}'
+  # ── Step 0b: Read the snapshot timestamp for staleness detection.
+  #            The timestamp is stored as `__ts__` inside the
+  #            `sleep_timeout` snapshot dict. A snapshot is stale if
+  #            it was written more than (sleep_timeout_minutes + 5)
+  #            minutes ago — longer than any possible fade sequence.
+  #            Stale snapshots are from previous tests or interrupted
+  #            runs and must be ignored so Branch B doesn't "restore"
+  #            to a phantom baseline.
   - variables:
-      original_volumes: '{{ _original_volumes_raw if _original_volumes_raw is mapping else {} }}'
+      _snapshot_ts: '{{ _original_volumes_raw.get("__ts__", 0) | float(0) if _original_volumes_raw is mapping else 0 }}'
+      _now_ts: '{{ now().timestamp() }}'
+      _stale_threshold_seconds: '{{ ((sleep_timeout_minutes | default(15) | int) + 5) * 60 }}'
+      _snapshot_age_seconds: '{{ _now_ts - _snapshot_ts }}'
+      _snapshot_is_stale: '{{ _snapshot_ts == 0 or _snapshot_age_seconds > _stale_threshold_seconds }}'
+  # Build original_volumes by filtering out the __ts__ key, and
+  # clearing the whole thing if the snapshot is stale.
+  - variables:
+      original_volumes: >-
+        {% if _snapshot_is_stale or not (_original_volumes_raw is mapping) %}
+          {{ {} }}
+        {% else %}
+          {% set ns = namespace(out={}) %}
+          {% for k, v in _original_volumes_raw.items() %}
+            {% if k != '__ts__' %}
+              {% set ns.out = dict(ns.out, **{k: v}) %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.out }}
+        {% endif %}
   # ── Diagnostic: log what Step 0 read so we can confirm the snapshot
   #    is visible on restart. Remove after confirming the fix.
   - action: system_log.write
@@ -3254,11 +3281,12 @@ labeled_feature_sleep_timeout:
       level: warning
       message: >-
         Sleep Timeout Step 0:
-        snapshots_is_mapping={{ _snapshots_raw is mapping }},
         snapshots_keys={{ _snapshots.keys() | list }},
-        original_volumes_is_mapping={{ _original_volumes_raw is mapping }},
         original_volumes={{ original_volumes }},
-        original_volumes_length={{ original_volumes | length }}
+        snapshot_ts={{ _snapshot_ts }},
+        snapshot_age_seconds={{ _snapshot_age_seconds | round(1) }},
+        stale_threshold={{ _stale_threshold_seconds }},
+        is_stale={{ _snapshot_is_stale }}
 
   # ── Step 1: normalize inputs and read the gate signals fresh.
   #            The media player target is resolved from the
@@ -3474,11 +3502,18 @@ labeled_feature_sleep_timeout:
                 **{eid: state_attr(eid, 'volume_level') | float(original_volumes[eid])}) %}
             {% endfor %}
             {{ ns.out }}
+      - variables:
+          _snapshot_payload: >-
+            {% set ns = namespace(out={__ts__: now().timestamp()}) %}
+            {% for k, v in original_volumes.items() %}
+              {% set ns.out = dict(ns.out, **{k: v}) %}
+            {% endfor %}
+            {{ ns.out }}
       - action: script.labeled_feature_generics
         data:
           feature: Set Snapshot
           snapshot_name: sleep_timeout
-          payload: '{{ original_volumes }}'
+          payload: '{{ _snapshot_payload }}'
 
     # ── Branch B — discrete re-trigger: restore only ─────────────
     # Restore the snapshotted volume but DO NOT clear the snapshot.
@@ -3586,23 +3621,35 @@ labeled_feature_sleep_timeout:
   #            publish it via `Set Snapshot` so the next `mode: restart`
   #            re-entry can read it back, and update the local var for
   #            the rest of the fade.
+  #            We also embed `__ts__` (Unix epoch seconds) in the snapshot
+  #            dict so Step 0 can detect stale snapshots from previous
+  #            tests. The `__ts__` key is filtered out at Step 0 so it
+  #            never reaches the volume restore loops.
   #
   - variables:
       original_volumes: >-
         {{ original_volumes
            if (original_volumes | length > 0)
            else {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
+  - variables:
+      _snapshot_payload: >-
+        {% set ns = namespace(out={__ts__: now().timestamp()}) %}
+        {% for k, v in original_volumes.items() %}
+          {% set ns.out = dict(ns.out, **{k: v}) %}
+        {% endfor %}
+        {{ ns.out }}
   - action: script.labeled_feature_generics
     data:
       feature: Set Snapshot
       snapshot_name: sleep_timeout
-      payload: '{{ original_volumes }}'
+      payload: '{{ _snapshot_payload }}'
   # ── Diagnostic: confirm what was written. Remove after confirming the fix.
   - action: system_log.write
     data:
       level: warning
       message: >-
-        Sleep Timeout Step 4: wrote snapshot original_volumes={{ original_volumes }},
+        Sleep Timeout Step 4: wrote snapshot payload={{ _snapshot_payload }},
+        original_volumes={{ original_volumes }},
         _mp={{ _mp }}, current_volume={{ state_attr(_mp, 'volume_level') }}
 
   # ── Step 5: Fade sequence.
