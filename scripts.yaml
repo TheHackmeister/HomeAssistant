@@ -3304,6 +3304,23 @@ labeled_feature_sleep_timeout:
   - variables:
       _should_run: '{{ _mp != "" and _night_enabled and _media_playing_enabled }}'
 
+  # ── Step 2 (early): Snapshot the current volume immediately after
+  #            resolving _mp. This is the single source of truth for
+  #            the "original" volume. It is persisted to the sensor
+  #            attribute so it survives `mode: restart` re-entries.
+  #            Must happen BEFORE any delay or fade so that every
+  #            dispatch — including re-triggers mid-fade — has a valid
+  #            baseline to restore from.
+  - if:
+    - condition: template
+      value_template: '{{ _mp != "" and original_volumes | length == 0 }}'
+    then:
+    - action: script.labeled_feature_generics
+      data:
+        feature: Set Snapshot
+        snapshot_name: sleep_timeout
+        payload: '{{ {_mp: state_attr(_mp, "volume_level") | float(0.5)} }}'
+
   # ── Step 1b: Re-trigger prelude — two branches.
   #
   # ANY dispatch arriving while a fade is in flight is treated as user
@@ -3326,10 +3343,12 @@ labeled_feature_sleep_timeout:
   #
   #   Branch B — discrete event (button short press, Night flip, Media
   #              Playing flip):
-  #     Restore the snapshotted volume, clear the snapshot, and fall
-  #     through to the gate. This is the existing "reset the timer"
-  #     / "cancel the timer" semantic depending on what the gate then
-  #     evaluates to.
+  #     Restore the snapshotted volume and fall through to the gate.
+  #     The snapshot is NOT cleared here — it survives until the fade
+  #     completes naturally (Step 6) so the fade sequence can restore
+  #     to the original volume. If the gate cancels (Step 3), the
+  #     restored volume is set but the snapshot persists for the next
+  #     full run.
   #
   # The classifier is `_is_stepping`, which matches the canonical
   # hold-in-progress / just-released event names emitted by the IKEA
@@ -3500,8 +3519,9 @@ labeled_feature_sleep_timeout:
 
   # ── Step 3: Cancel-restore branch.
   #            Idempotent — if no snapshot exists this is a no-op.
-  #            Always clears the snapshot at the end so the next
-  #            fresh run re-snapshots cleanly.
+  #            The snapshot is NOT cleared here — it must survive until
+  #            the fade completes naturally (Step 6) so that the fade
+  #            sequence can restore to the original volume.
   - if:
     - condition: template
       value_template: '{{ not _should_run }}'
@@ -3528,13 +3548,6 @@ labeled_feature_sleep_timeout:
             data:
               volume_level: '{{ original_volumes[repeat.item] }}'
             continue_on_error: true
-    # Clear the persisted snapshot so the next fresh full-run
-    # re-snapshots cleanly.
-    - action: script.labeled_feature_generics
-      data:
-        feature: Set Snapshot
-        snapshot_name: sleep_timeout
-        payload: {}
     - variables:
         original_volumes: {}
     - stop: >-
@@ -3548,8 +3561,7 @@ labeled_feature_sleep_timeout:
   #            `original_volumes` is already non-empty and this is a no-op.
   #            On a discrete re-trigger (Branch B), the snapshot is kept
   #            intact so the restarted instance preserves the original
-  #            volume baseline. Only cleared on cancel (Step 3) or
-  #            completion (Step 6).
+  #            volume baseline. Only cleared on natural completion (Step 6).
   #            Otherwise we capture the current volume_level for _mp,
   #            publish it via `Set Snapshot` so the next `mode: restart`
   #            re-entry can read it back, and update the local var for
