@@ -3258,7 +3258,7 @@ labeled_feature_sleep_timeout:
       _now_ts: '{{ now().timestamp() }}'
       _stale_threshold_seconds: '{{ ((sleep_timeout_minutes | default(15) | int) + 5) * 60 }}'
       _snapshot_age_seconds: '{{ _now_ts - _snapshot_ts }}'
-      _snapshot_is_stale: '{{ _snapshot_ts == 0 or _snapshot_age_seconds > _stale_threshold_seconds }}'
+      _snapshot_is_stale: '{{ _snapshot_ts > 0 and _snapshot_age_seconds > _stale_threshold_seconds }}'
   # Build original_volumes by filtering out the __ts__ key, and
   # clearing the whole thing if the snapshot is stale.
   - variables:
@@ -3504,7 +3504,7 @@ labeled_feature_sleep_timeout:
             {{ ns.out }}
       - variables:
           _snapshot_payload: >-
-            {% set ns = namespace(out={__ts__: now().timestamp()}) %}
+            {% set ns = namespace(out={'__ts__': now().timestamp()}) %}
             {% for k, v in original_volumes.items() %}
               {% set ns.out = dict(ns.out, **{k: v}) %}
             {% endfor %}
@@ -3633,7 +3633,7 @@ labeled_feature_sleep_timeout:
            else {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
   - variables:
       _snapshot_payload: >-
-        {% set ns = namespace(out={__ts__: now().timestamp()}) %}
+        {% set ns = namespace(out={'__ts__': now().timestamp()}) %}
         {% for k, v in original_volumes.items() %}
           {% set ns.out = dict(ns.out, **{k: v}) %}
         {% endfor %}
