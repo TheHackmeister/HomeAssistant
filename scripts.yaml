@@ -3251,7 +3251,7 @@ labeled_feature_sleep_timeout:
   #    is visible on restart. Remove after confirming the fix.
   - action: system_log.write
     data:
-      level: info
+      level: warning
       message: >-
         Sleep Timeout Step 0:
         snapshots_is_mapping={{ _snapshots_raw is mapping }},
@@ -3493,7 +3493,7 @@ labeled_feature_sleep_timeout:
       # ── Diagnostic: log Branch B entry. Remove after confirming the fix.
       - action: system_log.write
         data:
-          level: info
+          level: warning
           message: >-
             Sleep Timeout Branch B: restoring snapshot
             original_volumes={{ original_volumes }},
@@ -3600,7 +3600,7 @@ labeled_feature_sleep_timeout:
   # ── Diagnostic: confirm what was written. Remove after confirming the fix.
   - action: system_log.write
     data:
-      level: info
+      level: warning
       message: >-
         Sleep Timeout Step 4: wrote snapshot original_volumes={{ original_volumes }},
         _mp={{ _mp }}, current_volume={{ state_attr(_mp, 'volume_level') }}
@@ -3694,7 +3694,7 @@ labeled_feature_sleep_timeout:
   # ── Diagnostic: confirm the restore target. Remove after confirming the fix.
   - action: system_log.write
     data:
-      level: info
+      level: warning
       message: >-
         Sleep Timeout Step 5.5: restoring volume to {{ original_volumes[_mp] }},
         original_volumes={{ original_volumes }},
