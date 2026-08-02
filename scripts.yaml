@@ -3423,8 +3423,7 @@ labeled_feature_sleep_timeout:
   - variables:
       _trigger_state: '{{ _leader_entry.get("current_value", "") | string | lower }}'
       _is_stepping: >-
-        {{ _trigger_state | regex_search('(long_press|long_release|hold|_move_)')
-           is not none }}
+        {{ 'long_press' in _trigger_state or 'long_release' in _trigger_state or 'hold' in _trigger_state or '_move_' in _trigger_state }}
 
   # ── Step 1c: Configured button event in Night mode → disable Area Screen.
   # Dispatches `feature: <screen_off_feature>` directly through
@@ -3486,7 +3485,7 @@ labeled_feature_sleep_timeout:
     # ── Branch A — stepping in progress: re-baseline snapshot ────────
     - conditions:
       - condition: template
-        value_template: '{{ original_volumes | length > 0 and _is_stepping }}'
+        value_template: '{{ original_volumes | length > 0 and _is_stepping and _should_run }}'
       sequence:
       # Re-read each snapshotted entity's current volume_level. The hold
       # loop in `labeled_feature_generics` writes the new absolute value
