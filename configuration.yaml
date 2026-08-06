@@ -826,13 +826,17 @@ sensor:
 
 rest_command:
 
+  # tape_mm arrives as a string from input_select/script fields. Route it
+  # through float|round|int because `'3.5' | int` fails to parse in Jinja and
+  # silently renders the default (0). `default(24, true)` also falls back on
+  # empty string, not just undefined. The API maps 3/4 -> 4mm tape itself.
   print_label:
     url: https://brother-ptouch-automation.spencerslab.com/print
     method: POST
     headers:
       Content-Type: application/json
     payload: >
-      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | default(12) | int }}, "fields": {{ fields }}, "send": true}
+      {"template": {{ label_template | to_json }}, "tape_mm": {{ tape_mm | default(24, true) | float | round(0) | int }}, "fields": {{ fields }}, "send": true}
 
   render_label:
     url: https://brother-ptouch-automation.spencerslab.com/render
@@ -840,7 +844,7 @@ rest_command:
     headers:
       Content-Type: application/json
     payload: >
-      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | default(12) | int }}, "fields": {{ fields }}, "format": "base64"}
+      {"template": {{ label_template | to_json }}, "tape_mm": {{ tape_mm | default(24, true) | float | round(0) | int }}, "fields": {{ fields }}, "format": "base64"}
 
   label_printer_health:
     url: https://brother-ptouch-automation.spencerslab.com/health
@@ -909,9 +913,13 @@ rest_command:
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
-  save_label_preview: >
-    mkdir -p /config/www/labels &&
-    printf '%s' '{{ b64 }}' | base64 -d > "/config/www/labels/{{ filename }}"
+  # Wrapped in `sh -c` because HA renders templated shell_commands and then
+  # execs them WITHOUT a shell (shlex.split + create_subprocess_exec), so
+  # `&&`, `|` and `>` would be passed as literal mkdir arguments.
+  # subdir = environment name (www/labels/<environment>/<filename>).
+  save_label_preview: >-
+    sh -c 'mkdir -p "/config/www/labels/{{ subdir }}" && printf "%s" "{{ b64 }}"
+    | base64 -d > "/config/www/labels/{{ subdir }}/{{ filename }}"'
 
 #compensation:
 #device_tracker:
