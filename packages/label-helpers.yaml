@@ -1,0 +1,172 @@
+# Label printer input helpers — single source of truth for the dashboard.
+# Imported from configuration.yaml via homeassistant packages.
+
+input_select:
+  label_template:
+    name: "Label Template"
+    options:
+      - kitchen/pantry_jar
+      - kitchen/spice
+      - kitchen/leftover
+      - kitchen/freezer
+      - electronics/component_bin
+      - electronics/cable_flag
+      - electronics/psu_polarity
+      - three_d_printing/filament_spool
+      - three_d_printing/print_bin
+      - three_d_printing/tool_tag
+      - utility/qr
+      - utility/image
+      - garden/seed_packet
+      - garden/plant_tag
+      - garden/row_marker
+      - networking/patch_port
+      - networking/rack_unit
+      - networking/wap_location
+      - workshop/hazard
+      - workshop/tool_id
+      - workshop/torque_cal
+      - workshop/first_aid
+      - home_inventory/moving_box
+      - home_inventory/warranty
+      - home_inventory/storage_bin
+      - media/bookshelf_tag
+      - media/archive_box
+      - media/cd_record
+      - pet/collar_backup
+      - pet/med_schedule
+      - pet/food_bowl
+      - travel/luggage_tag
+      - travel/gear_bag
+      - travel/power_bank
+      - calibration/instrument_cal
+      - calibration/cert_id
+      - calibration/thermometer_cal
+
+  label_tape_mm:
+    name: "Tape Width (mm)"
+    options:
+      - '3.5'
+      - '12'
+      - '18'
+      - '24'
+    initial: '24'
+
+  label_date_preset:
+    name: "Date Preset"
+    options:
+      - '(none)'
+      - today
+      - 1 week from today
+      - 2 weeks from today
+      - 1 month from today
+      - 3 months from today
+    initial: '(none)'
+
+  label_icon:
+    name: "Icon"
+    options:
+      - antenna
+      - apple
+      - arrow-right
+      - arrow-up-right
+      - banana
+      - barcode
+      - battery
+      - beef
+      - biohazard
+      - bluetooth
+      - book
+      - bookmark
+      - box
+      - briefcase
+      - cable
+      - calendar
+      - carrot
+      - cat
+      - check
+      - chef-hat
+      - cherry
+      - circle
+      - clipboard-check
+      - clock
+      - coffee
+      - cog
+      - compass
+      - cookie
+      - cpu
+      - croissant
+      - dog
+      - drill
+      - droplets
+      - egg
+      - file-text
+      - fish
+      - flame
+      - flower-2
+      - gauge
+      - globe
+      - grape
+      - hammer
+      - hard-drive
+      - heart
+      - info
+      - key
+      - leaf
+      - lock
+      - luggage
+      - map
+      - map-pin
+      - milk
+      - monitor
+      - network
+      - package
+      - paintbrush
+      - paw-print
+      - pill
+      - plane
+      - plug
+      - printer
+      - qr-code
+      - router
+      - ruler
+      - salad
+      - scale
+      - scissors
+      - server
+      - server-cog
+      - shield
+      - signal
+      - snowflake
+      - sprout
+      - square
+      - star
+      - sun
+      - syringe
+      - tag
+      - tent
+      - thermometer
+      - tree-pine
+      - triangle
+      - usb
+      - utensils
+      - wheat
+      - wifi
+      - wrench
+      - x
+      - zap
+
+input_text:
+  label_name:
+    name: "Name / Primary Text"
+
+  label_date:
+    name: "Date"
+
+  label_preview_path:
+    name: "Preview Filename"
+    initial: "preview.png"
+
+  label_extra_fields:
+    name: "Extra Fields (JSON)"
+    initial: "{}"

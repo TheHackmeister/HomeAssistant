@@ -7387,7 +7387,7 @@ print_label:
             {% set f = dict(f, **{'icon': icon}) %}
           {% endif %}
           {{ f }}
-    - if: '{{ send }}'
+    - if: "{{ send | string | lower == 'true' }}"
       then:
         - action: rest_command.print_label
           data:
@@ -7829,3 +7829,93 @@ print_label_send:
         icon: '{{ icon | default("") }}'
         preview_path: '{{ preview_path | default("preview.png") }}'
         extra_fields: '{{ extra_fields | default({}) | to_json }}'
+
+label_dashboard_action:
+  alias: 'Label: Dashboard Action'
+  description: >-
+    Reads label parameters from input helpers and calls script.print_label.
+    Use send=true to print, send=false to render preview.
+  mode: single
+  icon: mdi:label-printer
+  fields:
+    send:
+      name: Send to printer
+      required: true
+      default: false
+      selector:
+        boolean: {}
+  sequence:
+    - variables:
+        _template: '{{ states("input_select.label_template") }}'
+        _tape: '{{ states("input_select.label_tape_mm") }}'
+        _name: '{{ states("input_text.label_name") }}'
+        _date: '{{ states("input_text.label_date") }}'
+        _date_preset: '{{ states("input_select.label_date_preset") }}'
+        _icon: '{{ states("input_select.label_icon") }}'
+        _preview_path: '{{ states("input_text.label_preview_path") }}'
+        _extra_raw: '{{ states("input_text.label_extra_fields") }}'
+        _extra: >-
+          {% set r = _extra_raw | default("{}") %}
+          {% if r and r != "{}" %}
+            {{ r | from_json }}
+          {% else %}
+            {{ {} }}
+          {% endif %}
+    - if:
+      - condition: template
+        value_template: '{{ not _template or _template == "" }}'
+      then:
+        - stop: "No template selected"
+      - condition: template
+        value_template: '{{ not _name or _name == "" }}'
+      then:
+        - stop: "No name / primary text entered"
+    - action: script.turn_on
+      target:
+        entity_id: script.print_label
+      data:
+        label_template: '{{ _template }}'
+        tape_mm: '{{ _tape }}'
+        send: '{{ send }}'
+        name: '{{ _name }}'
+        date: '{{ _date }}'
+        date_preset: '{{ _date_preset }}'
+        icon: '{{ _icon }}'
+        preview_path: '{{ _preview_path }}'
+        extra_fields: '{{ _extra | to_json }}'
+
+label_dashboard_reset:
+  alias: 'Label: Reset All'
+  description: Resets all label input helpers to their defaults.
+  mode: single
+  icon: mdi:restore
+  sequence:
+    - parallel:
+      - action: input_text.set_value
+        data:
+          entity_id: input_text.label_name
+          value: ""
+      - action: input_text.set_value
+        data:
+          entity_id: input_text.label_date
+          value: ""
+      - action: input_text.set_value
+        data:
+          entity_id: input_text.label_extra_fields
+          value: "{}"
+      - action: input_text.set_value
+        data:
+          entity_id: input_text.label_preview_path
+          value: "preview.png"
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.label_date_preset
+          option: "(none)"
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.label_icon
+          option: antenna
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.label_tape_mm
+          option: "24"
