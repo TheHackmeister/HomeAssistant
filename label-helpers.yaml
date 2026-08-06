@@ -59,7 +59,7 @@ label_template:
 label_tape_mm:
   name: 'Label: Tape width (mm)'
   icon: mdi:tape-measure
-  initial: '24'
+  initial: '12'
   options:
     - '3.5'
     - '12'

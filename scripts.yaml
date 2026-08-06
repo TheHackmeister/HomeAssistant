@@ -7109,7 +7109,7 @@ print_label:
       name: Tape width (mm)
       description: Loaded tape width
       required: true
-      default: '24'
+      default: '12'
       selector:
         select:
           options:
@@ -7404,19 +7404,37 @@ print_label:
         - action: rest_command.print_label
           data:
             label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | default("24") | int }}'
+            tape_mm: '{{ tape_mm | default("12") | int }}'
             fields: '{{ fields | to_json }}'
+          response_variable: api_response
+          continue_on_error: true
       else:
         - action: rest_command.render_label
           data:
             label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | default("24") | int }}'
+            tape_mm: '{{ tape_mm | default("12") | int }}'
             fields: '{{ fields | to_json }}'
-          response_variable: render_response
-        - action: shell_command.save_label_preview
+          response_variable: api_response
+          continue_on_error: true
+        - if: '{{ api_response is defined and api_response.status == 200 }}'
+          then:
+            - action: python_script.save_label_preview
+              data:
+                b64: '{{ api_response.content.png_b64 }}'
+                filename: '{{ preview_path | default("preview.png") }}'
+    # Surface API failures (e.g. 409 wrong tape loaded) in the UI — the
+    # rest_command error otherwise only lands in the system log.
+    - if: '{{ api_response is not defined or api_response.status != 200 }}'
+      then:
+        - action: persistent_notification.create
           data:
-            b64: '{{ render_response.content.png_b64 }}'
-            filename: '{{ preview_path | default("preview.png") }}'
+            title: "{{ 'Label: Print' if (send | bool) else 'Label: Preview' }} failed"
+            message: >
+              {% if api_response is not defined %}
+                No response from the label printer API (connection failed or timed out).
+              {% else %}
+                Printer API returned {{ api_response.status }}: {{ api_response.content }}
+              {% endif %}
 label_run:
   alias: 'Label: Preview / Send'
   description: >-
@@ -7461,7 +7479,7 @@ label_reset:
   alias: 'Label: Reset'
   description: >-
     Reset every Label Printer dashboard helper back to its default
-    (kitchen/pantry_jar template, 24 mm tape, blank name/date, no preset or
+    (kitchen/pantry_jar template, 12 mm tape, blank name/date, no preset or
     icon, empty extra fields) and clear the preview stamp so the dashboard
     preview pane returns to its placeholder.
   mode: single
@@ -7476,7 +7494,7 @@ label_reset:
       target:
         entity_id: input_select.label_tape_mm
       data:
-        option: '24'
+        option: '12'
     - action: input_select.select_option
       target:
         entity_id: input_select.label_date_preset
