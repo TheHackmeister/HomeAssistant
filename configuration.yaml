@@ -960,6 +960,8 @@ input_number:
 #     min: 0
 #     max: 100
 
+!include label-helpers.yaml
+
 influxdb:
   default_measurement: state
   username: !secret influxdb_username

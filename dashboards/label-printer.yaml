@@ -1,33 +1,69 @@
 views:
-  - type: sections
-    max_columns: 2
-    title: Label Printer
+  - title: Label Printer
     path: label-printer
-    sections:
+    cards:
+      - type: markdown
+        content: >-
+          ## Label Printer
+
+          Fill in the fields below, preview the label, then send to printer.
+
+      - type: entities
+        title: Label Options
+        show_header_toggle: false
+        entities:
+          - type: dropdown
+            entity: input_select.label_template
+            name: Template
+          - type: dropdown
+            entity: input_select.label_tape_mm
+            name: Tape Width
+          - type: input-text
+            entity: input_text.label_name
+            name: Name
+          - type: input-text
+            entity: input_text.label_date
+            name: Date
+          - type: dropdown
+            entity: input_select.label_date_preset
+            name: Date Preset
+          - type: dropdown
+            entity: input_select.label_icon
+            name: Icon
+          - type: input-text
+            entity: input_text.label_extra_fields
+            name: Extra Fields
+
+      - type: markdown
+        content: >-
+          {% set ts = states('input_text.label_preview_ts') | default('0') %}
+          <div style="text-align:center;">
+            <img src="/local/labels/preview.png?t={{ ts }}" style="max-width:100%; height:auto; border-radius:8px;" alt="Label Preview" />
+          </div>
+
       - type: grid
+        square: false
+        columns: 3
         cards:
-          - type: markdown
-            content: >-
-              ## Label Printer
-
-              **Step 1:** Preview a label — pick a template, fill in the
-              fields, and dry-run. The preview on the right updates.
-
-              **Step 2:** Once the preview looks right, print the same label.
           - type: button
-            name: Preview Label
+            tap_action:
+              action: perform-action
+              perform_action: script.label_print_from_helpers
+              data:
+                send: false
             icon: mdi:image-search
-            tap_action:
-              action: perform-action
-              perform_action: script.preview_label
+            name: Preview
           - type: button
-            name: Print Label
-            icon: mdi:printer
             tap_action:
               action: perform-action
-              perform_action: script.print_label_send
-      - type: grid
-        cards:
-          - type: picture
-            image: /local/labels/preview.png
-            title: Preview
+              perform_action: script.label_print_from_helpers
+              data:
+                send: true
+            icon: mdi:printer
+            name: Print
+          - type: button
+            tap_action:
+              action: perform-action
+              perform_action: script.label_reset
+            icon: mdi:restart
+            name: Reset

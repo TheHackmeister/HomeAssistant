@@ -7405,427 +7405,94 @@ print_label:
           data:
             b64: '{{ render_response.content.png_b64 }}'
             filename: '{{ preview_path | default("preview.png") }}'
-preview_label:
-  alias: 'Label: Preview'
+label_print_from_helpers:
+  alias: "Label: Print From Helpers"
   description: >-
-    Dry-run a label and save the preview PNG. Wraps script.print_label with
-    send=false. Opens the same field dialog minus the send toggle.
+    Read label input helpers, validate extra_fields JSON, and call script.print_label.
+    Set send=true to print, send=false to render preview PNG.
   mode: single
-  icon: mdi:image-search
+  icon: mdi:label-printer
   fields:
-    label_template:
-      name: Template
-      description: Label template (category/name)
+    send:
+      name: Send to printer
+      description: true = print, false = preview render
       required: true
+      default: false
       selector:
-        select:
-          options:
-            - kitchen/pantry_jar
-            - kitchen/spice
-            - kitchen/leftover
-            - kitchen/freezer
-            - electronics/component_bin
-            - electronics/cable_flag
-            - electronics/psu_polarity
-            - three_d_printing/filament_spool
-            - three_d_printing/print_bin
-            - three_d_printing/tool_tag
-            - utility/qr
-            - utility/image
-            - garden/seed_packet
-            - garden/plant_tag
-            - garden/row_marker
-            - networking/patch_port
-            - networking/rack_unit
-            - networking/wap_location
-            - workshop/hazard
-            - workshop/tool_id
-            - workshop/torque_cal
-            - workshop/first_aid
-            - home_inventory/moving_box
-            - home_inventory/warranty
-            - home_inventory/storage_bin
-            - media/bookshelf_tag
-            - media/archive_box
-            - media/cd_record
-            - pet/collar_backup
-            - pet/med_schedule
-            - pet/food_bowl
-            - travel/luggage_tag
-            - travel/gear_bag
-            - travel/power_bank
-            - calibration/instrument_cal
-            - calibration/cert_id
-            - calibration/thermometer_cal
-    tape_mm:
-      name: Tape width (mm)
-      description: Loaded tape width
-      required: true
-      default: '24'
-      selector:
-        select:
-          options:
-            - '3.5'
-            - '12'
-            - '18'
-            - '24'
-    name:
-      name: Name / primary text
-      description: Generic primary text, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date:
-      name: Date
-      description: Generic date string, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date_preset:
-      name: Date preset
-      description: Used only when Date is checked but empty.
-      required: false
-      default: '(none)'
-      selector:
-        select:
-          options:
-            - '(none)'
-            - today
-            - 1 week from today
-            - 2 weeks from today
-            - 1 month from today
-            - 3 months from today
-    icon:
-      name: Icon
-      description: Lucide icon name.
-      required: false
-      selector:
-        select:
-          options:
-            - antenna
-            - apple
-            - arrow-right
-            - arrow-up-right
-            - banana
-            - barcode
-            - battery
-            - beef
-            - biohazard
-            - bluetooth
-            - book
-            - bookmark
-            - box
-            - briefcase
-            - cable
-            - calendar
-            - carrot
-            - cat
-            - check
-            - chef-hat
-            - cherry
-            - circle
-            - clipboard-check
-            - clock
-            - coffee
-            - cog
-            - compass
-            - cookie
-            - cpu
-            - croissant
-            - dog
-            - drill
-            - droplets
-            - egg
-            - file-text
-            - fish
-            - flame
-            - flower-2
-            - gauge
-            - globe
-            - grape
-            - hammer
-            - hard-drive
-            - heart
-            - info
-            - key
-            - leaf
-            - lock
-            - luggage
-            - map
-            - map-pin
-            - milk
-            - monitor
-            - network
-            - package
-            - paintbrush
-            - paw-print
-            - pill
-            - plane
-            - plug
-            - printer
-            - qr-code
-            - router
-            - ruler
-            - salad
-            - scale
-            - scissors
-            - server
-            - server-cog
-            - shield
-            - signal
-            - snowflake
-            - sprout
-            - square
-            - star
-            - sun
-            - syringe
-            - tag
-            - tent
-            - thermometer
-            - tree-pine
-            - triangle
-            - usb
-            - utensils
-            - wheat
-            - wifi
-            - wrench
-            - x
-            - zap
-    preview_path:
-      name: Preview filename
-      description: Filename for the saved preview PNG.
-      required: false
-      default: preview.png
-      selector:
-        text: {}
-    extra_fields:
-      name: Extra fields
-      description: Arbitrary dict merged into the API fields object.
-      required: false
-      default: {}
-      selector:
-        object: {}
+        boolean: {}
   sequence:
+    - variables:
+        _ef_raw: "{{ states('input_text.label_extra_fields') | default('{}') }}"
+        _ef_valid: >-
+          {{ true if (_ef_raw | from_json if _ef_raw else {}) is mapping else false }}
+    - if: "{{ not _ef_valid }}"
+      then:
+        - action: persistent_notification.create
+          data:
+            title: "Label Printer: Invalid JSON"
+            notification_id: label_invalid_json
+            message: >-
+              The Extra Fields value is not valid JSON. Fields will be omitted.
+              Current value: {{ _ef_raw }}
     - action: script.print_label
       data:
-        label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm | default("24") }}'
-        send: false
-        name: '{{ name | default("") }}'
-        date: '{{ date | default("") }}'
-        date_preset: '{{ date_preset | default("(none)") }}'
-        icon: '{{ icon | default("") }}'
-        preview_path: '{{ preview_path | default("preview.png") }}'
-        extra_fields: '{{ extra_fields | default({}) | to_json }}'
-print_label_send:
-  alias: 'Label: Print (Send)'
-  description: >-
-    Print a label. Wraps script.print_label with send=true. Opens the same
-    field dialog minus the send toggle.
+        label_template: "{{ states('input_select.label_template') }}"
+        tape_mm: "{{ states('input_select.label_tape_mm') }}"
+        send: "{{ send }}"
+        name: "{{ states('input_text.label_name') }}"
+        date: "{{ states('input_text.label_date') }}"
+        date_preset: "{{ states('input_select.label_date_preset') }}"
+        icon: "{{ states('input_select.label_icon') }}"
+        preview_path: preview.png
+        extra_fields: "{{ _ef_raw }}"
+    - if: "{{ not send }}"
+      then:
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_preview_ts
+          data:
+            value: "{{ now().timestamp() | int }}"
+label_reset:
+  alias: "Label: Reset"
+  description: "Reset all label helpers to defaults."
   mode: single
-  icon: mdi:printer
-  fields:
-    label_template:
-      name: Template
-      description: Label template (category/name)
-      required: true
-      selector:
-        select:
-          options:
-            - kitchen/pantry_jar
-            - kitchen/spice
-            - kitchen/leftover
-            - kitchen/freezer
-            - electronics/component_bin
-            - electronics/cable_flag
-            - electronics/psu_polarity
-            - three_d_printing/filament_spool
-            - three_d_printing/print_bin
-            - three_d_printing/tool_tag
-            - utility/qr
-            - utility/image
-            - garden/seed_packet
-            - garden/plant_tag
-            - garden/row_marker
-            - networking/patch_port
-            - networking/rack_unit
-            - networking/wap_location
-            - workshop/hazard
-            - workshop/tool_id
-            - workshop/torque_cal
-            - workshop/first_aid
-            - home_inventory/moving_box
-            - home_inventory/warranty
-            - home_inventory/storage_bin
-            - media/bookshelf_tag
-            - media/archive_box
-            - media/cd_record
-            - pet/collar_backup
-            - pet/med_schedule
-            - pet/food_bowl
-            - travel/luggage_tag
-            - travel/gear_bag
-            - travel/power_bank
-            - calibration/instrument_cal
-            - calibration/cert_id
-            - calibration/thermometer_cal
-    tape_mm:
-      name: Tape width (mm)
-      description: Loaded tape width
-      required: true
-      default: '24'
-      selector:
-        select:
-          options:
-            - '3.5'
-            - '12'
-            - '18'
-            - '24'
-    name:
-      name: Name / primary text
-      description: Generic primary text, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date:
-      name: Date
-      description: Generic date string, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date_preset:
-      name: Date preset
-      description: Used only when Date is checked but empty.
-      required: false
-      default: '(none)'
-      selector:
-        select:
-          options:
-            - '(none)'
-            - today
-            - 1 week from today
-            - 2 weeks from today
-            - 1 month from today
-            - 3 months from today
-    icon:
-      name: Icon
-      description: Lucide icon name.
-      required: false
-      selector:
-        select:
-          options:
-            - antenna
-            - apple
-            - arrow-right
-            - arrow-up-right
-            - banana
-            - barcode
-            - battery
-            - beef
-            - biohazard
-            - bluetooth
-            - book
-            - bookmark
-            - box
-            - briefcase
-            - cable
-            - calendar
-            - carrot
-            - cat
-            - check
-            - chef-hat
-            - cherry
-            - circle
-            - clipboard-check
-            - clock
-            - coffee
-            - cog
-            - compass
-            - cookie
-            - cpu
-            - croissant
-            - dog
-            - drill
-            - droplets
-            - egg
-            - file-text
-            - fish
-            - flame
-            - flower-2
-            - gauge
-            - globe
-            - grape
-            - hammer
-            - hard-drive
-            - heart
-            - info
-            - key
-            - leaf
-            - lock
-            - luggage
-            - map
-            - map-pin
-            - milk
-            - monitor
-            - network
-            - package
-            - paintbrush
-            - paw-print
-            - pill
-            - plane
-            - plug
-            - printer
-            - qr-code
-            - router
-            - ruler
-            - salad
-            - scale
-            - scissors
-            - server
-            - server-cog
-            - shield
-            - signal
-            - snowflake
-            - sprout
-            - square
-            - star
-            - sun
-            - syringe
-            - tag
-            - tent
-            - thermometer
-            - tree-pine
-            - triangle
-            - usb
-            - utensils
-            - wheat
-            - wifi
-            - wrench
-            - x
-            - zap
-    preview_path:
-      name: Preview filename
-      description: Filename for the saved preview PNG.
-      required: false
-      default: preview.png
-      selector:
-        text: {}
-    extra_fields:
-      name: Extra fields
-      description: Arbitrary dict merged into the API fields object.
-      required: false
-      default: {}
-      selector:
-        object: {}
+  icon: mdi:restart
   sequence:
-    - action: script.print_label
+    - action: persistent_notification.dismiss
       data:
-        label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm | default("24") }}'
-        send: true
-        name: '{{ name | default("") }}'
-        date: '{{ date | default("") }}'
-        date_preset: '{{ date_preset | default("(none)") }}'
-        icon: '{{ icon | default("") }}'
-        preview_path: '{{ preview_path | default("preview.png") }}'
-        extra_fields: '{{ extra_fields | default({}) | to_json }}'
+        notification_id: label_invalid_json
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_template
+      data:
+        option: kitchen/pantry_jar
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_tape_mm
+      data:
+        option: '24'
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_date_preset
+      data:
+        option: '(none)'
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_icon
+      data:
+        option: tag
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.label_name
+      data:
+        value: ""
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.label_date
+      data:
+        value: ""
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.label_extra_fields
+      data:
+        value: "{}"
