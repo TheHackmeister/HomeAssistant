@@ -909,9 +909,12 @@ rest_command:
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
-  save_label_preview: >
-    mkdir -p /config/www/labels &&
-    printf '%s' '{{ b64 }}' | base64 -d > "/config/www/labels/{{ filename }}"
+  # Templated shell commands run WITHOUT a shell (create_subprocess_exec with
+  # shlex-split args), so pipes/redirects/&& are passed as literal argv and the
+  # command fails. Wrap in a literal `sh -c '...'`: the program (sh) stays
+  # template-free and the inner script regains shell features.
+  save_label_preview: >-
+    sh -c 'mkdir -p /config/www/labels && printf "%s" "{{ b64 }}" | base64 -d > "/config/www/labels/{{ filename }}"'
 
 #compensation:
 #device_tracker:
