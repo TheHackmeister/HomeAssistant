@@ -7395,11 +7395,15 @@ print_label:
             tape_mm: '{{ tape_mm | default("24") | int }}'
             fields: '{{ fields | to_json }}'
       else:
-        - action: shell_command.save_label_preview
+        - action: rest_command.render_label
           data:
             label_template: '{{ label_template }}'
             tape_mm: '{{ tape_mm | default("24") | int }}'
             fields: '{{ fields | to_json }}'
+          response_variable: render_response
+        - action: shell_command.save_label_preview
+          data:
+            b64: '{{ render_response.content.png_b64 }}'
             filename: '{{ preview_path | default("preview.png") }}'
 preview_label:
   alias: 'Label: Preview'
