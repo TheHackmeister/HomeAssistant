@@ -7352,8 +7352,6 @@ print_label:
           calibration/instrument_cal: next_due
           calibration/cert_id: null
           calibration/thermometer_cal: checked
-        name_key: '{{ name_map.get(label_template) }}'
-        date_key: '{{ date_map.get(label_template) }}'
         resolved_date: >-
           {% if date is defined and date %}
             {{ date }}
@@ -7370,17 +7368,31 @@ print_label:
               {{ (now() + timedelta(days=90)).strftime('%Y-%m-%d') }}
             {% endif %}
           {% endif %}
+        # NOTE: name_key/date_key are resolved INSIDE this template (not as
+        # separate script variables) so that a null map entry stays a real
+        # None. As separately-rendered variables they became the string
+        # "None" — truthy — and injected a bogus "None": <value> field for
+        # templates whose name/date mapping is null (e.g. psu_polarity).
         fields: >-
           {% set ef = extra_fields | default({}, true) %}
           {% if ef is string %}
-            {% set ef = ef | from_json %}
+            {% set ef = ef | trim %}
+            {% if ef.startswith('{') and ef.endswith('}') %}
+              {% set ef = ef | from_json %}
+            {% else %}
+              {% set ef = {} %}
+            {% endif %}
           {% endif %}
-          {% set f = ef | dictsort %}
-          {% set f = dict(f) %}
-          {% if name is defined and name and name_key and name_key not in f %}
+          {% if ef is not mapping %}
+            {% set ef = {} %}
+          {% endif %}
+          {% set f = dict(ef | dictsort) %}
+          {% set name_key = name_map.get(label_template) %}
+          {% set date_key = date_map.get(label_template) %}
+          {% if name is defined and name and name_key is not none and name_key not in f %}
             {% set f = dict(f, **{name_key: name}) %}
           {% endif %}
-          {% if resolved_date is defined and resolved_date and resolved_date | trim and date_key and date_key not in f %}
+          {% if resolved_date is defined and resolved_date and resolved_date | trim and date_key is not none and date_key not in f %}
             {% set f = dict(f, **{date_key: resolved_date | trim}) %}
           {% endif %}
           {% if icon is defined and icon and 'icon' not in f %}
@@ -7405,427 +7417,93 @@ print_label:
           data:
             b64: '{{ render_response.content.png_b64 }}'
             filename: '{{ preview_path | default("preview.png") }}'
-preview_label:
-  alias: 'Label: Preview'
+label_run:
+  alias: 'Label: Preview / Send'
   description: >-
-    Dry-run a label and save the preview PNG. Wraps script.print_label with
-    send=false. Opens the same field dialog minus the send toggle.
+    Single entry point for the Label Printer dashboard. Reads the
+    input_select.label_* / input_text.label_* helpers and calls
+    script.print_label: send=false renders a dry-run PNG to
+    /local/labels/preview.png (then bumps input_text.label_preview_version
+    so the dashboard preview card refreshes past the browser cache),
+    send=true prints. All field/option logic lives in script.print_label.
   mode: single
-  icon: mdi:image-search
+  icon: mdi:label-printer-outline
   fields:
-    label_template:
-      name: Template
-      description: Label template (category/name)
+    send:
+      name: Send to printer
+      description: >-
+        true = print (POST /print). false = dry-run render + preview
+        refresh (POST /render).
       required: true
+      default: false
       selector:
-        select:
-          options:
-            - kitchen/pantry_jar
-            - kitchen/spice
-            - kitchen/leftover
-            - kitchen/freezer
-            - electronics/component_bin
-            - electronics/cable_flag
-            - electronics/psu_polarity
-            - three_d_printing/filament_spool
-            - three_d_printing/print_bin
-            - three_d_printing/tool_tag
-            - utility/qr
-            - utility/image
-            - garden/seed_packet
-            - garden/plant_tag
-            - garden/row_marker
-            - networking/patch_port
-            - networking/rack_unit
-            - networking/wap_location
-            - workshop/hazard
-            - workshop/tool_id
-            - workshop/torque_cal
-            - workshop/first_aid
-            - home_inventory/moving_box
-            - home_inventory/warranty
-            - home_inventory/storage_bin
-            - media/bookshelf_tag
-            - media/archive_box
-            - media/cd_record
-            - pet/collar_backup
-            - pet/med_schedule
-            - pet/food_bowl
-            - travel/luggage_tag
-            - travel/gear_bag
-            - travel/power_bank
-            - calibration/instrument_cal
-            - calibration/cert_id
-            - calibration/thermometer_cal
-    tape_mm:
-      name: Tape width (mm)
-      description: Loaded tape width
-      required: true
-      default: '24'
-      selector:
-        select:
-          options:
-            - '3.5'
-            - '12'
-            - '18'
-            - '24'
-    name:
-      name: Name / primary text
-      description: Generic primary text, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date:
-      name: Date
-      description: Generic date string, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date_preset:
-      name: Date preset
-      description: Used only when Date is checked but empty.
-      required: false
-      default: '(none)'
-      selector:
-        select:
-          options:
-            - '(none)'
-            - today
-            - 1 week from today
-            - 2 weeks from today
-            - 1 month from today
-            - 3 months from today
-    icon:
-      name: Icon
-      description: Lucide icon name.
-      required: false
-      selector:
-        select:
-          options:
-            - antenna
-            - apple
-            - arrow-right
-            - arrow-up-right
-            - banana
-            - barcode
-            - battery
-            - beef
-            - biohazard
-            - bluetooth
-            - book
-            - bookmark
-            - box
-            - briefcase
-            - cable
-            - calendar
-            - carrot
-            - cat
-            - check
-            - chef-hat
-            - cherry
-            - circle
-            - clipboard-check
-            - clock
-            - coffee
-            - cog
-            - compass
-            - cookie
-            - cpu
-            - croissant
-            - dog
-            - drill
-            - droplets
-            - egg
-            - file-text
-            - fish
-            - flame
-            - flower-2
-            - gauge
-            - globe
-            - grape
-            - hammer
-            - hard-drive
-            - heart
-            - info
-            - key
-            - leaf
-            - lock
-            - luggage
-            - map
-            - map-pin
-            - milk
-            - monitor
-            - network
-            - package
-            - paintbrush
-            - paw-print
-            - pill
-            - plane
-            - plug
-            - printer
-            - qr-code
-            - router
-            - ruler
-            - salad
-            - scale
-            - scissors
-            - server
-            - server-cog
-            - shield
-            - signal
-            - snowflake
-            - sprout
-            - square
-            - star
-            - sun
-            - syringe
-            - tag
-            - tent
-            - thermometer
-            - tree-pine
-            - triangle
-            - usb
-            - utensils
-            - wheat
-            - wifi
-            - wrench
-            - x
-            - zap
-    preview_path:
-      name: Preview filename
-      description: Filename for the saved preview PNG.
-      required: false
-      default: preview.png
-      selector:
-        text: {}
-    extra_fields:
-      name: Extra fields
-      description: Arbitrary dict merged into the API fields object.
-      required: false
-      default: {}
-      selector:
-        object: {}
+        boolean: {}
   sequence:
     - action: script.print_label
       data:
-        label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm | default("24") }}'
-        send: false
-        name: '{{ name | default("") }}'
-        date: '{{ date | default("") }}'
-        date_preset: '{{ date_preset | default("(none)") }}'
-        icon: '{{ icon | default("") }}'
-        preview_path: '{{ preview_path | default("preview.png") }}'
-        extra_fields: '{{ extra_fields | default({}) | to_json }}'
-print_label_send:
-  alias: 'Label: Print (Send)'
+        label_template: "{{ states('input_select.label_template') }}"
+        tape_mm: "{{ states('input_select.label_tape_mm') }}"
+        send: "{{ send }}"
+        name: "{{ states('input_text.label_name') }}"
+        date: "{{ states('input_text.label_date') }}"
+        date_preset: "{{ states('input_select.label_date_preset') }}"
+        icon: "{{ '' if states('input_select.label_icon') == '(none)' else states('input_select.label_icon') }}"
+        preview_path: preview.png
+        extra_fields: "{{ states('input_text.label_extra_fields') }}"
+    - if: '{{ not (send | bool) }}'
+      then:
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_preview_version
+          data:
+            value: "{{ now().timestamp() | int }}"
+label_reset:
+  alias: 'Label: Reset'
   description: >-
-    Print a label. Wraps script.print_label with send=true. Opens the same
-    field dialog minus the send toggle.
+    Reset every Label Printer dashboard helper back to its default
+    (kitchen/pantry_jar template, 24 mm tape, blank name/date, no preset or
+    icon, empty extra fields) and clear the preview stamp so the dashboard
+    preview pane returns to its placeholder.
   mode: single
-  icon: mdi:printer
-  fields:
-    label_template:
-      name: Template
-      description: Label template (category/name)
-      required: true
-      selector:
-        select:
-          options:
-            - kitchen/pantry_jar
-            - kitchen/spice
-            - kitchen/leftover
-            - kitchen/freezer
-            - electronics/component_bin
-            - electronics/cable_flag
-            - electronics/psu_polarity
-            - three_d_printing/filament_spool
-            - three_d_printing/print_bin
-            - three_d_printing/tool_tag
-            - utility/qr
-            - utility/image
-            - garden/seed_packet
-            - garden/plant_tag
-            - garden/row_marker
-            - networking/patch_port
-            - networking/rack_unit
-            - networking/wap_location
-            - workshop/hazard
-            - workshop/tool_id
-            - workshop/torque_cal
-            - workshop/first_aid
-            - home_inventory/moving_box
-            - home_inventory/warranty
-            - home_inventory/storage_bin
-            - media/bookshelf_tag
-            - media/archive_box
-            - media/cd_record
-            - pet/collar_backup
-            - pet/med_schedule
-            - pet/food_bowl
-            - travel/luggage_tag
-            - travel/gear_bag
-            - travel/power_bank
-            - calibration/instrument_cal
-            - calibration/cert_id
-            - calibration/thermometer_cal
-    tape_mm:
-      name: Tape width (mm)
-      description: Loaded tape width
-      required: true
-      default: '24'
-      selector:
-        select:
-          options:
-            - '3.5'
-            - '12'
-            - '18'
-            - '24'
-    name:
-      name: Name / primary text
-      description: Generic primary text, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date:
-      name: Date
-      description: Generic date string, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date_preset:
-      name: Date preset
-      description: Used only when Date is checked but empty.
-      required: false
-      default: '(none)'
-      selector:
-        select:
-          options:
-            - '(none)'
-            - today
-            - 1 week from today
-            - 2 weeks from today
-            - 1 month from today
-            - 3 months from today
-    icon:
-      name: Icon
-      description: Lucide icon name.
-      required: false
-      selector:
-        select:
-          options:
-            - antenna
-            - apple
-            - arrow-right
-            - arrow-up-right
-            - banana
-            - barcode
-            - battery
-            - beef
-            - biohazard
-            - bluetooth
-            - book
-            - bookmark
-            - box
-            - briefcase
-            - cable
-            - calendar
-            - carrot
-            - cat
-            - check
-            - chef-hat
-            - cherry
-            - circle
-            - clipboard-check
-            - clock
-            - coffee
-            - cog
-            - compass
-            - cookie
-            - cpu
-            - croissant
-            - dog
-            - drill
-            - droplets
-            - egg
-            - file-text
-            - fish
-            - flame
-            - flower-2
-            - gauge
-            - globe
-            - grape
-            - hammer
-            - hard-drive
-            - heart
-            - info
-            - key
-            - leaf
-            - lock
-            - luggage
-            - map
-            - map-pin
-            - milk
-            - monitor
-            - network
-            - package
-            - paintbrush
-            - paw-print
-            - pill
-            - plane
-            - plug
-            - printer
-            - qr-code
-            - router
-            - ruler
-            - salad
-            - scale
-            - scissors
-            - server
-            - server-cog
-            - shield
-            - signal
-            - snowflake
-            - sprout
-            - square
-            - star
-            - sun
-            - syringe
-            - tag
-            - tent
-            - thermometer
-            - tree-pine
-            - triangle
-            - usb
-            - utensils
-            - wheat
-            - wifi
-            - wrench
-            - x
-            - zap
-    preview_path:
-      name: Preview filename
-      description: Filename for the saved preview PNG.
-      required: false
-      default: preview.png
-      selector:
-        text: {}
-    extra_fields:
-      name: Extra fields
-      description: Arbitrary dict merged into the API fields object.
-      required: false
-      default: {}
-      selector:
-        object: {}
+  icon: mdi:restore
   sequence:
-    - action: script.print_label
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_template
       data:
-        label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm | default("24") }}'
-        send: true
-        name: '{{ name | default("") }}'
-        date: '{{ date | default("") }}'
-        date_preset: '{{ date_preset | default("(none)") }}'
-        icon: '{{ icon | default("") }}'
-        preview_path: '{{ preview_path | default("preview.png") }}'
-        extra_fields: '{{ extra_fields | default({}) | to_json }}'
+        option: kitchen/pantry_jar
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_tape_mm
+      data:
+        option: '24'
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_date_preset
+      data:
+        option: '(none)'
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.label_icon
+      data:
+        option: '(none)'
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.label_name
+      data:
+        value: ''
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.label_date
+      data:
+        value: ''
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.label_extra_fields
+      data:
+        value: '{}'
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.label_preview_version
+      data:
+        value: ''

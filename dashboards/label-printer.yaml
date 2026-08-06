@@ -1,3 +1,15 @@
+# Label Printer dashboard
+#
+# Flow:
+#   1. Fill in the Label Options (backed by input_select.label_* /
+#      input_text.label_* helpers from label-helpers.yaml /
+#      label-helpers-text.yaml).
+#   2. Preview Label -> script.label_run with send=false renders a dry-run
+#      PNG to /local/labels/preview.png and bumps
+#      input_text.label_preview_version.
+#   3. Send to Printer -> script.label_run with send=true prints the same
+#      label.
+#   4. Reset Fields -> script.label_reset restores every helper default.
 views:
   - type: sections
     max_columns: 2
@@ -10,24 +22,74 @@ views:
             content: >-
               ## Label Printer
 
-              **Step 1:** Preview a label — pick a template, fill in the
-              fields, and dry-run. The preview on the right updates.
+              **Step 1:** Pick a template and fill in the fields below.
 
-              **Step 2:** Once the preview looks right, print the same label.
-          - type: button
-            name: Preview Label
-            icon: mdi:image-search
-            tap_action:
-              action: perform-action
-              perform_action: script.preview_label
-          - type: button
-            name: Print Label
-            icon: mdi:printer
-            tap_action:
-              action: perform-action
-              perform_action: script.print_label_send
+              **Step 2:** Tap **Preview Label** — the render appears on the
+              right.
+
+              **Step 3:** When it looks right, tap **Send to Printer**.
+
+              **Reset Fields** restores every option to its default.
+          - type: entities
+            title: Label Options
+            icon: mdi:label-printer
+            entities:
+              - entity: input_select.label_template
+                name: Template
+              - entity: input_select.label_tape_mm
+                name: Tape width (mm)
+              - entity: input_text.label_name
+                name: Name / primary text
+              - entity: input_text.label_date
+                name: Date (overrides preset)
+              - entity: input_select.label_date_preset
+                name: Date preset
+              - entity: input_select.label_icon
+                name: Icon
+              - entity: input_text.label_extra_fields
+                name: Extra fields (JSON)
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: button
+                name: Preview Label
+                icon: mdi:image-search
+                tap_action:
+                  action: perform-action
+                  perform_action: script.label_run
+                  data:
+                    send: false
+              - type: button
+                name: Send to Printer
+                icon: mdi:printer
+                tap_action:
+                  action: perform-action
+                  perform_action: script.label_run
+                  data:
+                    send: true
+                  confirmation:
+                    text: Print this label?
+              - type: button
+                name: Reset Fields
+                icon: mdi:restore
+                tap_action:
+                  action: perform-action
+                  perform_action: script.label_reset
+                  confirmation:
+                    text: Reset all label fields to defaults?
       - type: grid
         cards:
-          - type: picture
-            image: /local/labels/preview.png
+          - type: markdown
             title: Preview
+            content: >-
+              {% set v = states('input_text.label_preview_version') %}
+              {% if v not in ('', 'unknown', 'unavailable') %}
+              ![Label preview](/local/labels/preview.png?v={{ v }})
+
+              *{{ states('input_select.label_template') }} on {{
+              states('input_select.label_tape_mm') }} mm tape*
+              {% else %}
+              *No preview yet. Choose your options, then tap **Preview
+              Label**.*
+              {% endif %}

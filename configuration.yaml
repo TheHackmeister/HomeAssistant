@@ -766,6 +766,10 @@ group: !include groups.yaml
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
+
+# Label Printer dashboard input helpers (see dashboards/label-printer.yaml)
+input_select: !include label-helpers.yaml
+input_text: !include label-helpers-text.yaml
 frontend:
   themes: !include_dir_merge_named themes
 
@@ -829,6 +833,7 @@ rest_command:
   print_label:
     url: https://brother-ptouch-automation.spencerslab.com/print
     method: POST
+    timeout: 30
     headers:
       Content-Type: application/json
     payload: >
@@ -837,6 +842,7 @@ rest_command:
   render_label:
     url: https://brother-ptouch-automation.spencerslab.com/render
     method: POST
+    timeout: 30
     headers:
       Content-Type: application/json
     payload: >

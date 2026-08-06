@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────
+# Label Printer dashboard helpers (input_text)
+#
+# Text inputs for dashboards/label-printer.yaml. Read by
+# script.label_run and reset by script.label_reset.
+#
+# Imported from configuration.yaml via:
+#   input_text: !include label-helpers-text.yaml
+#
+# (Split from label-helpers.yaml because HA !include files are
+# single-domain.)
+# ─────────────────────────────────────────────────────────────────────
+
+label_name:
+  name: 'Label: Name / primary text'
+  icon: mdi:format-text
+  initial: ''
+  max: 255
+
+label_date:
+  name: 'Label: Date'
+  icon: mdi:calendar
+  initial: ''
+  max: 255
+
+label_extra_fields:
+  name: 'Label: Extra fields (JSON)'
+  icon: mdi:code-json
+  initial: '{}'
+  max: 255
+
+# Internal state, not a user input: bumped to a unix timestamp by
+# script.label_run after a new preview.png is written. The
+# dashboard's preview card watches it to bust the browser image cache.
+label_preview_version:
+  name: 'Label: Preview version'
+  icon: mdi:counter
+  initial: ''
+  max: 255
