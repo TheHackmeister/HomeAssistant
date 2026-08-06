@@ -6,28 +6,76 @@ views:
     sections:
       - type: grid
         cards:
+          - type: heading
+            heading: Label Printer
+            icon: mdi:label-printer
           - type: markdown
             content: >-
-              ## Label Printer
+              **Step 1:** Fill in the label options below and click **Preview
+              Label** — the dry-run render appears on the right.
 
-              **Step 1:** Preview a label — pick a template, fill in the
-              fields, and dry-run. The preview on the right updates.
+              **Step 2:** When the preview looks right, click **Send to
+              Printer** to print the same label.
 
-              **Step 2:** Once the preview looks right, print the same label.
-          - type: button
-            name: Preview Label
-            icon: mdi:image-search
-            tap_action:
-              action: perform-action
-              perform_action: script.preview_label
-          - type: button
-            name: Print Label
-            icon: mdi:printer
-            tap_action:
-              action: perform-action
-              perform_action: script.print_label_send
+              **Reset** restores every field to its default. `Extra fields`
+              takes an optional JSON object (max 255 chars) merged into the
+              template's fields, e.g. `{"weight_g": 500}`.
+          - type: entities
+            title: Label options
+            entities:
+              - entity: input_select.label_template
+                name: Template
+              - entity: input_select.label_tape_mm
+                name: Tape width (mm)
+              - entity: input_text.label_name
+                name: Name / primary text
+              - entity: input_text.label_date
+                name: Date
+              - entity: input_select.label_date_preset
+                name: Date preset
+              - entity: input_select.label_icon
+                name: Icon
+              - entity: input_text.label_extra_fields
+                name: Extra fields (JSON)
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: button
+                name: Preview Label
+                icon: mdi:image-search
+                tap_action:
+                  action: perform-action
+                  perform_action: script.label_apply_from_helpers
+                  data:
+                    send: false
+              - type: button
+                name: Send to Printer
+                icon: mdi:printer
+                tap_action:
+                  action: perform-action
+                  perform_action: script.label_apply_from_helpers
+                  data:
+                    send: true
+                  confirmation:
+                    text: Send this label to the printer?
+              - type: button
+                name: Reset
+                icon: mdi:restore
+                tap_action:
+                  action: perform-action
+                  perform_action: script.label_reset_helpers
+                  confirmation:
+                    text: Reset all label fields to defaults?
       - type: grid
         cards:
-          - type: picture
-            image: /local/labels/preview.png
-            title: Preview
+          - type: heading
+            heading: Preview
+            icon: mdi:image-search-outline
+          - type: markdown
+            content: >
+              {% if states('input_text.label_preview_token') not in ['', 'unknown', 'unavailable'] %}
+              ![Label preview](/local/labels/preview.png?v={{ states('input_text.label_preview_token') }})
+              {% else %}
+              No preview yet — fill in the options and click **Preview Label**.
+              {% endif %}
