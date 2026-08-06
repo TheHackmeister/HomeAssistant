@@ -10,24 +10,69 @@ views:
             content: >-
               ## Label Printer
 
-              **Step 1:** Preview a label — pick a template, fill in the
-              fields, and dry-run. The preview on the right updates.
 
-              **Step 2:** Once the preview looks right, print the same label.
+              **1.** Fill in the options below. **2.** Preview the label.
+              **3.** Send it to the printer. **4.** Reset when done.
+          - type: entities
+            title: Label Options
+            entities:
+              - input_select.label_template
+              - input_select.label_tape_mm
+              - input_text.label_name
+              - input_text.label_date
+              - input_select.label_date_preset
+              - input_select.label_icon
+              - input_text.label_extra_fields
+              - input_text.label_preview_path
           - type: button
             name: Preview Label
             icon: mdi:image-search
             tap_action:
               action: perform-action
-              perform_action: script.preview_label
+              perform_action: script.print_label
+              data:
+                label_template: "{{ states('input_select.label_template') }}"
+                tape_mm: "{{ states('input_select.label_tape_mm') }}"
+                send: false
+                name: "{{ states('input_text.label_name') }}"
+                date: "{{ states('input_text.label_date') }}"
+                date_preset: "{{ states('input_select.label_date_preset') }}"
+                icon: "{{ '' if is_state('input_select.label_icon', '(none)') else states('input_select.label_icon') }}"
+                preview_path: "{{ states('input_text.label_preview_path') }}"
+                extra_fields: "{{ states('input_text.label_extra_fields') }}"
           - type: button
             name: Print Label
             icon: mdi:printer
+            confirmation:
+              text: Print this label now?
             tap_action:
               action: perform-action
-              perform_action: script.print_label_send
+              perform_action: script.print_label
+              data:
+                label_template: "{{ states('input_select.label_template') }}"
+                tape_mm: "{{ states('input_select.label_tape_mm') }}"
+                send: true
+                name: "{{ states('input_text.label_name') }}"
+                date: "{{ states('input_text.label_date') }}"
+                date_preset: "{{ states('input_select.label_date_preset') }}"
+                icon: "{{ '' if is_state('input_select.label_icon', '(none)') else states('input_select.label_icon') }}"
+                preview_path: "{{ states('input_text.label_preview_path') }}"
+                extra_fields: "{{ states('input_text.label_extra_fields') }}"
+          - type: button
+            name: Reset Label Helpers
+            icon: mdi:refresh
+            tap_action:
+              action: perform-action
+              perform_action: script.label_reset_helpers
       - type: grid
         cards:
-          - type: picture
-            image: /local/labels/preview.png
-            title: Preview
+          - type: markdown
+            content: >-
+              {% set st = states['input_text.label_status'] %}
+              {% set nonce = st.last_changed.timestamp() if st is not none else 0 %}
+              {% set fname = states('input_text.label_preview_path') %}
+              {% if fname in ['unknown', 'unavailable', ''] %}{% set fname = 'preview.png' %}{% endif %}
+              ![Label preview](/local/labels/{{ fname }}?{{ nonce }})
+
+
+              **Status:** {{ states('input_text.label_status') }}
