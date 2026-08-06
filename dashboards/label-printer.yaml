@@ -12,10 +12,10 @@ views:
         title: Label Options
         show_header_toggle: false
         entities:
-          - type: dropdown
+          - type: input-select
             entity: input_select.label_template
             name: Template
-          - type: dropdown
+          - type: input-select
             entity: input_select.label_tape_mm
             name: Tape Width
           - type: input-text
@@ -24,10 +24,10 @@ views:
           - type: input-text
             entity: input_text.label_date
             name: Date
-          - type: dropdown
+          - type: input-select
             entity: input_select.label_date_preset
             name: Date Preset
-          - type: dropdown
+          - type: input-select
             entity: input_select.label_icon
             name: Icon
           - type: input-text
