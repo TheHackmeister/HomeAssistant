@@ -913,13 +913,11 @@ rest_command:
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
-  # Wrapped in `sh -c` because HA renders templated shell_commands and then
-  # execs them WITHOUT a shell (shlex.split + create_subprocess_exec), so
-  # `&&`, `|` and `>` would be passed as literal mkdir arguments.
-  # subdir = environment name (www/labels/<environment>/<filename>).
-  save_label_preview: >-
-    sh -c 'mkdir -p "/config/www/labels/{{ subdir }}" && printf "%s" "{{ b64 }}"
-    | base64 -d > "/config/www/labels/{{ subdir }}/{{ filename }}"'
+  # HA executes templated shell commands WITHOUT a shell (no pipes/redirects,
+  # and only text after the first space may be templated), so the actual shell
+  # logic lives in scripts/save_label_preview.sh and we only pass plain args:
+  # <subdir> <filename> <base64 png>.
+  save_label_preview: /config/scripts/save_label_preview.sh {{ subdir }} {{ filename }} {{ b64 }}
 
 #compensation:
 #device_tracker:
