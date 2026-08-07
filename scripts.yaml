@@ -7057,7 +7057,7 @@ print_label:
     template, fill in the common fields (name/date/icon), and optionally merge
     in arbitrary extra fields. Set send=true to actually print, false to
     dry-run render. The Label Printer dashboard buttons call this script with
-    values from the label_* input helpers (packages/label-helpers.yaml).
+    values from the label_* input helpers (packages/label_helpers.yaml).
     Dry-runs save the PNG to www/labels/<environment>/<preview_path> and
     publish the cache-busted URL to input_text.label_preview_url. Template
     list captured from GET /templates on 2026-07-26 — update the select
