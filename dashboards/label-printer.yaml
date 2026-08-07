@@ -11,15 +11,19 @@ views:
             icon: mdi:label-printer
           - type: markdown
             content: >-
-              **Step 1:** Fill in the label options below and click **Preview
-              Label** — the dry-run render appears on the right.
+              **Step 1:** Pick a template — the form below shows that
+              template's fields (`*` = required). Tape width is set to the
+              template's default automatically.
 
-              **Step 2:** When the preview looks right, click **Send to
-              Printer** to print the same label.
+              **Step 2:** Click **Preview Label** — the dry-run render appears
+              on the right.
 
-              **Reset** restores every field to its default. `Extra fields`
-              takes an optional JSON object (max 255 chars) merged into the
-              template's fields, e.g. `{"weight_g": 500}`.
+              **Step 3:** When the preview looks right, click **Send to
+              Printer**. **Reset** restores every field to its default.
+
+              `Extra fields` takes an optional JSON object (max 255 chars)
+              merged in last, e.g. `{"wire": "red"}` — needed only for
+              `electronics/cable_flag`'s overflow fields.
           - type: entities
             title: Label options
             entities:
@@ -27,16 +31,31 @@ views:
                 name: Template
               - entity: input_select.label_tape_mm
                 name: Tape width (mm)
-              - entity: input_text.label_name
-                name: Name / primary text
-              - entity: input_text.label_date
-                name: Date
-              - entity: input_select.label_date_preset
-                name: Date preset
               - entity: input_select.label_icon
                 name: Icon
               - entity: input_text.label_extra_fields
                 name: Extra fields (JSON)
+          # Dynamic per-template fields: relabels the shared
+          # input_text.label_field_1..6 pool from the template schema.
+          # Same data as the schema map in packages/label_printer.yaml —
+          # update both together. Field order/name/required flags from
+          # GET /templates on 2026-08-07.
+          - type: custom:config-template-card
+            entities:
+              - input_select.label_template
+            card:
+              type: entities
+              title: Label fields
+              entities: >-
+                ${ (() => {
+                  const S = {"kitchen/pantry_jar":[["name",1],["purchased",1],["expires",0]],"kitchen/spice":[["name",1],["origin",0],["best_by",0]],"kitchen/leftover":[["contents",1],["cooked",1],["eat_within_days",0]],"kitchen/freezer":[["contents",1],["frozen",1],["portion",0]],"electronics/component_bin":[["value",1],["footprint",1],["tolerance",0]],"electronics/cable_flag":[["title",0],["source",0],["dest",0],["date",0],["details",0],["link",0],["image",0],["wire",0],["overlap_mm",0]],"electronics/psu_polarity":[["voltage",1],["current",1],["polarity",0]],"three_d_printing/filament_spool":[["material",1],["color",1],["brand",1],["opened",1],["nozzle_temp",0],["bed_temp",0]],"three_d_printing/print_bin":[["part",1],["project",0],["qty",0]],"three_d_printing/tool_tag":[["tool",1],["owner",0]],"utility/qr":[["data",1],["caption",0]],"utility/image":[["path",1],["caption",0],["threshold",0]],"garden/seed_packet":[["variety",1],["sow_by",1],["year",0]],"garden/plant_tag":[["name",1],["planted",1]],"garden/row_marker":[["crop",1],["variety",1]],"networking/patch_port":[["port",1],["vlan",1],["dest",0]],"networking/rack_unit":[["unit",1],["device",1]],"networking/wap_location":[["name",1],["location",1]],"workshop/hazard":[["hazard",1],["text",1],["code",0]],"workshop/tool_id":[["name",1],["owner",1],["project",0]],"workshop/torque_cal":[["tool",1],["range_nm",1],["last_cal",1]],"workshop/first_aid":[["kit",1],["expires",1]],"home_inventory/moving_box":[["room",1],["contents",1],["fragile",0]],"home_inventory/warranty":[["item",1],["expires",1],["receipt",0]],"home_inventory/storage_bin":[["location",1],["contents",1]],"media/bookshelf_tag":[["title",1],["author",1],["callno",0]],"media/archive_box":[["label",1],["retain_until",1]],"media/cd_record":[["title",1],["artist",1],["year",0]],"pet/collar_backup":[["name",1],["contact",1]],"pet/med_schedule":[["pet",1],["med",1],["cadence",1]],"pet/food_bowl":[["pet",1],["food",1],["portion",1]],"travel/luggage_tag":[["name",1],["contact",1]],"travel/gear_bag":[["bag",1],["purpose",1]],"travel/power_bank":[["capacity_mah",1],["charged",1],["model",0]],"calibration/instrument_cal":[["instrument",1],["next_due",1],["owner",0]],"calibration/cert_id":[["cert_no",1],["issuer",1]],"calibration/thermometer_cal":[["instrument",1],["ice_point_c",1],["checked",1]]};
+                  const sch = S[states['input_select.label_template'].state];
+                  if (!sch) return [];
+                  return sch.slice(0, 6).map((f, i) => ({
+                    entity: 'input_text.label_field_' + (i + 1),
+                    name: f[0] + (f[1] ? ' *' : ''),
+                  }));
+                })() }
       - type: grid
         cards:
           - type: heading
