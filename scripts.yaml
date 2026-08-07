@@ -7871,9 +7871,7 @@ label_dashboard_action:
         value_template: '{{ not _name or _name == "" }}'
       then:
         - stop: "No name / primary text entered"
-    - action: script.turn_on
-      target:
-        entity_id: script.print_label
+    - action: script.print_label
       data:
         label_template: '{{ _template }}'
         tape_mm: '{{ _tape }}'
