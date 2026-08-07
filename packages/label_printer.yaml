@@ -73,6 +73,8 @@ input_select:
     initial: '24'
     options:
       - '3.5'
+      - '6'
+      - '9'
       - '12'
       - '18'
       - '24'
@@ -380,6 +382,19 @@ script:
             {%- set sch = schema[tpl] -%}
             {%- set f = built if built is mapping else (built | trim | from_json) -%}
             {{ sch.fields | selectattr(1) | map(attribute=0) | reject('in', f) | list | join(', ') }}
+      # Sync the tape selector to what's physically loaded BEFORE rendering,
+      # so the preview (and any later print) targets the real tape. A failed
+      # status query never blocks a preview.
+      - action: rest_command.label_printer_status
+        response_variable: printer_status
+        continue_on_error: true
+      - if: "{{ printer_status is defined and (printer_status.content | default({}, true)) is mapping and printer_status.content.get('ok') }}"
+        then:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.label_tape_mm
+            data:
+              option: "{{ printer_status.content.tape_mm }}"
       # Validate BEFORE calling the API: the server answers missing fields
       # with a bare 500 and no reason.
       - if: "{{ missing != '' }}"

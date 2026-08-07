@@ -56,6 +56,12 @@ views:
                     name: f[0] + (f[1] ? ' *' : ''),
                   }));
                 })() }
+          - type: markdown
+            content: >
+              {% set icon = states('input_select.label_icon') %}
+              {% if icon not in ['(none)', '', 'unknown', 'unavailable'] %}
+              **Icon:** <img src="https://brother-ptouch-automation.spencerslab.com/icons/{{ icon }}.svg" width="48" alt="{{ icon }}" style="vertical-align: middle"> {{ icon }}
+              {% endif %}
       - type: grid
         cards:
           - type: heading
@@ -99,3 +105,30 @@ views:
                   perform_action: script.label_reset_helpers
                   confirmation:
                     text: Reset all label fields to defaults?
+      - type: grid
+        cards:
+          - type: heading
+            heading: Icon picker
+            icon: mdi:emoticon-outline
+            heading_style: subtitle
+          # One tappable picture per icon; sets input_select.label_icon.
+          # Icon names mirror the select options (Lucide set served by the
+          # ptouch service at /icons/<name>.svg).
+          - type: custom:config-template-card
+            entities:
+              - input_select.label_icon
+            card:
+              type: grid
+              columns: 8
+              square: true
+              cards: >-
+                ${ ["antenna", "apple", "arrow-right", "arrow-up-right", "banana", "barcode", "battery", "beef", "biohazard", "bluetooth", "book", "bookmark", "box", "briefcase", "cable", "calendar", "carrot", "cat", "check", "chef-hat", "cherry", "circle", "clipboard-check", "clock", "coffee", "cog", "compass", "cookie", "cpu", "croissant", "dog", "drill", "droplets", "egg", "file-text", "fish", "flame", "flower-2", "gauge", "globe", "grape", "hammer", "hard-drive", "heart", "info", "key", "leaf", "lock", "luggage", "map", "map-pin", "milk", "monitor", "network", "package", "paintbrush", "paw-print", "pill", "plane", "plug", "printer", "qr-code", "router", "ruler", "salad", "scale", "scissors", "server", "server-cog", "shield", "signal", "snowflake", "sprout", "square", "star", "sun", "syringe", "tag", "tent", "thermometer", "tree-pine", "triangle", "usb", "utensils", "wheat", "wifi", "wrench", "x", "zap"].map(n => ({
+                    type: 'picture',
+                    image: 'https://brother-ptouch-automation.spencerslab.com/icons/' + n + '.svg',
+                    tap_action: {
+                      action: 'perform-action',
+                      perform_action: 'input_select.select_option',
+                      target: { entity_id: 'input_select.label_icon' },
+                      data: { option: n },
+                    },
+                  })) }

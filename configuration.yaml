@@ -846,6 +846,12 @@ rest_command:
     url: https://brother-ptouch-automation.spencerslab.com/health
     method: GET
 
+  # Currently loaded tape width + printer error state (SNMP-backed).
+  # Response: {"ok": true, "tape_mm": 12, "has_media": true, "errors": []}
+  label_printer_status:
+    url: https://brother-ptouch-automation.spencerslab.com/status
+    method: GET
+
   healthchecksio:
     url: https://hc-ping.com/89ba143b-b5bc-4074-bf95-b0897ec23102
     method: GET
