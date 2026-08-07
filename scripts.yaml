@@ -7418,7 +7418,7 @@ print_label:
           continue_on_error: true
         - if: '{{ api_response is defined and api_response.status == 200 }}'
           then:
-            - action: python_script.save_label_preview
+            - action: shell_command.save_label_preview
               data:
                 b64: '{{ api_response.content.png_b64 }}'
                 filename: '{{ preview_path | default("preview.png") }}'
