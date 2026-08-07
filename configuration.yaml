@@ -909,6 +909,7 @@ rest_command:
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
+  save_label_preview: 'python3 /config/save_preview.py {{ b64 }} {{ filename }}'
 
 #compensation:
 #device_tracker:

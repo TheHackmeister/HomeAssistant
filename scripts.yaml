@@ -7401,7 +7401,7 @@ print_label:
             tape_mm: '{{ tape_mm | default("24") | int }}'
             fields: '{{ fields | to_json }}'
           response_variable: render_response
-        - action: python_script.save_label_preview
+        - action: shell_command.save_label_preview
           data:
             b64: '{{ render_response.content.png_b64 }}'
             filename: '{{ preview_path | default("preview.png") }}'
