@@ -37,3 +37,12 @@ label_preview_version:
   icon: mdi:counter
   initial: ''
   max: 255
+
+# Status line shown on the dashboard. Written by script.print_label after
+# every preview/print (success or API error, e.g. "Error 409: wrong tape
+# loaded: ..."); cleared by script.label_reset.
+label_last_result:
+  name: 'Label: Last result'
+  icon: mdi:information-outline
+  initial: ''
+  max: 255

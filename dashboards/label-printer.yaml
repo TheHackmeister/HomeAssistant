@@ -78,6 +78,14 @@ views:
                   perform_action: script.label_reset
                   confirmation:
                     text: Reset all label fields to defaults?
+          - type: markdown
+            content: >-
+              {% set s = states('input_text.label_last_result') %}
+              {% if s in ('', 'unknown', 'unavailable') %}
+              *Status will appear here after the first preview or print.*
+              {% else %}
+              **{{ s }}**
+              {% endif %}
       - type: grid
         cards:
           - type: markdown
