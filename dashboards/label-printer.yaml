@@ -46,17 +46,13 @@ views:
                 icon: mdi:image-search
                 tap_action:
                   action: perform-action
-                  perform_action: script.label_apply_from_helpers
-                  data:
-                    send: false
+                  perform_action: script.label_preview_from_helpers
               - type: button
                 name: Send to Printer
                 icon: mdi:printer
                 tap_action:
                   action: perform-action
-                  perform_action: script.label_apply_from_helpers
-                  data:
-                    send: true
+                  perform_action: script.label_print_from_helpers
                   confirmation:
                     text: Send this label to the printer?
               - type: button

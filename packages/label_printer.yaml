@@ -3,14 +3,17 @@
 ##
 ## Dashboard-driven flow for the Brother P-Touch label service (rest_command.print_label / render_label):
 ##   1. User fills the helpers below on the Label Printer dashboard
-##   2. "Preview Label"  -> script.label_apply_from_helpers {send: false} -> dry-run render saved to
+##   2. "Preview Label"  -> script.label_preview_from_helpers -> dry-run render saved to
 ##      /config/www/labels/preview.png (served at /local/labels/preview.png), then bumps
 ##      input_text.label_preview_token so the dashboard's markdown card reloads the image
-##   3. "Send to Printer" -> script.label_apply_from_helpers {send: true} -> prints the same label
+##   3. "Send to Printer" -> script.label_print_from_helpers -> prints the same label
 ##   4. "Reset" -> script.label_reset_helpers restores every helper to its default
 ##
 ## script.print_label (scripts.yaml) stays the single source of truth for template/field mapping;
-## the glue script here only bridges the dashboard helpers to it (dashboard actions can't template).
+## the glue scripts here only bridge the dashboard helpers to it (dashboard actions can't
+## template). They intentionally take NO fields: a previous version with a boolean selector
+## field kept failing validation on deploy ("Only one type can be specified" on an emptied
+## selector map), so there is deliberately nothing here to mangle in transit.
 #######################################################################################################################
 
 input_select:
@@ -198,7 +201,7 @@ input_text:
     initial: ''
 
   # Internal plumbing: cache-buster for the dashboard preview image. Updated by
-  # script.label_apply_from_helpers after every successful dry-run render; the
+  # script.label_preview_from_helpers after every successful dry-run render; the
   # markdown card re-renders when this changes. Not shown on the dashboard.
   label_preview_token:
     name: 'Label: Preview token'
@@ -207,45 +210,54 @@ input_text:
     initial: ''
 
 script:
-  label_apply_from_helpers:
-    alias: 'Label: Apply From Dashboard'
+  label_preview_from_helpers:
+    alias: 'Label: Preview From Helpers'
     description: >-
-      Reads the Label Printer dashboard helpers and runs script.print_label.
-      send=false renders a dry-run preview (and bumps the preview token so the
-      dashboard image refreshes); send=true prints the label.
+      Reads the Label Printer dashboard helpers and dry-run renders the label
+      to /local/labels/preview.png, then bumps the preview token so the
+      dashboard image refreshes.
     mode: single
-    icon: mdi:label-printer
-    fields:
-      send:
-        name: Send to printer
-        description: >-
-          true = actually print (POST /print). false = dry-run render saved to
-          /local/labels/preview.png.
-        required: true
-        selector:
-          boolean: {}
+    icon: mdi:image-search
     sequence:
       - action: script.print_label
         data:
           label_template: "{{ states('input_select.label_template') }}"
           tape_mm: "{{ states('input_select.label_tape_mm') }}"
-          send: '{{ send }}'
+          send: false
           name: "{{ states('input_text.label_name') }}"
           date: "{{ states('input_text.label_date') }}"
           date_preset: "{{ states('input_select.label_date_preset') }}"
           icon: "{{ '' if states('input_select.label_icon') == '(none)' else states('input_select.label_icon') }}"
           preview_path: preview.png
           extra_fields: "{{ states('input_text.label_extra_fields') }}"
-      # Only after a successful preview: bump the token so the dashboard's
+      # Only after a successful render: bump the token so the dashboard's
       # markdown card reloads preview.png (a failed render aborts the script
       # before this step, so a broken preview never masks the last good one).
-      - if: '{{ not (send | bool) }}'
-        then:
-          - action: input_text.set_value
-            target:
-              entity_id: input_text.label_preview_token
-            data:
-              value: '{{ now().timestamp() | int }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.label_preview_token
+        data:
+          value: '{{ now().timestamp() | int }}'
+
+  label_print_from_helpers:
+    alias: 'Label: Print From Helpers'
+    description: >-
+      Reads the Label Printer dashboard helpers and prints the label via
+      script.print_label (send=true).
+    mode: single
+    icon: mdi:printer
+    sequence:
+      - action: script.print_label
+        data:
+          label_template: "{{ states('input_select.label_template') }}"
+          tape_mm: "{{ states('input_select.label_tape_mm') }}"
+          send: true
+          name: "{{ states('input_text.label_name') }}"
+          date: "{{ states('input_text.label_date') }}"
+          date_preset: "{{ states('input_select.label_date_preset') }}"
+          icon: "{{ '' if states('input_select.label_icon') == '(none)' else states('input_select.label_icon') }}"
+          preview_path: preview.png
+          extra_fields: "{{ states('input_text.label_extra_fields') }}"
 
   label_reset_helpers:
     alias: 'Label: Reset Helpers'
