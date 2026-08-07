@@ -9,15 +9,6 @@ views:
     - type: heading
       heading: Label Printer
       icon: mdi:label-printer
-    - type: markdown
-      content: '**Step 1:** Pick a template — the form below shows that template''s fields (`*` = required). Empty required fields are filled with their own name on preview, so you can see exactly where
-        each field lands on the label.
-
-
-        **Step 2:** Click **Preview Label** — the dry-run render appears on the right, and the tape width syncs to what''s physically loaded. Turn on **Live reload** to re-render automatically on every field change.
-
-
-        **Step 3:** When the preview looks right, click **Send to Printer** (printing requires all `*` fields to be filled). **Reset** restores every field to its default.'
     - type: entities
       title: Label options
       entities:
@@ -46,33 +37,22 @@ views:
           :[[\"name\",1],[\"contact\",1]],\"i\":1},\"travel/gear_bag\":{\"f\":[[\"bag\",1],[\"purpose\",1]],\"i\":1},\"travel/power_bank\":{\"f\":[[\"capacity_mah\",1],[\"charged\",1],[\"model\",0]],\"\
           i\":1},\"calibration/instrument_cal\":{\"f\":[[\"instrument\",1],[\"next_due\",1],[\"owner\",0]],\"i\":1},\"calibration/cert_id\":{\"f\":[[\"cert_no\",1],[\"issuer\",1]],\"i\":1},\"calibration/thermometer_cal\"\
           :{\"f\":[[\"instrument\",1],[\"ice_point_c\",1],[\"checked\",1]],\"i\":1}};\n                  const sch = S[states['input_select.label_template'].state];\n                  if (!sch) return [];\n\
-          \                  const rows = sch.f.slice(0, 6).map((f, i) => ({\n                    entity: 'input_text.label_field_' + (i + 1),\n                    name: f[0] + (f[1] ? ' *' : ''),\n   \
+          \                  const rows = sch.f.slice(0, 7).map((f, i) => ({\n                    entity: 'input_text.label_field_' + (i + 1),\n                    name: f[0] + (f[1] ? ' *' : ''),\n   \
           \               }));\n                  if (sch.i) rows.push({ entity: 'input_select.label_icon', name: 'icon' });\n                  return rows;\n                })() }"
-    - type: markdown
-      content: '{% set icon_templates = ["kitchen/pantry_jar", "garden/seed_packet", "garden/plant_tag", "garden/row_marker", "networking/patch_port", "networking/rack_unit", "networking/wap_location",
-        "workshop/hazard", "workshop/tool_id", "workshop/torque_cal", "workshop/first_aid", "home_inventory/moving_box", "home_inventory/warranty", "home_inventory/storage_bin", "media/bookshelf_tag", "media/archive_box",
-        "media/cd_record", "pet/collar_backup", "pet/med_schedule", "pet/food_bowl", "travel/luggage_tag", "travel/gear_bag", "travel/power_bank", "calibration/instrument_cal", "calibration/cert_id", "calibration/thermometer_cal"]
-        %}
-
-        {% set icon = states(''input_select.label_icon'') %}
-
-        {% if states(''input_select.label_template'') in icon_templates and icon not in [''(none)'', '''', ''unknown'', ''unavailable''] %}
-
-        **Icon:** <img src="https://brother-ptouch-automation.spencerslab.com/icons/{{ icon }}.svg" width="48" alt="{{ icon }}" style="vertical-align: middle"> {{ icon }}
-
-        {% endif %}'
     - type: entities
       title: Advanced
       entities:
       - entity: input_text.label_extra_fields
         name: Extra fields (JSON)
-    - type: markdown
-      content: '`Extra fields` takes an optional JSON object (max 255 chars) merged in last, e.g. `{"wire": "red"}` — needed only for `electronics/cable_flag`''s overflow fields.'
   - type: grid
     cards:
     - type: heading
       heading: Preview
       icon: mdi:image-search-outline
+    - type: entities
+      entities:
+      - entity: input_boolean.label_live_reload
+        name: Live reload preview on change
     - type: markdown
       content: '{% if states(''input_text.label_preview_token'') not in ['''', ''unknown'', ''unavailable''] %}
 
@@ -93,12 +73,10 @@ views:
 
         {% endif %}'
     - type: entities
-      title: Tape & live reload
+      title: Tape
       entities:
       - entity: input_select.label_tape_mm
         name: Tape width (mm, synced from printer on preview)
-      - entity: input_boolean.label_live_reload
-        name: Live reload preview on change
     - type: grid
       columns: 3
       square: false

@@ -13,8 +13,8 @@
 ## The glue scripts map the field pool onto the template's real field names using the schema map
 ## below (captured from GET /templates on 2026-08-07), validate required fields BEFORE calling the
 ## API (the server returns an unhelpful bare 500 for missing fields), and only pass icon to
-## templates that declare one. Fields beyond the 6 pool slots (only electronics/cable_flag) go
-## through input_text.label_extra_fields as a JSON object.
+## templates that declare one. Fields beyond the 7 pool slots (electronics/cable_flag's wire and
+## overlap_mm) go through input_text.label_extra_fields as a JSON object.
 ##
 ## script.print_label (scripts.yaml) stays the engine (render/print + last-result status writes);
 ## the glue scripts here bridge the dashboard helpers to it (dashboard actions can't template).
@@ -181,7 +181,7 @@ input_boolean:
   label_live_reload:
     name: 'Label: Live reload preview'
     icon: mdi:autorenew
-    initial: false
+    initial: true
 
 input_text:
   # Generic field pool. The dashboard relabels these per selected template and
@@ -209,6 +209,10 @@ input_text:
     initial: ''
   label_field_6:
     name: 'Label: Field 6'
+    max: 255
+    initial: ''
+  label_field_7:
+    name: 'Label: Field 7'
     max: 255
     initial: ''
 
@@ -256,6 +260,7 @@ automation:
             - input_text.label_field_4
             - input_text.label_field_5
             - input_text.label_field_6
+            - input_text.label_field_7
         data:
           value: ''
       # default_tape_mm per template (GET /templates, 2026-08-07)
@@ -331,6 +336,8 @@ automation:
       - trigger: state
         entity_id: input_text.label_field_6
       - trigger: state
+        entity_id: input_text.label_field_7
+      - trigger: state
         entity_id: input_text.label_extra_fields
     conditions:
       - condition: state
@@ -361,7 +368,7 @@ script:
             kitchen/leftover: { icon: false, fields: [ ['contents', true], ['cooked', true], ['eat_within_days', false] ] }
             kitchen/freezer: { icon: false, fields: [ ['contents', true], ['frozen', true], ['portion', false] ] }
             electronics/component_bin: { icon: false, fields: [ ['value', true], ['footprint', true], ['tolerance', false] ] }
-            electronics/cable_flag: { icon: false, fields: [ ['title', false], ['source', false], ['dest', false], ['date', false], ['details', false], ['link', false] ] }
+            electronics/cable_flag: { icon: false, fields: [ ['title', false], ['source', false], ['dest', false], ['date', false], ['details', false], ['link', false], ['image', false] ] }
             electronics/psu_polarity: { icon: false, fields: [ ['voltage', true], ['current', true], ['polarity', false] ] }
             three_d_printing/filament_spool: { icon: false, fields: [ ['material', true], ['color', true], ['brand', true], ['opened', true], ['nozzle_temp', false], ['bed_temp', false] ] }
             three_d_printing/print_bin: { icon: false, fields: [ ['part', true], ['project', false], ['qty', false] ] }
@@ -401,6 +408,7 @@ script:
             - "{{ states('input_text.label_field_4') }}"
             - "{{ states('input_text.label_field_5') }}"
             - "{{ states('input_text.label_field_6') }}"
+            - "{{ states('input_text.label_field_7') }}"
           icon_sel: "{{ states('input_select.label_icon') }}"
           extra_raw: "{{ states('input_text.label_extra_fields') }}"
           # HA parses variable render results into native types, so `built`
@@ -473,6 +481,7 @@ script:
             - "{{ states('input_text.label_field_4') }}"
             - "{{ states('input_text.label_field_5') }}"
             - "{{ states('input_text.label_field_6') }}"
+            - "{{ states('input_text.label_field_7') }}"
           icon_sel: "{{ states('input_select.label_icon') }}"
           extra_raw: "{{ states('input_text.label_extra_fields') }}"
           # HA parses variable render results into native types, so `built`
@@ -537,7 +546,7 @@ script:
           entity_id: input_select.label_icon
         data:
           option: '(none)'
-      - action: input_boolean.turn_off
+      - action: input_boolean.turn_on
         target:
           entity_id: input_boolean.label_live_reload
       - action: input_text.set_value
@@ -549,6 +558,7 @@ script:
             - input_text.label_field_4
             - input_text.label_field_5
             - input_text.label_field_6
+            - input_text.label_field_7
             - input_text.label_extra_fields
             - input_text.label_preview_token
             - input_text.label_last_result
