@@ -361,7 +361,10 @@ script:
           icon_sel: "{{ states('input_select.label_icon') }}"
           extra_raw: "{{ states('input_text.label_extra_fields') }}"
           # HA parses variable render results into native types, so `built`
-          # arrives below as a dict, not a string — `missing` handles both.
+          # arrives at the action below as a dict, not a string.
+          # Empty REQUIRED pool slots are filled with their own field name so
+          # a preview shows exactly where each field lands on the label; the
+          # print script keeps the strict missing-field validation instead.
           built: >-
             {%- set sch = schema[tpl] -%}
             {%- set ns = namespace(f={}) -%}
@@ -369,6 +372,8 @@ script:
               {%- set v = pool[loop.index0] -%}
               {%- if v not in ['', 'unknown', 'unavailable'] -%}
                 {%- set ns.f = dict(ns.f, **{fname: v | trim}) -%}
+              {%- elif req -%}
+                {%- set ns.f = dict(ns.f, **{fname: fname}) -%}
               {%- endif -%}
             {%- endfor -%}
             {%- if icon_sel not in ['(none)', '', 'unknown', 'unavailable'] and sch.icon and 'icon' not in ns.f -%}
@@ -378,10 +383,6 @@ script:
               {%- set ns.f = dict(ns.f, **(extra_raw | from_json)) -%}
             {%- endif -%}
             {{ ns.f | to_json }}
-          missing: >-
-            {%- set sch = schema[tpl] -%}
-            {%- set f = built if built is mapping else (built | trim | from_json) -%}
-            {{ sch.fields | selectattr(1) | map(attribute=0) | reject('in', f) | list | join(', ') }}
       # Sync the tape selector to what's physically loaded BEFORE rendering,
       # so the preview (and any later print) targets the real tape. A failed
       # status query never blocks a preview.
@@ -395,17 +396,6 @@ script:
               entity_id: input_select.label_tape_mm
             data:
               option: "{{ printer_status.content.tape_mm }}"
-      # Validate BEFORE calling the API: the server answers missing fields
-      # with a bare 500 and no reason.
-      - if: "{{ missing != '' }}"
-        then:
-          - action: input_text.set_value
-            target:
-              entity_id: input_text.label_last_result
-            data:
-              value: 'Missing required fields: {{ missing }} ({{ now().strftime(''%H:%M:%S'') }})'
-          - stop: 'Label preview aborted: missing required fields: {{ missing }}'
-            error: true
       - action: script.print_label
         data:
           label_template: '{{ tpl }}'
