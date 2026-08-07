@@ -14,7 +14,7 @@ views:
         each field lands on the label.
 
 
-        **Step 2:** Click **Preview Label** — the dry-run render appears on the right, and the tape width syncs to what''s physically loaded.
+        **Step 2:** Click **Preview Label** — the dry-run render appears on the right, and the tape width syncs to what''s physically loaded. Turn on **Live reload** to re-render automatically on every field change.
 
 
         **Step 3:** When the preview looks right, click **Send to Printer** (printing requires all `*` fields to be filled). **Reset** restores every field to its default.'
@@ -93,10 +93,12 @@ views:
 
         {% endif %}'
     - type: entities
-      title: Tape
+      title: Tape & live reload
       entities:
       - entity: input_select.label_tape_mm
         name: Tape width (mm, synced from printer on preview)
+      - entity: input_boolean.label_live_reload
+        name: Live reload preview on change
     - type: grid
       columns: 3
       square: false

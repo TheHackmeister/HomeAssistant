@@ -175,6 +175,14 @@ input_select:
       - x
       - zap
 
+input_boolean:
+  # When on, the Label: Live Reload automation re-renders the preview on
+  # every field change. Off by default.
+  label_live_reload:
+    name: 'Label: Live reload preview'
+    icon: mdi:autorenew
+    initial: false
+
 input_text:
   # Generic field pool. The dashboard relabels these per selected template and
   # the glue scripts map them positionally onto the template's real field names
@@ -295,6 +303,41 @@ automation:
           entity_id: input_select.label_tape_mm
         data:
           option: '{{ default_tape[trigger.to_state.state] | default("24") }}'
+
+  # Live reload: re-render the preview whenever a form field changes, while
+  # input_boolean.label_live_reload is on. The preview substitutes placeholders
+  # for empty required fields, so every change renders something meaningful.
+  # Loop-safe by construction: the preview script never writes any of these
+  # trigger entities (it writes label_preview_token / label_last_result and
+  # syncs label_tape_mm, none of which are triggers here).
+  - id: label_live_reload
+    alias: 'Label: Live Reload'
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_select.label_template
+      - trigger: state
+        entity_id: input_select.label_icon
+      - trigger: state
+        entity_id: input_text.label_field_1
+      - trigger: state
+        entity_id: input_text.label_field_2
+      - trigger: state
+        entity_id: input_text.label_field_3
+      - trigger: state
+        entity_id: input_text.label_field_4
+      - trigger: state
+        entity_id: input_text.label_field_5
+      - trigger: state
+        entity_id: input_text.label_field_6
+      - trigger: state
+        entity_id: input_text.label_extra_fields
+    conditions:
+      - condition: state
+        entity_id: input_boolean.label_live_reload
+        state: 'on'
+    actions:
+      - action: script.label_preview_from_helpers
 
 script:
   label_preview_from_helpers:
@@ -494,6 +537,9 @@ script:
           entity_id: input_select.label_icon
         data:
           option: '(none)'
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.label_live_reload
       - action: input_text.set_value
         target:
           entity_id:
