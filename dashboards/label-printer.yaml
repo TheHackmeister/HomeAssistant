@@ -75,3 +75,8 @@ views:
               {% else %}
               No preview yet — fill in the options and click **Preview Label**.
               {% endif %}
+              {% set r = states('input_text.label_last_result') %}
+              {% if r not in ['', 'unknown', 'unavailable'] %}
+
+              **Last result:** {{ r }}
+              {% endif %}

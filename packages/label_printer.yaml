@@ -209,6 +209,14 @@ input_text:
     max: 100
     initial: ''
 
+  # Last preview/print outcome, written by script.print_label on every path
+  # (success and HTTP failures) and shown on the dashboard under the preview.
+  label_last_result:
+    name: 'Label: Last result'
+    icon: mdi:message-text-outline
+    max: 255
+    initial: ''
+
 script:
   label_preview_from_helpers:
     alias: 'Label: Preview From Helpers'
@@ -292,5 +300,6 @@ script:
             - input_text.label_date
             - input_text.label_extra_fields
             - input_text.label_preview_token
+            - input_text.label_last_result
         data:
           value: ''

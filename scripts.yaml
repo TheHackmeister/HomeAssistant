@@ -7397,6 +7397,27 @@ print_label:
             label_template: '{{ label_template }}'
             tape_mm: '{{ tape_mm | default("24") | int }}'
             fields: '{{ fields | to_json }}'
+          response_variable: print_response
+        # rest_command only raises on timeout/connection/decode errors — an
+        # HTTP error status (e.g. 409 printer busy) just logs a warning and
+        # returns normally. Record the outcome for the dashboard and stop
+        # hard on failure so callers see the error too.
+        - if: '{{ print_response.status >= 400 }}'
+          then:
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.label_last_result
+              data:
+                value: >-
+                  {% set detail = print_response.content if print_response.content is string else '' -%}
+                  Print failed: HTTP {{ print_response.status }}{{ ' — ' ~ detail[:80] if detail else '' }} ({{ now().strftime('%H:%M:%S') }})
+            - stop: 'Label print failed (HTTP {{ print_response.status }})'
+              error: true
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_last_result
+          data:
+            value: 'Printed OK ({{ now().strftime(''%H:%M:%S'') }})'
       else:
         - action: rest_command.render_label
           data:
@@ -7407,13 +7428,23 @@ print_label:
         # rest_command only raises on timeout/connection/decode errors — an
         # HTTP error status just logs a warning and returns the error body.
         # Guard so a failed render never zeroes out the last good preview.png,
-        # and so the error propagates to callers (script.label_preview_from_helpers
+        # and record the outcome for the dashboard (script.label_preview_from_helpers
         # then skips its preview-token bump).
         - if: '{{ render_response.status >= 400 or render_response.content.png_b64 is not defined }}'
           then:
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.label_last_result
+              data:
+                value: 'Preview failed: HTTP {{ render_response.status }} ({{ now().strftime(''%H:%M:%S'') }})'
             - stop: 'Label render failed (HTTP {{ render_response.status }})'
               error: true
         - action: shell_command.save_label_preview
           data:
             b64: '{{ render_response.content.png_b64 }}'
             filename: '{{ preview_path | default("preview.png") }}'
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_last_result
+          data:
+            value: 'Preview updated ({{ now().strftime(''%H:%M:%S'') }})'
