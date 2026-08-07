@@ -7459,8 +7459,10 @@ print_label:
           data:
             b64: '{{ render_response.content.png_b64 }}'
             filename: '{{ preview_path | default("preview.png") }}'
+        # A good preview clears any stale failure message — the updated image
+        # is feedback enough, and this keeps the status line unambiguous.
         - action: input_text.set_value
           target:
             entity_id: input_text.label_last_result
           data:
-            value: 'Preview updated ({{ now().strftime(''%H:%M:%S'') }})'
+            value: ''

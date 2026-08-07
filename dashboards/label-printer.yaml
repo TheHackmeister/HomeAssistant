@@ -37,6 +37,23 @@ views:
                 name: Icon
               - entity: input_text.label_extra_fields
                 name: Extra fields (JSON)
+      - type: grid
+        cards:
+          - type: heading
+            heading: Preview
+            icon: mdi:image-search-outline
+          - type: markdown
+            content: >
+              {% if states('input_text.label_preview_token') not in ['', 'unknown', 'unavailable'] %}
+              ![Label preview](/local/labels/preview.png?v={{ states('input_text.label_preview_token') }})
+              {% else %}
+              No preview yet — fill in the options and click **Preview Label**.
+              {% endif %}
+              {% set r = states('input_text.label_last_result') %}
+              {% if r not in ['', 'unknown', 'unavailable'] %}
+
+              **Last result:** {{ r }}
+              {% endif %}
           - type: grid
             columns: 3
             square: false
@@ -63,20 +80,3 @@ views:
                   perform_action: script.label_reset_helpers
                   confirmation:
                     text: Reset all label fields to defaults?
-      - type: grid
-        cards:
-          - type: heading
-            heading: Preview
-            icon: mdi:image-search-outline
-          - type: markdown
-            content: >
-              {% if states('input_text.label_preview_token') not in ['', 'unknown', 'unavailable'] %}
-              ![Label preview](/local/labels/preview.png?v={{ states('input_text.label_preview_token') }})
-              {% else %}
-              No preview yet — fill in the options and click **Preview Label**.
-              {% endif %}
-              {% set r = states('input_text.label_last_result') %}
-              {% if r not in ['', 'unknown', 'unavailable'] %}
-
-              **Last result:** {{ r }}
-              {% endif %}
