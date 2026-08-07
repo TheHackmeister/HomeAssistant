@@ -7409,8 +7409,15 @@ print_label:
                 entity_id: input_text.label_last_result
               data:
                 value: >-
-                  {% set detail = print_response.content if print_response.content is string else '' -%}
-                  Print failed: HTTP {{ print_response.status }}{{ ' — ' ~ detail[:80] if detail else '' }} ({{ now().strftime('%H:%M:%S') }})
+                  {% set c = print_response.content -%}
+                  {% if c is string -%}
+                  {% set reason = c -%}
+                  {% elif c is mapping -%}
+                  {% set reason = c.get('detail') or c.get('error') or c.get('message') or (c | to_json) -%}
+                  {% else -%}
+                  {% set reason = '' -%}
+                  {% endif -%}
+                  Print failed: HTTP {{ print_response.status }}{{ ' — ' ~ reason[:150] if reason else '' }} ({{ now().strftime('%H:%M:%S') }})
             - stop: 'Label print failed (HTTP {{ print_response.status }})'
               error: true
         - action: input_text.set_value
@@ -7436,7 +7443,16 @@ print_label:
               target:
                 entity_id: input_text.label_last_result
               data:
-                value: 'Preview failed: HTTP {{ render_response.status }} ({{ now().strftime(''%H:%M:%S'') }})'
+                value: >-
+                  {% set c = render_response.content -%}
+                  {% if c is string -%}
+                  {% set reason = c -%}
+                  {% elif c is mapping -%}
+                  {% set reason = c.get('detail') or c.get('error') or c.get('message') or (c | to_json) -%}
+                  {% else -%}
+                  {% set reason = '' -%}
+                  {% endif -%}
+                  Preview failed: HTTP {{ render_response.status }}{{ ' — ' ~ reason[:150] if reason else '' }} ({{ now().strftime('%H:%M:%S') }})
             - stop: 'Label render failed (HTTP {{ render_response.status }})'
               error: true
         - action: shell_command.save_label_preview
