@@ -7866,6 +7866,7 @@ label_dashboard_action:
         value_template: '{{ not _template or _template == "" }}'
       then:
         - stop: "No template selected"
+    - if:
       - condition: template
         value_template: '{{ not _name or _name == "" }}'
       then:
