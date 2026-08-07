@@ -358,25 +358,27 @@ script:
             - "{{ states('input_text.label_field_6') }}"
           icon_sel: "{{ states('input_select.label_icon') }}"
           extra_raw: "{{ states('input_text.label_extra_fields') }}"
+          # HA parses variable render results into native types, so `built`
+          # arrives below as a dict, not a string — `missing` handles both.
           built: >-
-            {% set sch = schema[tpl] %}
-            {% set ns = namespace(f={}) %}
-            {% for fname, req in sch.fields %}
-              {% set v = pool[loop.index0] %}
-              {% if v not in ['', 'unknown', 'unavailable'] %}
-                {% set ns.f = dict(ns.f, **{fname: v | trim}) %}
-              {% endif %}
-            {% endfor %}
-            {% if icon_sel not in ['(none)', '', 'unknown', 'unavailable'] and sch.icon and 'icon' not in ns.f %}
-              {% set ns.f = dict(ns.f, icon=icon_sel) %}
-            {% endif %}
-            {% if extra_raw not in ['', 'unknown', 'unavailable'] %}
-              {% set ns.f = dict(ns.f, **(extra_raw | from_json)) %}
-            {% endif %}
+            {%- set sch = schema[tpl] -%}
+            {%- set ns = namespace(f={}) -%}
+            {%- for fname, req in sch.fields -%}
+              {%- set v = pool[loop.index0] -%}
+              {%- if v not in ['', 'unknown', 'unavailable'] -%}
+                {%- set ns.f = dict(ns.f, **{fname: v | trim}) -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if icon_sel not in ['(none)', '', 'unknown', 'unavailable'] and sch.icon and 'icon' not in ns.f -%}
+              {%- set ns.f = dict(ns.f, icon=icon_sel) -%}
+            {%- endif -%}
+            {%- if extra_raw not in ['', 'unknown', 'unavailable'] -%}
+              {%- set ns.f = dict(ns.f, **(extra_raw | from_json)) -%}
+            {%- endif -%}
             {{ ns.f | to_json }}
           missing: >-
-            {% set sch = schema[tpl] %}
-            {% set f = built | from_json %}
+            {%- set sch = schema[tpl] -%}
+            {%- set f = built if built is mapping else (built | trim | from_json) -%}
             {{ sch.fields | selectattr(1) | map(attribute=0) | reject('in', f) | list | join(', ') }}
       # Validate BEFORE calling the API: the server answers missing fields
       # with a bare 500 and no reason.
@@ -425,25 +427,27 @@ script:
             - "{{ states('input_text.label_field_6') }}"
           icon_sel: "{{ states('input_select.label_icon') }}"
           extra_raw: "{{ states('input_text.label_extra_fields') }}"
+          # HA parses variable render results into native types, so `built`
+          # arrives below as a dict, not a string — `missing` handles both.
           built: >-
-            {% set sch = schema[tpl] %}
-            {% set ns = namespace(f={}) %}
-            {% for fname, req in sch.fields %}
-              {% set v = pool[loop.index0] %}
-              {% if v not in ['', 'unknown', 'unavailable'] %}
-                {% set ns.f = dict(ns.f, **{fname: v | trim}) %}
-              {% endif %}
-            {% endfor %}
-            {% if icon_sel not in ['(none)', '', 'unknown', 'unavailable'] and sch.icon and 'icon' not in ns.f %}
-              {% set ns.f = dict(ns.f, icon=icon_sel) %}
-            {% endif %}
-            {% if extra_raw not in ['', 'unknown', 'unavailable'] %}
-              {% set ns.f = dict(ns.f, **(extra_raw | from_json)) %}
-            {% endif %}
+            {%- set sch = schema[tpl] -%}
+            {%- set ns = namespace(f={}) -%}
+            {%- for fname, req in sch.fields -%}
+              {%- set v = pool[loop.index0] -%}
+              {%- if v not in ['', 'unknown', 'unavailable'] -%}
+                {%- set ns.f = dict(ns.f, **{fname: v | trim}) -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {%- if icon_sel not in ['(none)', '', 'unknown', 'unavailable'] and sch.icon and 'icon' not in ns.f -%}
+              {%- set ns.f = dict(ns.f, icon=icon_sel) -%}
+            {%- endif -%}
+            {%- if extra_raw not in ['', 'unknown', 'unavailable'] -%}
+              {%- set ns.f = dict(ns.f, **(extra_raw | from_json)) -%}
+            {%- endif -%}
             {{ ns.f | to_json }}
           missing: >-
-            {% set sch = schema[tpl] %}
-            {% set f = built | from_json %}
+            {%- set sch = schema[tpl] -%}
+            {%- set f = built if built is mapping else (built | trim | from_json) -%}
             {{ sch.fields | selectattr(1) | map(attribute=0) | reject('in', f) | list | join(', ') }}
       - if: "{{ missing != '' }}"
         then:
