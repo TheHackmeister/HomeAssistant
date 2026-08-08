@@ -5,12 +5,10 @@
 // live preview via script.print_label (send=false); the engine writes the
 // preview token / last-result helpers and the card follows them via HA state.
 //
-// Prefill modes (select under Template): empty required fields can be
-// pre-filled with their own field name so the preview shows the field mapping
-// ("required" default, "all", or "none"). Date fields prefill to today's date
-// instead (any mode except "none") and get +1 week / +1 month quick buttons.
+// Date fields prefill to today (any prefill mode except "none") and get
+// +1wk / +2wk / +1mo quick buttons. Template options show the template's
+// DEFAULT tape — every template renders at any tape width (3.5/6/9/12/18/24).
 
-// Field names that hold dates across the template schema (ISO YYYY-MM-DD).
 const DATE_FIELDS = new Set([
   "purchased", "expires", "cooked", "frozen", "opened", "sow_by", "planted",
   "last_cal", "checked", "retain_until", "next_due", "charged", "best_by", "date",
@@ -18,7 +16,7 @@ const DATE_FIELDS = new Set([
 
 const isoDate = (d) => d.toISOString().slice(0, 10);
 const today = () => isoDate(new Date());
-const plusWeek = () => isoDate(new Date(Date.now() + 7 * 86400000));
+const plusDays = (n) => isoDate(new Date(Date.now() + n * 86400000));
 const plusMonth = () => {
   const d = new Date();
   d.setMonth(d.getMonth() + 1);
@@ -95,24 +93,13 @@ class LabelPrinterCard extends HTMLElement {
       : "Loaded tape: unavailable";
   }
 
-  _leftSchema() {
-    const t = this._schema[this._template];
+  _formSchema() {
     const schema = [
-      {
-        name: "_template",
-        selector: {
-          select: {
-            options: this._templates.map((k) => ({
-              value: k,
-              label: `${k} (${this._schema[k].tape}mm tape)`,
-            })),
-          },
-        },
-      },
       {
         name: "_prefill",
         selector: {
           select: {
+            mode: "dropdown",
             options: [
               { value: "required", label: "Prefill required fields with field names" },
               { value: "all", label: "Prefill ALL fields with field names" },
@@ -122,7 +109,7 @@ class LabelPrinterCard extends HTMLElement {
         },
       },
     ];
-    for (const [fname, req] of t.fields) {
+    for (const [fname, req] of this._schema[this._template].fields) {
       // Date fields render as custom rows (with quick buttons), not via ha-form.
       if (DATE_FIELDS.has(fname)) continue;
       schema.push({ name: fname, required: !!req, selector: { text: {} } });
@@ -140,7 +127,6 @@ class LabelPrinterCard extends HTMLElement {
   }
 
   _labels = {
-    _template: "Template",
     _prefill: "Field prefill",
     _batch_size: "Batch size (copies)",
     _gap_dots: "Gap between labels (dots)",
@@ -158,9 +144,22 @@ class LabelPrinterCard extends HTMLElement {
     const style = document.createElement("style");
     style.textContent = `
       ha-card { padding: 16px; }
+      .card-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+      .card-title ha-icon { color: var(--primary-color); }
+      .card-title h1 { font-size: 1.4rem; margin: 0; font-weight: 500; }
       .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
       @media (max-width: 800px) { .wrap { grid-template-columns: 1fr; } }
       h2 { font-size: 1.1rem; margin: 0 0 8px; font-weight: 600; }
+      .tpl-row label, .date-row label { display: block; font-size: 0.9em; margin-bottom: 2px; }
+      .tpl-row select { width: 100%; padding: 8px; font: inherit;
+                        background: var(--card-background-color);
+                        color: var(--primary-text-color);
+                        border: 1px solid var(--divider-color); border-radius: 6px; }
+      .tpl-nav { display: flex; gap: 4px; margin: 4px 0 8px; }
+      .tpl-nav button { flex: 1; background: var(--secondary-background-color); border: none;
+                        border-radius: 6px; padding: 6px 8px; cursor: pointer;
+                        color: var(--primary-color); }
+      .tape-note { color: var(--secondary-text-color); font-size: 0.8em; margin-bottom: 8px; }
       .buttons { display: flex; gap: 8px; margin-top: 12px; }
       .buttons ha-button { flex: 1; }
       .preview img { max-width: 100%; image-rendering: pixelated; background: #fff; }
@@ -175,10 +174,9 @@ class LabelPrinterCard extends HTMLElement {
       .icon-grid img { width: 28px; height: 28px; display: block; }
       .icon-grid button.none { color: var(--secondary-text-color); font-size: 0.75em;
                                min-height: 36px; }
-      .date-row { display: grid; grid-template-columns: 1fr auto auto; gap: 4px;
+      .date-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 4px;
                   align-items: end; margin-top: 8px; }
-      .date-row label { grid-column: 1 / -1; font-size: 0.9em;
-                        color: var(--primary-text-color); }
+      .date-row label { grid-column: 1 / -1; }
       .date-row input { width: 100%; box-sizing: border-box; padding: 6px 8px;
                         background: var(--card-background-color);
                         color: var(--primary-text-color);
@@ -190,9 +188,19 @@ class LabelPrinterCard extends HTMLElement {
     `;
     const card = document.createElement("ha-card");
     card.innerHTML = `
+      <div class="card-title"><ha-icon icon="mdi:label-printer"></ha-icon><h1>Label Printer</h1></div>
       <div class="wrap">
         <div class="form-col">
-          <h2>Label options</h2>
+          <div class="tpl-row">
+            <label for="tpl">Template</label>
+            <select id="tpl"></select>
+            <div class="tpl-nav">
+              <button class="tpl-prev">◀ Prev</button>
+              <button class="tpl-next">Next ▶</button>
+            </div>
+            <div class="tape-note">Listed size is the template's default — all templates
+              accept 3.5 / 6 / 9 / 12 / 18 / 24 mm tape.</div>
+          </div>
           <div class="form-host"></div>
           <div class="date-host"></div>
           <div class="icon-area"></div>
@@ -218,10 +226,29 @@ class LabelPrinterCard extends HTMLElement {
     this._placeholder = card.querySelector(".placeholder");
     this._statusEl = card.querySelector(".status");
     this._tapeEl = card.querySelector(".tape");
+    this._tplSelect = card.querySelector("#tpl");
+    this._tplSelect.addEventListener("change", () => this._changeTemplate(this._tplSelect.value));
+    card.querySelector(".tpl-prev").addEventListener("click", () => this._stepTemplate(-1));
+    card.querySelector(".tpl-next").addEventListener("click", () => this._stepTemplate(1));
     card.querySelector(".print-btn").addEventListener("click", () => this._print());
     card.querySelector(".reset-btn").addEventListener("click", () => this._reset());
     this.replaceChildren(style, card);
     this._rebuildForm();
+  }
+
+  _stepTemplate(delta) {
+    const i = this._templates.indexOf(this._template);
+    const next = (i + delta + this._templates.length) % this._templates.length;
+    this._changeTemplate(this._templates[next]);
+  }
+
+  _changeTemplate(tpl) {
+    if (tpl === this._template) return;
+    this._template = tpl;
+    this._data = this._defaults();
+    this._applyPrefill();
+    this._rebuildForm();
+    this._debouncedPreview();
   }
 
   _makeForm(host, schema, data) {
@@ -235,28 +262,34 @@ class LabelPrinterCard extends HTMLElement {
   }
 
   _rebuildForm() {
+    // Template select (custom row above the form)
+    this._tplSelect.replaceChildren(
+      ...this._templates.map((k) => {
+        const opt = document.createElement("option");
+        opt.value = k;
+        opt.textContent = `${k} (${this._schema[k].tape}mm default)`;
+        opt.selected = k === this._template;
+        return opt;
+      }),
+    );
+
     this._form = this._makeForm(
-      this.querySelector(".form-host"), this._leftSchema(), this._data,
+      this.querySelector(".form-host"), this._formSchema(), this._data,
     );
     this._form.addEventListener("value-changed", (ev) => {
       ev.stopPropagation();
       const v = ev.detail.value;
-      if (v._template !== this._template) {
-        // New template: fresh defaults, fresh field set, immediate preview.
-        this._template = v._template;
-        this._data = this._defaults();
-        this._applyPrefill();
-        this._rebuildForm();
-      } else if (v._prefill !== this._data._prefill) {
+      if (v._prefill !== this._data._prefill) {
         // Prefill mode change: repopulate the field values accordingly.
-        this._data = { ...v };
+        this._data = { ...this._data, ...v };
         this._applyPrefill();
         this._rebuildForm();
       } else {
-        this._data = v;
+        this._data = { ...this._data, ...v };
       }
       this._debouncedPreview();
     });
+
     this._batchForm = this._makeForm(
       this.querySelector(".batch-host"), this._batchSchema(), this._data,
     );
@@ -266,6 +299,7 @@ class LabelPrinterCard extends HTMLElement {
       // Batch size changes the strip preview; gap/cut only matter at print time.
       if (ev.detail.value._batch_size !== undefined) this._debouncedPreview();
     });
+
     this._renderDateRows();
     this._renderIconPicker();
   }
@@ -287,13 +321,13 @@ class LabelPrinterCard extends HTMLElement {
         this._data = { ...this._data, [fname]: input.value };
         this._debouncedPreview();
       });
-      const week = document.createElement("button");
-      week.textContent = "+1 wk";
-      week.addEventListener("click", () => this._setDate(fname, plusWeek()));
-      const month = document.createElement("button");
-      month.textContent = "+1 mo";
-      month.addEventListener("click", () => this._setDate(fname, plusMonth()));
-      row.replaceChildren(label, input, week, month);
+      row.replaceChildren(label, input);
+      for (const [text, fn] of [["+1 wk", () => plusDays(7)], ["+2 wk", () => plusDays(14)], ["+1 mo", plusMonth]]) {
+        const btn = document.createElement("button");
+        btn.textContent = text;
+        btn.addEventListener("click", () => this._setDate(fname, fn()));
+        row.appendChild(btn);
+      }
       rows.push(row);
     }
     host.replaceChildren(...rows);

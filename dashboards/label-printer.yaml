@@ -6,9 +6,6 @@ views:
   sections:
   - type: grid
     cards:
-    - type: heading
-      heading: Label Printer
-      icon: mdi:label-printer
     - type: custom:label-printer-card
       tape_sensor: sensor.label_printer_status
       icons:
@@ -464,3 +461,5 @@ views:
             - true
           - - checked
             - true
+      grid_options:
+        columns: 12
