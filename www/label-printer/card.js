@@ -244,9 +244,26 @@ class LabelPrinterCard extends HTMLElement {
 
   _changeTemplate(tpl) {
     if (tpl === this._template) return;
+    // Template change only regenerates the template's own field values;
+    // prefill mode, icon choice, and batch settings all carry over.
+    const keep = {
+      _prefill: this._data._prefill,
+      icon: this._data.icon,
+      _batch_size: this._data._batch_size,
+      _gap_dots: this._data._gap_dots,
+      _cut_every: this._data._cut_every,
+      _half_cut: this._data._half_cut,
+    };
     this._template = tpl;
-    this._data = this._defaults();
+    this._data = { ...this._defaults(), ...keep, _template: tpl };
     this._applyPrefill();
+    // Icon choice carries over, and is remembered across non-icon templates.
+    if (this._schema[tpl].icon) {
+      this._data.icon = keep.icon || this._lastIcon || "(none)";
+    } else {
+      if (keep.icon && keep.icon !== "(none)") this._lastIcon = keep.icon;
+      delete this._data.icon;
+    }
     this._rebuildForm();
     this._debouncedPreview();
   }
@@ -374,6 +391,7 @@ class LabelPrinterCard extends HTMLElement {
   }
 
   _pickIcon(name) {
+    if (name !== "(none)") this._lastIcon = name;
     this._data = { ...this._data, icon: name };
     this._renderIconPicker();
     this._debouncedPreview();

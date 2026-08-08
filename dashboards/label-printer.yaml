@@ -1,6 +1,6 @@
 views:
 - type: sections
-  max_columns: 2
+  max_columns: 1
   title: Label Printer
   path: label-printer
   sections:
@@ -461,5 +461,5 @@ views:
             - true
           - - checked
             - true
-      grid_options:
-        columns: 12
+      layout_options:
+        grid_columns: 4
