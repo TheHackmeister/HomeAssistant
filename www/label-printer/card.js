@@ -1,5 +1,11 @@
 // Label Printer card — helper-free dynamic form for the brother-ptouch-automation service.
-// v1.5 — bump the resource URL (?v=…) when this changes to bust browser caches.
+// v1.6 — bump the resource URL (?v=…) when this changes to bust browser caches.
+
+// Temporary debug probe for the icon-reset hunt: enable with
+// `window.__lpDebug = true` in the browser console, reproduce, and share the log.
+const lpLog = (...args) => {
+  if (window.__lpDebug) console.log("[label-printer]", ...args);
+};
 //
 // All form state is client-side. Fields regenerate per selected template from
 // the embedded schema (mirrors GET /templates). Every change debounces into a
@@ -408,7 +414,9 @@ class LabelPrinterCard extends HTMLElement {
     this._form.addEventListener("value-changed", (ev) => {
       ev.stopPropagation();
       const v = ev.detail.value;
+      lpLog("main form change:", JSON.stringify(v), "| stored icon:", this._data.icon);
       if (v._prefill !== this._data._prefill) {
+        lpLog("-> prefill branch, rebuilding");
         // Prefill mode change: repopulate the field values accordingly.
         this._data = mergeDefined(this._data, v);
         this._applyPrefill();
@@ -424,6 +432,7 @@ class LabelPrinterCard extends HTMLElement {
     );
     this._batchForm.addEventListener("value-changed", (ev) => {
       ev.stopPropagation();
+      lpLog("batch form change:", JSON.stringify(ev.detail.value), "| stored icon:", this._data.icon);
       this._data = mergeDefined(this._data, ev.detail.value);
       // Batch size changes the strip preview; gap/cut only matter at print time.
       if (ev.detail.value._batch_size !== undefined) this._debouncedPreview();
@@ -483,6 +492,8 @@ class LabelPrinterCard extends HTMLElement {
     // Don't rebuild the icon area on unrelated form rebuilds — only when the
     // template (or picker availability) actually changed the mode.
     const mode = customElements.get("ha-icon-picker") ? "picker" : "grid";
+    lpLog("renderIconPicker:", mode, "| stored icon:", this._data.icon,
+      "| skip?", this._iconRenderedFor === `${this._template}:${mode}`);
     if (this._iconRenderedFor === `${this._template}:${mode}`) return;
     this._iconRenderedFor = `${this._template}:${mode}`;
     // HA-native picker when available: searchable mdi: references with live
@@ -497,6 +508,7 @@ class LabelPrinterCard extends HTMLElement {
       picker.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
         const v = ev.detail.value || "";
+        lpLog("picker value-changed:", JSON.stringify(v), "| focused:", picker.matches(":focus-within"));
         // ha-combo-box emits a spurious empty value-changed while its icon
         // items load asynchronously (e.g. right after a field change triggers
         // a state update). Ignore empty emissions unless the user is actually
