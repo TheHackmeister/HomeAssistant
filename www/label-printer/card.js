@@ -1,7 +1,5 @@
 // Label Printer card — helper-free dynamic form for the brother-ptouch-automation service.
-// v1.6 — bump the resource URL (?v=…) when this changes to bust browser caches.
-
-// Temporary debug probe for the icon-reset hunt: enable with
+// v1.6 — bump the resource URL (?v=…) when this changes to bust browser caches.// Temporary debug probe for the icon-reset hunt: enable with
 // `window.__lpDebug = true` in the browser console, reproduce, and share the log.
 const lpLog = (...args) => {
   if (window.__lpDebug) console.log("[label-printer]", ...args);
@@ -187,9 +185,6 @@ class LabelPrinterCard extends HTMLElement {
       .card-title h1 { font-size: 1.4rem; margin: 0; font-weight: 500; }
       .wrap { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
       @media (max-width: 1000px) { .wrap { grid-template-columns: 1fr; } }
-      .wrap > div { display: flex; flex-direction: column; }
-      .grow { flex: 1; }
-      .push-bottom { margin-top: auto; }
       .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
                     font-size: 0.95em; cursor: pointer; }
       .toggle-row input { accent-color: var(--primary-color); }
@@ -270,7 +265,7 @@ class LabelPrinterCard extends HTMLElement {
           <div class="status"></div>
           <div class="tape meta"></div>
           <h2 style="margin-top:12px">Batch</h2>
-          <div class="batch-host grow"></div>
+          <div class="batch-host"></div>
         </div>
         <div class="groups-col">
           <h2>Saved Groups</h2>
@@ -280,8 +275,8 @@ class LabelPrinterCard extends HTMLElement {
           <input class="group-name" type="text" placeholder="Group name">
           <input class="group-keywords" type="text" placeholder="Search entities">
           <input class="group-search" type="text" placeholder="Search prints">
-          <div class="groups-host grow"></div>
-          <ha-button class="save-btn push-bottom">Save Group</ha-button>
+          <div class="groups-host"></div>
+          <ha-button class="save-btn">Save Group</ha-button>
         </div>
       </div>
     `;
