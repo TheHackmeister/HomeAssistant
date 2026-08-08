@@ -770,6 +770,9 @@ frontend:
   themes: !include_dir_merge_named themes
 
 lovelace:
+  resources:
+    - url: /local/label-printer/card.js
+      type: module
   dashboards:
     label-printer:
       mode: yaml
@@ -777,6 +780,17 @@ lovelace:
       title: Label Printer
       icon: mdi:label-printer
       show_in_sidebar: true
+
+# Loaded-tape / printer-status sensor backing the label printer card readout.
+rest:
+  - resource: https://brother-ptouch-automation.spencerslab.com/status
+    scan_interval: 120
+    sensor:
+      - name: Label printer status
+        value_template: "{{ value_json.tape_mm ~ ' mm' if value_json.get('ok') else 'unavailable' }}"
+        json_attributes:
+          - errors
+          - has_media
 
 # panel_iframe:
 #   router:

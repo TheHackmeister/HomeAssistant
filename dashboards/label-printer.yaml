@@ -9,138 +9,458 @@ views:
     - type: heading
       heading: Label Printer
       icon: mdi:label-printer
-    - type: entities
-      title: Label options
-      entities:
-      - entity: input_select.label_template
-        name: Template
-    - type: custom:config-template-card
-      entities:
-      - input_select.label_template
-      card:
-        type: entities
-        title: Label fields
-        entities: "${ (() => {\n                  const S = {\"kitchen/pantry_jar\":{\"f\":[[\"name\",1],[\"purchased\",1],[\"expires\",0]],\"i\":1},\"kitchen/spice\":{\"f\":[[\"name\",1],[\"origin\",0],[\"\
-          best_by\",0]],\"i\":0},\"kitchen/leftover\":{\"f\":[[\"contents\",1],[\"cooked\",1],[\"eat_within_days\",0]],\"i\":0},\"kitchen/freezer\":{\"f\":[[\"contents\",1],[\"frozen\",1],[\"portion\",0]],\"\
-          i\":0},\"electronics/component_bin\":{\"f\":[[\"value\",1],[\"footprint\",1],[\"tolerance\",0]],\"i\":0},\"electronics/cable_flag\":{\"f\":[[\"title\",0],[\"source\",0],[\"dest\",0],[\"date\"\
-          ,0],[\"details\",0],[\"link\",0],[\"image\",0],[\"wire\",0],[\"overlap_mm\",0]],\"i\":0},\"electronics/psu_polarity\":{\"f\":[[\"voltage\",1],[\"current\",1],[\"polarity\",0]],\"i\":0},\"three_d_printing/filament_spool\"\
-          :{\"f\":[[\"material\",1],[\"color\",1],[\"brand\",1],[\"opened\",1],[\"nozzle_temp\",0],[\"bed_temp\",0]],\"i\":0},\"three_d_printing/print_bin\":{\"f\":[[\"part\",1],[\"project\",0],[\"qty\"\
-          ,0]],\"i\":0},\"three_d_printing/tool_tag\":{\"f\":[[\"tool\",1],[\"owner\",0]],\"i\":0},\"utility/qr\":{\"f\":[[\"data\",1],[\"caption\",0]],\"i\":0},\"utility/image\":{\"f\":[[\"path\",1],[\"\
-          caption\",0],[\"threshold\",0]],\"i\":0},\"garden/seed_packet\":{\"f\":[[\"variety\",1],[\"sow_by\",1],[\"year\",0]],\"i\":1},\"garden/plant_tag\":{\"f\":[[\"name\",1],[\"planted\",1]],\"i\":1},\"\
-          garden/row_marker\":{\"f\":[[\"crop\",1],[\"variety\",1]],\"i\":1},\"networking/patch_port\":{\"f\":[[\"port\",1],[\"vlan\",1],[\"dest\",0]],\"i\":1},\"networking/rack_unit\":{\"f\":[[\"unit\"\
-          ,1],[\"device\",1]],\"i\":1},\"networking/wap_location\":{\"f\":[[\"name\",1],[\"location\",1]],\"i\":1},\"workshop/hazard\":{\"f\":[[\"hazard\",1],[\"text\",1],[\"code\",0]],\"i\":1},\"workshop/tool_id\"\
-          :{\"f\":[[\"name\",1],[\"owner\",1],[\"project\",0]],\"i\":1},\"workshop/torque_cal\":{\"f\":[[\"tool\",1],[\"range_nm\",1],[\"last_cal\",1]],\"i\":1},\"workshop/first_aid\":{\"f\":[[\"kit\",1],[\"\
-          expires\",1]],\"i\":1},\"home_inventory/moving_box\":{\"f\":[[\"room\",1],[\"contents\",1],[\"fragile\",0]],\"i\":1},\"home_inventory/warranty\":{\"f\":[[\"item\",1],[\"expires\",1],[\"receipt\"\
-          ,0]],\"i\":1},\"home_inventory/storage_bin\":{\"f\":[[\"location\",1],[\"contents\",1]],\"i\":1},\"media/bookshelf_tag\":{\"f\":[[\"title\",1],[\"author\",1],[\"callno\",0]],\"i\":1},\"media/archive_box\"\
-          :{\"f\":[[\"label\",1],[\"retain_until\",1]],\"i\":1},\"media/cd_record\":{\"f\":[[\"title\",1],[\"artist\",1],[\"year\",0]],\"i\":1},\"pet/collar_backup\":{\"f\":[[\"name\",1],[\"contact\",1]],\"\
-          i\":1},\"pet/med_schedule\":{\"f\":[[\"pet\",1],[\"med\",1],[\"cadence\",1]],\"i\":1},\"pet/food_bowl\":{\"f\":[[\"pet\",1],[\"food\",1],[\"portion\",1]],\"i\":1},\"travel/luggage_tag\":{\"f\"\
-          :[[\"name\",1],[\"contact\",1]],\"i\":1},\"travel/gear_bag\":{\"f\":[[\"bag\",1],[\"purpose\",1]],\"i\":1},\"travel/power_bank\":{\"f\":[[\"capacity_mah\",1],[\"charged\",1],[\"model\",0]],\"\
-          i\":1},\"calibration/instrument_cal\":{\"f\":[[\"instrument\",1],[\"next_due\",1],[\"owner\",0]],\"i\":1},\"calibration/cert_id\":{\"f\":[[\"cert_no\",1],[\"issuer\",1]],\"i\":1},\"calibration/thermometer_cal\"\
-          :{\"f\":[[\"instrument\",1],[\"ice_point_c\",1],[\"checked\",1]],\"i\":1}};\n                  const sch = S[states['input_select.label_template'].state];\n                  if (!sch) return [];\n\
-          \                  const rows = sch.f.slice(0, 7).map((f, i) => ({\n                    entity: 'input_text.label_field_' + (i + 1),\n                    name: f[0] + (f[1] ? ' *' : ''),\n   \
-          \               }));\n                  if (sch.i) rows.push({ entity: 'input_select.label_icon', name: 'icon' });\n                  return rows;\n                })() }"
-    - type: entities
-      title: Advanced
-      entities:
-      - entity: input_text.label_extra_fields
-        name: Extra fields (JSON)
-  - type: grid
-    cards:
-    - type: heading
-      heading: Preview
-      icon: mdi:image-search-outline
-    - type: vertical-stack
-      card_mod:
-        style: ':host { --vertical-stack-card-gap: 0px; }'
-      cards:
-      - type: entities
-        entities:
-        - entity: input_boolean.label_live_reload
-          name: Live reload preview on change
-        card_mod:
-          style: 'ha-card { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; }'
-      - type: markdown
-        content: '{% if states(''input_text.label_preview_token'') not in ['''', ''unknown'', ''unavailable''] %}
-
-          ![Label preview](/local/labels/preview.png?v={{ states(''input_text.label_preview_token'') }})
-
-          {% else %}
-
-          No preview yet — fill in the options and click **Preview Label**.
-
-          {% endif %}
-
-          {% set r = states(''input_text.label_last_result'') %}
-
-          {% if r not in ['''', ''unknown'', ''unavailable''] %}
-
-
-          **Last result:** {{ r }}
-
-          {% endif %}'
-        card_mod:
-          style: 'ha-card { border-top-left-radius: 0; border-top-right-radius: 0; }'
-    - type: entities
-      title: Batch settings
-      entities:
-      - entity: input_number.label_batch_size
-        name: Batch size (copies)
-      - entity: input_number.label_batch_gap_dots
-        name: Gap between labels (dots)
-      - entity: input_number.label_batch_cut_every
-        name: Full cut every N labels (0 = off)
-      - entity: input_boolean.label_batch_half_cut
-        name: Half-cut between labels
-    - type: entities
-      title: Tape
-      entities:
-      - entity: input_select.label_tape_mm
-        name: Tape width (mm, synced from printer on preview)
-    - type: grid
-      columns: 3
-      square: false
-      cards:
-      - type: button
-        name: Preview Label
-        icon: mdi:image-search
-        tap_action:
-          action: perform-action
-          perform_action: script.label_preview_from_helpers
-      - type: button
-        name: Send to Printer
-        icon: mdi:printer
-        tap_action:
-          action: perform-action
-          perform_action: script.label_print_from_helpers
-          confirmation:
-            text: Send this label to the printer?
-      - type: button
-        name: Reset
-        icon: mdi:restore
-        tap_action:
-          action: perform-action
-          perform_action: script.label_reset_helpers
-          confirmation:
-            text: Reset all label fields to defaults?
-  - type: grid
-    cards:
-    - type: heading
-      heading: Icon picker
-      icon: mdi:emoticon-outline
-      heading_style: subtitle
-    - type: custom:config-template-card
-      entities:
-      - input_select.label_icon
-      card:
-        type: grid
-        columns: 8
-        square: true
-        cards: "${ [\"antenna\", \"apple\", \"arrow-right\", \"arrow-up-right\", \"banana\", \"barcode\", \"battery\", \"beef\", \"biohazard\", \"bluetooth\", \"book\", \"bookmark\", \"box\", \"briefcase\"\
-          , \"cable\", \"calendar\", \"carrot\", \"cat\", \"check\", \"chef-hat\", \"cherry\", \"circle\", \"clipboard-check\", \"clock\", \"coffee\", \"cog\", \"compass\", \"cookie\", \"cpu\", \"croissant\"\
-          , \"dog\", \"drill\", \"droplets\", \"egg\", \"file-text\", \"fish\", \"flame\", \"flower-2\", \"gauge\", \"globe\", \"grape\", \"hammer\", \"hard-drive\", \"heart\", \"info\", \"key\", \"leaf\"\
-          , \"lock\", \"luggage\", \"map\", \"map-pin\", \"milk\", \"monitor\", \"network\", \"package\", \"paintbrush\", \"paw-print\", \"pill\", \"plane\", \"plug\", \"printer\", \"qr-code\", \"router\"\
-          , \"ruler\", \"salad\", \"scale\", \"scissors\", \"server\", \"server-cog\", \"shield\", \"signal\", \"snowflake\", \"sprout\", \"square\", \"star\", \"sun\", \"syringe\", \"tag\", \"tent\", \"\
-          thermometer\", \"tree-pine\", \"triangle\", \"usb\", \"utensils\", \"wheat\", \"wifi\", \"wrench\", \"x\", \"zap\"].map(n => ({\n                    type: 'picture',\n                    image:\
-          \ 'https://brother-ptouch-automation.spencerslab.com/icons/' + n + '.svg',\n                    tap_action: {\n                      action: 'perform-action',\n                      perform_action:\
-          \ 'input_select.select_option',\n                      target: { entity_id: 'input_select.label_icon' },\n                      data: { option: n },\n                    },\n                 \
-          \ })) }"
+    - type: custom:label-printer-card
+      tape_sensor: sensor.label_printer_status
+      icons:
+      - antenna
+      - apple
+      - arrow-right
+      - arrow-up-right
+      - banana
+      - barcode
+      - battery
+      - beef
+      - biohazard
+      - bluetooth
+      - book
+      - bookmark
+      - box
+      - briefcase
+      - cable
+      - calendar
+      - carrot
+      - cat
+      - check
+      - chef-hat
+      - cherry
+      - circle
+      - clipboard-check
+      - clock
+      - coffee
+      - cog
+      - compass
+      - cookie
+      - cpu
+      - croissant
+      - dog
+      - drill
+      - droplets
+      - egg
+      - file-text
+      - fish
+      - flame
+      - flower-2
+      - gauge
+      - globe
+      - grape
+      - hammer
+      - hard-drive
+      - heart
+      - info
+      - key
+      - leaf
+      - lock
+      - luggage
+      - map
+      - map-pin
+      - milk
+      - monitor
+      - network
+      - package
+      - paintbrush
+      - paw-print
+      - pill
+      - plane
+      - plug
+      - printer
+      - qr-code
+      - router
+      - ruler
+      - salad
+      - scale
+      - scissors
+      - server
+      - server-cog
+      - shield
+      - signal
+      - snowflake
+      - sprout
+      - square
+      - star
+      - sun
+      - syringe
+      - tag
+      - tent
+      - thermometer
+      - tree-pine
+      - triangle
+      - usb
+      - utensils
+      - wheat
+      - wifi
+      - wrench
+      - x
+      - zap
+      schema:
+        kitchen/pantry_jar:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - purchased
+            - true
+          - - expires
+            - false
+        kitchen/spice:
+          tape: 12
+          icon: false
+          fields:
+          - - name
+            - true
+          - - origin
+            - false
+          - - best_by
+            - false
+        kitchen/leftover:
+          tape: 12
+          icon: false
+          fields:
+          - - contents
+            - true
+          - - cooked
+            - true
+          - - eat_within_days
+            - false
+        kitchen/freezer:
+          tape: 12
+          icon: false
+          fields:
+          - - contents
+            - true
+          - - frozen
+            - true
+          - - portion
+            - false
+        electronics/component_bin:
+          tape: 12
+          icon: false
+          fields:
+          - - value
+            - true
+          - - footprint
+            - true
+          - - tolerance
+            - false
+        electronics/cable_flag:
+          tape: 12
+          icon: false
+          fields:
+          - - title
+            - false
+          - - source
+            - false
+          - - dest
+            - false
+          - - date
+            - false
+          - - details
+            - false
+          - - link
+            - false
+          - - image
+            - false
+          - - wire
+            - false
+          - - overlap_mm
+            - false
+        electronics/psu_polarity:
+          tape: 12
+          icon: false
+          fields:
+          - - voltage
+            - true
+          - - current
+            - true
+          - - polarity
+            - false
+        three_d_printing/filament_spool:
+          tape: 12
+          icon: false
+          fields:
+          - - material
+            - true
+          - - color
+            - true
+          - - brand
+            - true
+          - - opened
+            - true
+          - - nozzle_temp
+            - false
+          - - bed_temp
+            - false
+        three_d_printing/print_bin:
+          tape: 12
+          icon: false
+          fields:
+          - - part
+            - true
+          - - project
+            - false
+          - - qty
+            - false
+        three_d_printing/tool_tag:
+          tape: 12
+          icon: false
+          fields:
+          - - tool
+            - true
+          - - owner
+            - false
+        utility/qr:
+          tape: 12
+          icon: false
+          fields:
+          - - data
+            - true
+          - - caption
+            - false
+        utility/image:
+          tape: 12
+          icon: false
+          fields:
+          - - path
+            - true
+          - - caption
+            - false
+          - - threshold
+            - false
+        garden/seed_packet:
+          tape: 12
+          icon: true
+          fields:
+          - - variety
+            - true
+          - - sow_by
+            - true
+          - - year
+            - false
+        garden/plant_tag:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - planted
+            - true
+        garden/row_marker:
+          tape: 12
+          icon: true
+          fields:
+          - - crop
+            - true
+          - - variety
+            - true
+        networking/patch_port:
+          tape: 12
+          icon: true
+          fields:
+          - - port
+            - true
+          - - vlan
+            - true
+          - - dest
+            - false
+        networking/rack_unit:
+          tape: 12
+          icon: true
+          fields:
+          - - unit
+            - true
+          - - device
+            - true
+        networking/wap_location:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - location
+            - true
+        workshop/hazard:
+          tape: 12
+          icon: true
+          fields:
+          - - hazard
+            - true
+          - - text
+            - true
+          - - code
+            - false
+        workshop/tool_id:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - owner
+            - true
+          - - project
+            - false
+        workshop/torque_cal:
+          tape: 12
+          icon: true
+          fields:
+          - - tool
+            - true
+          - - range_nm
+            - true
+          - - last_cal
+            - true
+        workshop/first_aid:
+          tape: 12
+          icon: true
+          fields:
+          - - kit
+            - true
+          - - expires
+            - true
+        home_inventory/moving_box:
+          tape: 24
+          icon: true
+          fields:
+          - - room
+            - true
+          - - contents
+            - true
+          - - fragile
+            - false
+        home_inventory/warranty:
+          tape: 12
+          icon: true
+          fields:
+          - - item
+            - true
+          - - expires
+            - true
+          - - receipt
+            - false
+        home_inventory/storage_bin:
+          tape: 12
+          icon: true
+          fields:
+          - - location
+            - true
+          - - contents
+            - true
+        media/bookshelf_tag:
+          tape: 12
+          icon: true
+          fields:
+          - - title
+            - true
+          - - author
+            - true
+          - - callno
+            - false
+        media/archive_box:
+          tape: 18
+          icon: true
+          fields:
+          - - label
+            - true
+          - - retain_until
+            - true
+        media/cd_record:
+          tape: 12
+          icon: true
+          fields:
+          - - title
+            - true
+          - - artist
+            - true
+          - - year
+            - false
+        pet/collar_backup:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - contact
+            - true
+        pet/med_schedule:
+          tape: 12
+          icon: true
+          fields:
+          - - pet
+            - true
+          - - med
+            - true
+          - - cadence
+            - true
+        pet/food_bowl:
+          tape: 12
+          icon: true
+          fields:
+          - - pet
+            - true
+          - - food
+            - true
+          - - portion
+            - true
+        travel/luggage_tag:
+          tape: 18
+          icon: true
+          fields:
+          - - name
+            - true
+          - - contact
+            - true
+        travel/gear_bag:
+          tape: 12
+          icon: true
+          fields:
+          - - bag
+            - true
+          - - purpose
+            - true
+        travel/power_bank:
+          tape: 12
+          icon: true
+          fields:
+          - - capacity_mah
+            - true
+          - - charged
+            - true
+          - - model
+            - false
+        calibration/instrument_cal:
+          tape: 12
+          icon: true
+          fields:
+          - - instrument
+            - true
+          - - next_due
+            - true
+          - - owner
+            - false
+        calibration/cert_id:
+          tape: 12
+          icon: true
+          fields:
+          - - cert_no
+            - true
+          - - issuer
+            - true
+        calibration/thermometer_cal:
+          tape: 12
+          icon: true
+          fields:
+          - - instrument
+            - true
+          - - ice_point_c
+            - true
+          - - checked
+            - true

@@ -7314,6 +7314,18 @@ print_label:
       selector:
         boolean: {}
   sequence:
+    # Physical tape wins: preview and print target what's actually loaded.
+    # Falls back to the passed tape_mm when the status query fails.
+    - action: rest_command.label_printer_status
+      response_variable: printer_status
+      continue_on_error: true
+    - variables:
+        tape_mm: >-
+          {%- if printer_status is defined and printer_status.content is mapping and printer_status.content.get('ok') -%}
+          {{ printer_status.content.tape_mm }}
+          {%- else -%}
+          {{ tape_mm | default('24') }}
+          {%- endif %}
     - variables:
         name_map:
           kitchen/pantry_jar: name
@@ -7533,3 +7545,9 @@ print_label:
             entity_id: input_text.label_last_result
           data:
             value: ''
+        # Bump the cache-buster so dashboard cards reload preview.png.
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_preview_token
+          data:
+            value: '{{ now().timestamp() | int }}'
