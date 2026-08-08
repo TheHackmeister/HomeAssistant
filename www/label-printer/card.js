@@ -1,5 +1,8 @@
 // Label Printer card — helper-free dynamic form for the brother-ptouch-automation service.
-// v1.6 — bump the resource URL (?v=…) when this changes to bust browser caches.// Temporary debug probe for the icon-reset hunt: enable with
+// v1.7 — bump the resource URL (?v=…) when this changes to bust browser caches.
+
+const CARD_VERSION = "1.7";
+console.info(`%clabel-printer-card v${CARD_VERSION}`, "color: #4af");// Temporary debug probe for the icon-reset hunt: enable with
 // `window.__lpDebug = true` in the browser console, reproduce, and share the log.
 const lpLog = (...args) => {
   if (window.__lpDebug) console.log("[label-printer]", ...args);
@@ -183,6 +186,7 @@ class LabelPrinterCard extends HTMLElement {
       .card-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
       .card-title ha-icon { color: var(--primary-color); }
       .card-title h1 { font-size: 1.4rem; margin: 0; font-weight: 500; }
+      .card-title .ver { color: var(--secondary-text-color); font-size: 0.75em; }
       .wrap { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
       @media (max-width: 1000px) { .wrap { grid-template-columns: 1fr; } }
       .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
@@ -235,7 +239,7 @@ class LabelPrinterCard extends HTMLElement {
     `;
     const card = document.createElement("ha-card");
     card.innerHTML = `
-      <div class="card-title"><ha-icon icon="mdi:label-outline"></ha-icon><h1>Label Printer</h1></div>
+      <div class="card-title"><ha-icon icon="mdi:label-outline"></ha-icon><h1>Label Printer</h1><span class="ver">v${CARD_VERSION}</span></div>
       <div class="wrap">
         <div class="form-col">
           <div class="tpl-row">
