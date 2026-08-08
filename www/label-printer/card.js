@@ -1,5 +1,5 @@
 // Label Printer card — helper-free dynamic form for the brother-ptouch-automation service.
-// v1.4 — bump the resource URL (?v=…) when this changes to bust browser caches.
+// v1.5 — bump the resource URL (?v=…) when this changes to bust browser caches.
 //
 // All form state is client-side. Fields regenerate per selected template from
 // the embedded schema (mirrors GET /templates). Every change debounces into a
@@ -249,8 +249,8 @@ class LabelPrinterCard extends HTMLElement {
           </div>
           <div class="form-host"></div>
           <div class="date-host"></div>
-          <div class="icon-area grow"></div>
-          <div class="buttons push-bottom">
+          <div class="icon-area"></div>
+          <div class="buttons">
             <ha-button class="reset-btn">Reset</ha-button>
             <ha-button class="print-btn">Print</ha-button>
           </div>
@@ -589,7 +589,7 @@ class LabelPrinterCard extends HTMLElement {
     if (this._data._autosave) {
       const now = new Date();
       const pad = (n) => String(n).padStart(2, "0");
-      const name = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const name = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
       await this._saveGroup(name);
     }
   }
