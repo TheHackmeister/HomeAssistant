@@ -14,6 +14,12 @@ const DATE_FIELDS = new Set([
   "last_cal", "checked", "retain_until", "next_due", "charged", "best_by", "date",
 ]);
 
+// Integer fields (name -> prefill default). Rendered as number inputs.
+const INT_FIELDS = new Map([
+  ["eat_within_days", 7],
+  ["overlap_mm", 7],
+]);
+
 const isoDate = (d) => d.toISOString().slice(0, 10);
 const today = () => isoDate(new Date());
 const plusDays = (n) => isoDate(new Date(Date.now() + n * 86400000));
@@ -57,6 +63,9 @@ class LabelPrinterCard extends HTMLElement {
       if (DATE_FIELDS.has(fname)) {
         // Dates prefill to today instead of the field-name placeholder.
         this._data[fname] = mode === "none" ? "" : (mode === "all" || req) ? today() : "";
+      } else if (INT_FIELDS.has(fname)) {
+        // Ints prefill to a number, not the field-name string.
+        this._data[fname] = mode === "none" ? "" : (mode === "all" || req) ? INT_FIELDS.get(fname) : "";
       } else {
         this._data[fname] = mode === "all" || (mode === "required" && req) ? fname : "";
       }
@@ -112,6 +121,10 @@ class LabelPrinterCard extends HTMLElement {
     for (const [fname, req] of this._schema[this._template].fields) {
       // Date fields render as custom rows (with quick buttons), not via ha-form.
       if (DATE_FIELDS.has(fname)) continue;
+      if (INT_FIELDS.has(fname)) {
+        schema.push({ name: fname, required: !!req, selector: { number: { min: 0, max: 9999, mode: "box" } } });
+        continue;
+      }
       schema.push({ name: fname, required: !!req, selector: { text: {} } });
     }
     return schema;
@@ -174,7 +187,7 @@ class LabelPrinterCard extends HTMLElement {
       .icon-grid img { width: 28px; height: 28px; display: block; }
       .icon-grid button.none { color: var(--secondary-text-color); font-size: 0.75em;
                                min-height: 36px; }
-      .date-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 4px;
+      .date-row { display: grid; grid-template-columns: 1fr repeat(4, auto); gap: 4px;
                   align-items: end; margin-top: 8px; }
       .date-row label { grid-column: 1 / -1; }
       .date-row input { width: 100%; box-sizing: border-box; padding: 6px 8px;
@@ -339,7 +352,7 @@ class LabelPrinterCard extends HTMLElement {
         this._debouncedPreview();
       });
       row.replaceChildren(label, input);
-      for (const [text, fn] of [["+1 wk", () => plusDays(7)], ["+2 wk", () => plusDays(14)], ["+1 mo", plusMonth]]) {
+      for (const [text, fn] of [["Today", today], ["+1 wk", () => plusDays(7)], ["+2 wk", () => plusDays(14)], ["+1 mo", plusMonth]]) {
         const btn = document.createElement("button");
         btn.textContent = text;
         btn.addEventListener("click", () => this._setDate(fname, fn()));
