@@ -7274,6 +7274,45 @@ print_label:
       default: {}
       selector:
         object: {}
+    copies:
+      name: Copies
+      description: >-
+        Number of copies to chain-print as one batch (proposal 0002). 1 = a
+        normal single label via /print; values > 1 route to the /batch
+        endpoints and the preview becomes a stacked strip.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    gap_dots:
+      name: Gap between labels (dots)
+      description: Extra blank feed between chained labels. Batch only.
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 200
+          mode: box
+    cut_every:
+      name: Full cut every N labels
+      description: '0 = off (half-cut between labels, full cut at end). Batch only.'
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          mode: box
+    half_cut:
+      name: Half-cut between labels
+      required: false
+      default: true
+      selector:
+        boolean: {}
   sequence:
     - variables:
         name_map:
@@ -7392,12 +7431,26 @@ print_label:
           {{ f }}
     - if: '{{ send }}'
       then:
-        - action: rest_command.print_label
-          data:
-            label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | default("24") | int }}'
-            fields: '{{ fields | to_json }}'
-          response_variable: print_response
+        # Batches (copies > 1) go to /batch; single labels keep the /print path.
+        - if: '{{ copies | default(1) | int > 1 }}'
+          then:
+            - action: rest_command.label_print_batch
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+                copies: '{{ copies | default(1) | int }}'
+                gap_dots: '{{ gap_dots | default(0) | int }}'
+                cut_every: '{{ cut_every | default(0) | int }}'
+                half_cut: '{{ half_cut | default(true) | bool }}'
+              response_variable: print_response
+          else:
+            - action: rest_command.print_label
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+              response_variable: print_response
         # rest_command only raises on timeout/connection/decode errors — an
         # HTTP error status (e.g. 409 printer busy) just logs a warning and
         # returns normally. Record the outcome for the dashboard and stop
@@ -7424,14 +7477,28 @@ print_label:
           target:
             entity_id: input_text.label_last_result
           data:
-            value: 'Printed OK ({{ now().strftime(''%H:%M:%S'') }})'
+            value: 'Printed OK{{ " — " ~ print_response.content.labels ~ " labels" if print_response.content is mapping and print_response.content.labels else "" }} ({{ now().strftime(''%H:%M:%S'') }})'
       else:
-        - action: rest_command.render_label
-          data:
-            label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | default("24") | int }}'
-            fields: '{{ fields | to_json }}'
-          response_variable: render_response
+        # Batches preview as a stacked strip via /render/batch.
+        - if: '{{ copies | default(1) | int > 1 }}'
+          then:
+            - action: rest_command.label_render_batch
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+                copies: '{{ copies | default(1) | int }}'
+                gap_dots: '{{ gap_dots | default(0) | int }}'
+                cut_every: '{{ cut_every | default(0) | int }}'
+                half_cut: '{{ half_cut | default(true) | bool }}'
+              response_variable: render_response
+          else:
+            - action: rest_command.render_label
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+              response_variable: render_response
         # rest_command only raises on timeout/connection/decode errors — an
         # HTTP error status just logs a warning and returns the error body.
         # Guard so a failed render never zeroes out the last good preview.png,

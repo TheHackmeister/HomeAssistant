@@ -177,11 +177,44 @@ input_select:
 
 input_boolean:
   # When on, the Label: Live Reload automation re-renders the preview on
-  # every field change. Off by default.
+  # every field change. On by default.
   label_live_reload:
     name: 'Label: Live reload preview'
     icon: mdi:autorenew
     initial: true
+  # Batch setting: half-cut between chained labels (proposal 0002).
+  label_batch_half_cut:
+    name: 'Label: Half-cut between labels'
+    icon: mdi:content-cut
+    initial: true
+
+input_number:
+  # Batch settings (proposal 0002). Size > 1 routes preview to /render/batch
+  # (stacked strip) and print to /batch (chained job).
+  label_batch_size:
+    name: 'Label: Batch size'
+    icon: mdi:layers-triple
+    min: 1
+    max: 50
+    step: 1
+    mode: box
+    initial: 1
+  label_batch_gap_dots:
+    name: 'Label: Batch gap (dots)'
+    icon: mdi:arrow-expand-vertical
+    min: 0
+    max: 200
+    step: 1
+    mode: box
+    initial: 0
+  label_batch_cut_every:
+    name: 'Label: Full cut every N'
+    icon: mdi:scissors-cutting
+    min: 0
+    max: 50
+    step: 1
+    mode: box
+    initial: 0
 
 input_text:
   # Generic field pool. The dashboard relabels these per selected template and
@@ -339,6 +372,10 @@ automation:
         entity_id: input_text.label_field_7
       - trigger: state
         entity_id: input_text.label_extra_fields
+      # Batch size changes the strip preview; gap/cut settings only matter at
+      # print time, so they're deliberately not triggers.
+      - trigger: state
+        entity_id: input_number.label_batch_size
     conditions:
       - condition: state
         entity_id: input_boolean.label_live_reload
@@ -454,6 +491,10 @@ script:
           send: false
           preview_path: preview.png
           extra_fields: '{{ built }}'
+          copies: "{{ states('input_number.label_batch_size') | float(1) | int }}"
+          gap_dots: "{{ states('input_number.label_batch_gap_dots') | float(0) | int }}"
+          cut_every: "{{ states('input_number.label_batch_cut_every') | float(0) | int }}"
+          half_cut: "{{ is_state('input_boolean.label_batch_half_cut', 'on') }}"
       # Only after a successful render: bump the token so the dashboard's
       # markdown card reloads preview.png (a failed render aborts the script
       # before this step, so a broken preview never masks the last good one).
@@ -522,6 +563,10 @@ script:
           send: true
           preview_path: preview.png
           extra_fields: '{{ built }}'
+          copies: "{{ states('input_number.label_batch_size') | float(1) | int }}"
+          gap_dots: "{{ states('input_number.label_batch_gap_dots') | float(0) | int }}"
+          cut_every: "{{ states('input_number.label_batch_cut_every') | float(0) | int }}"
+          half_cut: "{{ is_state('input_boolean.label_batch_half_cut', 'on') }}"
 
   label_reset_helpers:
     alias: 'Label: Reset Helpers'
@@ -546,6 +591,24 @@ script:
           entity_id: input_select.label_icon
         data:
           option: '(none)'
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.label_batch_size
+        data:
+          value: 1
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.label_batch_gap_dots
+        data:
+          value: 0
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.label_batch_cut_every
+        data:
+          value: 0
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.label_batch_half_cut
       - action: input_text.set_value
         target:
           entity_id:

@@ -124,4 +124,20 @@ views:
           thermometer\", \"tree-pine\", \"triangle\", \"usb\", \"utensils\", \"wheat\", \"wifi\", \"wrench\", \"x\", \"zap\"].map(n => ({\n                    type: 'picture',\n                    image:\
           \ 'https://brother-ptouch-automation.spencerslab.com/icons/' + n + '.svg',\n                    tap_action: {\n                      action: 'perform-action',\n                      perform_action:\
           \ 'input_select.select_option',\n                      target: { entity_id: 'input_select.label_icon' },\n                      data: { option: n },\n                    },\n                 \
-          \ })) }"
+           \ })) }"
+  - type: grid
+    cards:
+    - type: heading
+      heading: Batches
+      icon: mdi:layers-triple
+    - type: entities
+      title: Batch settings
+      entities:
+      - entity: input_number.label_batch_size
+        name: Batch size (copies)
+      - entity: input_number.label_batch_gap_dots
+        name: Gap between labels (dots)
+      - entity: input_number.label_batch_cut_every
+        name: Full cut every N labels (0 = off)
+      - entity: input_boolean.label_batch_half_cut
+        name: Half-cut between labels

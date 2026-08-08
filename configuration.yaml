@@ -852,6 +852,25 @@ rest_command:
     url: https://brother-ptouch-automation.spencerslab.com/status
     method: GET
 
+  # Batched print (proposal 0002): one template, N copies, chained with
+  # half-cuts. cut_every must be JSON null when off — handled in the payload.
+  label_print_batch:
+    url: https://brother-ptouch-automation.spencerslab.com/batch
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: >
+      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | int }}, "labels": [{"fields": {{ fields }}, "copies": {{ copies | int }}}], "half_cut": {{ 'true' if half_cut | bool else 'false' }}, "gap_dots": {{ gap_dots | int }}, "cut_every": {{ cut_every | int if cut_every | int > 0 else 'null' }}, "send": true}
+
+  # Whole-strip preview: labels stacked vertically, same base64 shape as /render.
+  label_render_batch:
+    url: https://brother-ptouch-automation.spencerslab.com/render/batch
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: >
+      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | int }}, "labels": [{"fields": {{ fields }}, "copies": {{ copies | int }}}], "half_cut": {{ 'true' if half_cut | bool else 'false' }}, "gap_dots": {{ gap_dots | int }}, "cut_every": {{ cut_every | int if cut_every | int > 0 else 'null' }}, "format": "base64"}
+
   healthchecksio:
     url: https://hc-ping.com/89ba143b-b5bc-4074-bf95-b0897ec23102
     method: GET
