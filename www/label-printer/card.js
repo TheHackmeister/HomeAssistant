@@ -1,4 +1,5 @@
 // Label Printer card — helper-free dynamic form for the brother-ptouch-automation service.
+// v1.2 — bump the resource URL (?v=…) when this changes to bust browser caches.
 //
 // All form state is client-side. Fields regenerate per selected template from
 // the embedded schema (mirrors GET /templates). Every change debounces into a
@@ -27,6 +28,13 @@ const plusMonth = () => {
   const d = new Date();
   d.setMonth(d.getMonth() + 1);
   return isoDate(d);
+};
+// Spread-merge that ignores undefined values, so a partial form update can
+// never clobber stored state (e.g. icon) with undefined.
+const mergeDefined = (base, upd) => {
+  const out = { ...base };
+  for (const [k, v] of Object.entries(upd)) if (v !== undefined) out[k] = v;
+  return out;
 };
 
 class LabelPrinterCard extends HTMLElement {
@@ -76,9 +84,12 @@ class LabelPrinterCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    if (this._form) this._form.hass = hass;
-    if (this._batchForm) this._batchForm.hass = hass;
-    if (this._iconPicker) this._iconPicker.hass = hass;
+    // Forms/components only need hass once — re-assigning on every state
+    // change causes re-render churn (and can reset transient input state).
+    if (this._form && !this._form.hass) this._form.hass = hass;
+    if (this._batchForm && !this._batchForm.hass) this._batchForm.hass = hass;
+    if (this._iconPicker && !this._iconPicker.hass) this._iconPicker.hass = hass;
+    // auto-entities DOES need hass updates (its filter re-evaluates).
     if (this._ae) this._ae.hass = hass;
     // First hass assignment: render an initial (placeholder) preview and
     // subscribe to restore events from the Saved Groups view.
@@ -144,7 +155,6 @@ class LabelPrinterCard extends HTMLElement {
       { name: "_gap_dots", selector: { number: { min: 0, max: 200, mode: "box" } } },
       { name: "_cut_every", selector: { number: { min: 0, max: 50, mode: "box" } } },
       { name: "_half_cut", selector: { boolean: {} } },
-      { name: "_autosave", selector: { boolean: {} } },
     ];
   }
 
@@ -154,7 +164,6 @@ class LabelPrinterCard extends HTMLElement {
     _gap_dots: "Gap between labels (dots)",
     _cut_every: "Full cut every N (0 = off)",
     _half_cut: "Half-cut between labels",
-    _autosave: "Save every print (timestamped)",
   };
 
   _computeLabel = (s) => {
@@ -172,6 +181,12 @@ class LabelPrinterCard extends HTMLElement {
       .card-title h1 { font-size: 1.4rem; margin: 0; font-weight: 500; }
       .wrap { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
       @media (max-width: 1000px) { .wrap { grid-template-columns: 1fr; } }
+      .wrap > div { display: flex; flex-direction: column; }
+      .grow { flex: 1; }
+      .push-bottom { margin-top: auto; }
+      .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+                    font-size: 0.95em; cursor: pointer; }
+      .toggle-row input { accent-color: var(--primary-color); }
       h2 { font-size: 1.1rem; margin: 0 0 8px; font-weight: 600; }
       .tpl-row label, .date-row label { display: block; font-size: 0.9em; margin-bottom: 2px; }
       .tpl-row select { width: 100%; padding: 8px; font: inherit;
@@ -245,19 +260,22 @@ class LabelPrinterCard extends HTMLElement {
           <div class="status"></div>
           <div class="tape meta"></div>
           <h2 style="margin-top:12px">Batch</h2>
-          <div class="batch-host"></div>
-          <div class="buttons">
+          <div class="batch-host grow"></div>
+          <div class="buttons push-bottom">
             <ha-button class="reset-btn">Reset</ha-button>
             <ha-button class="print-btn">Print</ha-button>
           </div>
         </div>
         <div class="groups-col">
           <h2>Saved Groups</h2>
+          <label class="toggle-row">
+            <input type="checkbox" class="autosave-toggle"> Save every print
+          </label>
           <input class="group-name" type="text" placeholder="Group name">
-          <input class="group-keywords" type="text" placeholder="Search keywords (optional)">
-          <ha-button class="save-btn">Save Group</ha-button>
-          <input class="group-search" type="text" placeholder="Search (name, keywords, template)">
-          <div class="groups-host"></div>
+          <input class="group-keywords" type="text" placeholder="Search entities">
+          <input class="group-search" type="text" placeholder="Search prints">
+          <div class="groups-host grow"></div>
+          <ha-button class="save-btn push-bottom">Save Group</ha-button>
         </div>
       </div>
     `;
@@ -271,6 +289,10 @@ class LabelPrinterCard extends HTMLElement {
     card.querySelector(".tpl-next").addEventListener("click", () => this._stepTemplate(1));
     card.querySelector(".print-btn").addEventListener("click", () => this._print());
     card.querySelector(".reset-btn").addEventListener("click", () => this._reset());
+    const autosaveToggle = card.querySelector(".autosave-toggle");
+    autosaveToggle.addEventListener("change", () => {
+      this._data = { ...this._data, _autosave: autosaveToggle.checked };
+    });
     // Inline save: read the name/keywords inputs in this column (no popups).
     const nameInput = card.querySelector(".group-name");
     const kwInput = card.querySelector(".group-keywords");
@@ -387,11 +409,11 @@ class LabelPrinterCard extends HTMLElement {
       const v = ev.detail.value;
       if (v._prefill !== this._data._prefill) {
         // Prefill mode change: repopulate the field values accordingly.
-        this._data = { ...this._data, ...v };
+        this._data = mergeDefined(this._data, v);
         this._applyPrefill();
         this._rebuildForm();
       } else {
-        this._data = { ...this._data, ...v };
+        this._data = mergeDefined(this._data, v);
       }
       this._debouncedPreview();
     });
@@ -401,10 +423,13 @@ class LabelPrinterCard extends HTMLElement {
     );
     this._batchForm.addEventListener("value-changed", (ev) => {
       ev.stopPropagation();
-      this._data = { ...this._data, ...ev.detail.value };
+      this._data = mergeDefined(this._data, ev.detail.value);
       // Batch size changes the strip preview; gap/cut only matter at print time.
       if (ev.detail.value._batch_size !== undefined) this._debouncedPreview();
     });
+
+    // Keep the autosave toggle in sync with form state.
+    this.querySelector(".autosave-toggle").checked = !!this._data._autosave;
 
     this._renderDateRows();
     this._renderIconPicker();
@@ -450,12 +475,19 @@ class LabelPrinterCard extends HTMLElement {
     if (!this._schema[this._template].icon) {
       area.replaceChildren();
       delete this._data.icon;
+      this._iconRenderedFor = null;
+      this._iconPicker = null;
       return;
     }
+    // Don't rebuild the icon area on unrelated form rebuilds — only when the
+    // template (or picker availability) actually changed the mode.
+    const mode = customElements.get("ha-icon-picker") ? "picker" : "grid";
+    if (this._iconRenderedFor === `${this._template}:${mode}`) return;
+    this._iconRenderedFor = `${this._template}:${mode}`;
     // HA-native picker when available: searchable mdi: references with live
     // icon rendering, resolved server-side from the MDI pack. Falls back to
     // the bundled-Lucide thumbnail grid if ha-icon-picker isn't loaded.
-    if (customElements.get("ha-icon-picker")) {
+    if (mode === "picker") {
       const current = this._data.icon || "";
       const picker = document.createElement("ha-icon-picker");
       picker.hass = this._hass;
@@ -502,7 +534,11 @@ class LabelPrinterCard extends HTMLElement {
   _pickIcon(name) {
     if (name) this._lastIcon = name;
     this._data = { ...this._data, icon: name };
-    this._renderIconPicker();
+    if (!this._iconPicker) {
+      // Grid fallback: force re-render so the selection highlight updates.
+      this._iconRenderedFor = null;
+      this._renderIconPicker();
+    }
     this._debouncedPreview();
   }
 
