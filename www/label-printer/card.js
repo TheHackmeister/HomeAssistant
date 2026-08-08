@@ -206,7 +206,7 @@ class LabelPrinterCard extends HTMLElement {
     `;
     const card = document.createElement("ha-card");
     card.innerHTML = `
-      <div class="card-title"><ha-icon icon="mdi:label-printer"></ha-icon><h1>Label Printer</h1></div>
+      <div class="card-title"><ha-icon icon="mdi:label-outline"></ha-icon><h1>Label Printer</h1></div>
       <div class="wrap">
         <div class="form-col">
           <div class="tpl-row">

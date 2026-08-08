@@ -778,7 +778,7 @@ lovelace:
       mode: yaml
       filename: dashboards/label-printer.yaml
       title: Label Printer
-      icon: mdi:label-printer
+      icon: mdi:label-outline
       show_in_sidebar: true
 
 # Loaded-tape / printer-status sensor backing the label printer card readout.
