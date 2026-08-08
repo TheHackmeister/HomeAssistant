@@ -1,470 +1,469 @@
 views:
-- type: panel
-  title: Create
-  path: label-printer
-  icon: mdi:label-printer
-  cards:
-  - type: custom:label-printer-card
-    tape_sensor: sensor.label_printer_status
-    icons:
-    - antenna
-    - apple
-    - arrow-right
-    - arrow-up-right
-    - banana
-    - barcode
-    - battery
-    - beef
-    - biohazard
-    - bluetooth
-    - book
-    - bookmark
-    - box
-    - briefcase
-    - cable
-    - calendar
-    - carrot
-    - cat
-    - check
-    - chef-hat
-    - cherry
-    - circle
-    - clipboard-check
-    - clock
-    - coffee
-    - cog
-    - compass
-    - cookie
-    - cpu
-    - croissant
-    - dog
-    - drill
-    - droplets
-    - egg
-    - file-text
-    - fish
-    - flame
-    - flower-2
-    - gauge
-    - globe
-    - grape
-    - hammer
-    - hard-drive
-    - heart
-    - info
-    - key
-    - leaf
-    - lock
-    - luggage
-    - map
-    - map-pin
-    - milk
-    - monitor
-    - network
-    - package
-    - paintbrush
-    - paw-print
-    - pill
-    - plane
-    - plug
-    - printer
-    - qr-code
-    - router
-    - ruler
-    - salad
-    - scale
-    - scissors
-    - server
-    - server-cog
-    - shield
-    - signal
-    - snowflake
-    - sprout
-    - square
-    - star
-    - sun
-    - syringe
-    - tag
-    - tent
-    - thermometer
-    - tree-pine
-    - triangle
-    - usb
-    - utensils
-    - wheat
-    - wifi
-    - wrench
-    - x
-    - zap
-    schema:
-      kitchen/pantry_jar:
-        tape: 12
-        icon: true
-        fields:
-        - - name
-          - true
-        - - purchased
-          - true
-        - - expires
-          - false
-      kitchen/spice:
-        tape: 12
-        icon: false
-        fields:
-        - - name
-          - true
-        - - origin
-          - false
-        - - best_by
-          - false
-      kitchen/leftover:
-        tape: 12
-        icon: false
-        fields:
-        - - contents
-          - true
-        - - cooked
-          - true
-        - - eat_within_days
-          - false
-      kitchen/freezer:
-        tape: 12
-        icon: false
-        fields:
-        - - contents
-          - true
-        - - frozen
-          - true
-        - - portion
-          - false
-      electronics/component_bin:
-        tape: 12
-        icon: false
-        fields:
-        - - value
-          - true
-        - - footprint
-          - true
-        - - tolerance
-          - false
-      electronics/cable_flag:
-        tape: 12
-        icon: false
-        fields:
-        - - title
-          - false
-        - - source
-          - false
-        - - dest
-          - false
-        - - date
-          - false
-        - - details
-          - false
-        - - link
-          - false
-        - - image
-          - false
-        - - wire
-          - false
-        - - overlap_mm
-          - false
-      electronics/psu_polarity:
-        tape: 12
-        icon: false
-        fields:
-        - - voltage
-          - true
-        - - current
-          - true
-        - - polarity
-          - false
-      three_d_printing/filament_spool:
-        tape: 12
-        icon: false
-        fields:
-        - - material
-          - true
-        - - color
-          - true
-        - - brand
-          - true
-        - - opened
-          - true
-        - - nozzle_temp
-          - false
-        - - bed_temp
-          - false
-      three_d_printing/print_bin:
-        tape: 12
-        icon: false
-        fields:
-        - - part
-          - true
-        - - project
-          - false
-        - - qty
-          - false
-      three_d_printing/tool_tag:
-        tape: 12
-        icon: false
-        fields:
-        - - tool
-          - true
-        - - owner
-          - false
-      utility/qr:
-        tape: 12
-        icon: false
-        fields:
-        - - data
-          - true
-        - - caption
-          - false
-      utility/image:
-        tape: 12
-        icon: false
-        fields:
-        - - path
-          - true
-        - - caption
-          - false
-        - - threshold
-          - false
-      garden/seed_packet:
-        tape: 12
-        icon: true
-        fields:
-        - - variety
-          - true
-        - - sow_by
-          - true
-        - - year
-          - false
-      garden/plant_tag:
-        tape: 12
-        icon: true
-        fields:
-        - - name
-          - true
-        - - planted
-          - true
-      garden/row_marker:
-        tape: 12
-        icon: true
-        fields:
-        - - crop
-          - true
-        - - variety
-          - true
-      networking/patch_port:
-        tape: 12
-        icon: true
-        fields:
-        - - port
-          - true
-        - - vlan
-          - true
-        - - dest
-          - false
-      networking/rack_unit:
-        tape: 12
-        icon: true
-        fields:
-        - - unit
-          - true
-        - - device
-          - true
-      networking/wap_location:
-        tape: 12
-        icon: true
-        fields:
-        - - name
-          - true
-        - - location
-          - true
-      workshop/hazard:
-        tape: 12
-        icon: true
-        fields:
-        - - hazard
-          - true
-        - - text
-          - true
-        - - code
-          - false
-      workshop/tool_id:
-        tape: 12
-        icon: true
-        fields:
-        - - name
-          - true
-        - - owner
-          - true
-        - - project
-          - false
-      workshop/torque_cal:
-        tape: 12
-        icon: true
-        fields:
-        - - tool
-          - true
-        - - range_nm
-          - true
-        - - last_cal
-          - true
-      workshop/first_aid:
-        tape: 12
-        icon: true
-        fields:
-        - - kit
-          - true
-        - - expires
-          - true
-      home_inventory/moving_box:
-        tape: 24
-        icon: true
-        fields:
-        - - room
-          - true
-        - - contents
-          - true
-        - - fragile
-          - false
-      home_inventory/warranty:
-        tape: 12
-        icon: true
-        fields:
-        - - item
-          - true
-        - - expires
-          - true
-        - - receipt
-          - false
-      home_inventory/storage_bin:
-        tape: 12
-        icon: true
-        fields:
-        - - location
-          - true
-        - - contents
-          - true
-      media/bookshelf_tag:
-        tape: 12
-        icon: true
-        fields:
-        - - title
-          - true
-        - - author
-          - true
-        - - callno
-          - false
-      media/archive_box:
-        tape: 18
-        icon: true
-        fields:
-        - - label
-          - true
-        - - retain_until
-          - true
-      media/cd_record:
-        tape: 12
-        icon: true
-        fields:
-        - - title
-          - true
-        - - artist
-          - true
-        - - year
-          - false
-      pet/collar_backup:
-        tape: 12
-        icon: true
-        fields:
-        - - name
-          - true
-        - - contact
-          - true
-      pet/med_schedule:
-        tape: 12
-        icon: true
-        fields:
-        - - pet
-          - true
-        - - med
-          - true
-        - - cadence
-          - true
-      pet/food_bowl:
-        tape: 12
-        icon: true
-        fields:
-        - - pet
-          - true
-        - - food
-          - true
-        - - portion
-          - true
-      travel/luggage_tag:
-        tape: 18
-        icon: true
-        fields:
-        - - name
-          - true
-        - - contact
-          - true
-      travel/gear_bag:
-        tape: 12
-        icon: true
-        fields:
-        - - bag
-          - true
-        - - purpose
-          - true
-      travel/power_bank:
-        tape: 12
-        icon: true
-        fields:
-        - - capacity_mah
-          - true
-        - - charged
-          - true
-        - - model
-          - false
-      calibration/instrument_cal:
-        tape: 12
-        icon: true
-        fields:
-        - - instrument
-          - true
-        - - next_due
-          - true
-        - - owner
-          - false
-      calibration/cert_id:
-        tape: 12
-        icon: true
-        fields:
-        - - cert_no
-          - true
-        - - issuer
-          - true
-      calibration/thermometer_cal:
-        tape: 12
-        icon: true
-        fields:
-        - - instrument
-          - true
-        - - ice_point_c
-          - true
-        - - checked
-          - true
 - type: sections
   max_columns: 1
-  title: Saved Groups
-  path: label-groups
-  icon: mdi:content-save
+  title: Label Printer
+  path: label-printer
+  icon: mdi:printer
   sections:
+  - type: grid
+    cards:
+    - type: custom:label-printer-card
+      tape_sensor: sensor.label_printer_status
+      icons:
+      - antenna
+      - apple
+      - arrow-right
+      - arrow-up-right
+      - banana
+      - barcode
+      - battery
+      - beef
+      - biohazard
+      - bluetooth
+      - book
+      - bookmark
+      - box
+      - briefcase
+      - cable
+      - calendar
+      - carrot
+      - cat
+      - check
+      - chef-hat
+      - cherry
+      - circle
+      - clipboard-check
+      - clock
+      - coffee
+      - cog
+      - compass
+      - cookie
+      - cpu
+      - croissant
+      - dog
+      - drill
+      - droplets
+      - egg
+      - file-text
+      - fish
+      - flame
+      - flower-2
+      - gauge
+      - globe
+      - grape
+      - hammer
+      - hard-drive
+      - heart
+      - info
+      - key
+      - leaf
+      - lock
+      - luggage
+      - map
+      - map-pin
+      - milk
+      - monitor
+      - network
+      - package
+      - paintbrush
+      - paw-print
+      - pill
+      - plane
+      - plug
+      - printer
+      - qr-code
+      - router
+      - ruler
+      - salad
+      - scale
+      - scissors
+      - server
+      - server-cog
+      - shield
+      - signal
+      - snowflake
+      - sprout
+      - square
+      - star
+      - sun
+      - syringe
+      - tag
+      - tent
+      - thermometer
+      - tree-pine
+      - triangle
+      - usb
+      - utensils
+      - wheat
+      - wifi
+      - wrench
+      - x
+      - zap
+      schema:
+        kitchen/pantry_jar:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - purchased
+            - true
+          - - expires
+            - false
+        kitchen/spice:
+          tape: 12
+          icon: false
+          fields:
+          - - name
+            - true
+          - - origin
+            - false
+          - - best_by
+            - false
+        kitchen/leftover:
+          tape: 12
+          icon: false
+          fields:
+          - - contents
+            - true
+          - - cooked
+            - true
+          - - eat_within_days
+            - false
+        kitchen/freezer:
+          tape: 12
+          icon: false
+          fields:
+          - - contents
+            - true
+          - - frozen
+            - true
+          - - portion
+            - false
+        electronics/component_bin:
+          tape: 12
+          icon: false
+          fields:
+          - - value
+            - true
+          - - footprint
+            - true
+          - - tolerance
+            - false
+        electronics/cable_flag:
+          tape: 12
+          icon: false
+          fields:
+          - - title
+            - false
+          - - source
+            - false
+          - - dest
+            - false
+          - - date
+            - false
+          - - details
+            - false
+          - - link
+            - false
+          - - image
+            - false
+          - - wire
+            - false
+          - - overlap_mm
+            - false
+        electronics/psu_polarity:
+          tape: 12
+          icon: false
+          fields:
+          - - voltage
+            - true
+          - - current
+            - true
+          - - polarity
+            - false
+        three_d_printing/filament_spool:
+          tape: 12
+          icon: false
+          fields:
+          - - material
+            - true
+          - - color
+            - true
+          - - brand
+            - true
+          - - opened
+            - true
+          - - nozzle_temp
+            - false
+          - - bed_temp
+            - false
+        three_d_printing/print_bin:
+          tape: 12
+          icon: false
+          fields:
+          - - part
+            - true
+          - - project
+            - false
+          - - qty
+            - false
+        three_d_printing/tool_tag:
+          tape: 12
+          icon: false
+          fields:
+          - - tool
+            - true
+          - - owner
+            - false
+        utility/qr:
+          tape: 12
+          icon: false
+          fields:
+          - - data
+            - true
+          - - caption
+            - false
+        utility/image:
+          tape: 12
+          icon: false
+          fields:
+          - - path
+            - true
+          - - caption
+            - false
+          - - threshold
+            - false
+        garden/seed_packet:
+          tape: 12
+          icon: true
+          fields:
+          - - variety
+            - true
+          - - sow_by
+            - true
+          - - year
+            - false
+        garden/plant_tag:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - planted
+            - true
+        garden/row_marker:
+          tape: 12
+          icon: true
+          fields:
+          - - crop
+            - true
+          - - variety
+            - true
+        networking/patch_port:
+          tape: 12
+          icon: true
+          fields:
+          - - port
+            - true
+          - - vlan
+            - true
+          - - dest
+            - false
+        networking/rack_unit:
+          tape: 12
+          icon: true
+          fields:
+          - - unit
+            - true
+          - - device
+            - true
+        networking/wap_location:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - location
+            - true
+        workshop/hazard:
+          tape: 12
+          icon: true
+          fields:
+          - - hazard
+            - true
+          - - text
+            - true
+          - - code
+            - false
+        workshop/tool_id:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - owner
+            - true
+          - - project
+            - false
+        workshop/torque_cal:
+          tape: 12
+          icon: true
+          fields:
+          - - tool
+            - true
+          - - range_nm
+            - true
+          - - last_cal
+            - true
+        workshop/first_aid:
+          tape: 12
+          icon: true
+          fields:
+          - - kit
+            - true
+          - - expires
+            - true
+        home_inventory/moving_box:
+          tape: 24
+          icon: true
+          fields:
+          - - room
+            - true
+          - - contents
+            - true
+          - - fragile
+            - false
+        home_inventory/warranty:
+          tape: 12
+          icon: true
+          fields:
+          - - item
+            - true
+          - - expires
+            - true
+          - - receipt
+            - false
+        home_inventory/storage_bin:
+          tape: 12
+          icon: true
+          fields:
+          - - location
+            - true
+          - - contents
+            - true
+        media/bookshelf_tag:
+          tape: 12
+          icon: true
+          fields:
+          - - title
+            - true
+          - - author
+            - true
+          - - callno
+            - false
+        media/archive_box:
+          tape: 18
+          icon: true
+          fields:
+          - - label
+            - true
+          - - retain_until
+            - true
+        media/cd_record:
+          tape: 12
+          icon: true
+          fields:
+          - - title
+            - true
+          - - artist
+            - true
+          - - year
+            - false
+        pet/collar_backup:
+          tape: 12
+          icon: true
+          fields:
+          - - name
+            - true
+          - - contact
+            - true
+        pet/med_schedule:
+          tape: 12
+          icon: true
+          fields:
+          - - pet
+            - true
+          - - med
+            - true
+          - - cadence
+            - true
+        pet/food_bowl:
+          tape: 12
+          icon: true
+          fields:
+          - - pet
+            - true
+          - - food
+            - true
+          - - portion
+            - true
+        travel/luggage_tag:
+          tape: 18
+          icon: true
+          fields:
+          - - name
+            - true
+          - - contact
+            - true
+        travel/gear_bag:
+          tape: 12
+          icon: true
+          fields:
+          - - bag
+            - true
+          - - purpose
+            - true
+        travel/power_bank:
+          tape: 12
+          icon: true
+          fields:
+          - - capacity_mah
+            - true
+          - - charged
+            - true
+          - - model
+            - false
+        calibration/instrument_cal:
+          tape: 12
+          icon: true
+          fields:
+          - - instrument
+            - true
+          - - next_due
+            - true
+          - - owner
+            - false
+        calibration/cert_id:
+          tape: 12
+          icon: true
+          fields:
+          - - cert_no
+            - true
+          - - issuer
+            - true
+        calibration/thermometer_cal:
+          tape: 12
+          icon: true
+          fields:
+          - - instrument
+            - true
+          - - ice_point_c
+            - true
+          - - checked
+            - true
+      layout_options:
+        grid_columns: 4
   - type: grid
     cards:
     - type: heading
@@ -477,9 +476,6 @@ views:
     - type: custom:auto-entities
       card:
         type: custom:label-group-list
-      card_param: entities
       filter:
         template: "{% set q = states('input_text.label_group_search') | lower | trim %}\n{% for e in states.label_group %}\n  {% set a = e.attributes %}\n  {% set hay = (e.state ~ ' ' ~ a.get('search',\
           \ '') ~ ' ' ~ a.get('template', '')) | lower %}\n  {% if not q or q in hay %}{{ e.entity_id }},{% endif %}\n{% endfor %}\n"
-      sort:
-        method: name
