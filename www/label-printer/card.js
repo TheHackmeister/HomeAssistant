@@ -54,6 +54,7 @@ class LabelPrinterCard extends HTMLElement {
       _gap_dots: 0,
       _cut_every: 0,
       _half_cut: true,
+      _autosave: false,
     };
   }
 
@@ -70,13 +71,15 @@ class LabelPrinterCard extends HTMLElement {
         this._data[fname] = mode === "all" || (mode === "required" && req) ? fname : "";
       }
     }
-    if (this._schema[this._template].icon && !this._data.icon) this._data.icon = "(none)";
+    if (this._schema[this._template].icon && !this._data.icon) this._data.icon = "";
   }
 
   set hass(hass) {
     this._hass = hass;
     if (this._form) this._form.hass = hass;
     if (this._batchForm) this._batchForm.hass = hass;
+    if (this._iconPicker) this._iconPicker.hass = hass;
+    if (this._ae) this._ae.hass = hass;
     // First hass assignment: render an initial (placeholder) preview and
     // subscribe to restore events from the Saved Groups view.
     if (!this._initialized) {
@@ -141,6 +144,7 @@ class LabelPrinterCard extends HTMLElement {
       { name: "_gap_dots", selector: { number: { min: 0, max: 200, mode: "box" } } },
       { name: "_cut_every", selector: { number: { min: 0, max: 50, mode: "box" } } },
       { name: "_half_cut", selector: { boolean: {} } },
+      { name: "_autosave", selector: { boolean: {} } },
     ];
   }
 
@@ -150,6 +154,7 @@ class LabelPrinterCard extends HTMLElement {
     _gap_dots: "Gap between labels (dots)",
     _cut_every: "Full cut every N (0 = off)",
     _half_cut: "Half-cut between labels",
+    _autosave: "Save every print (timestamped)",
   };
 
   _computeLabel = (s) => {
@@ -165,8 +170,8 @@ class LabelPrinterCard extends HTMLElement {
       .card-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
       .card-title ha-icon { color: var(--primary-color); }
       .card-title h1 { font-size: 1.4rem; margin: 0; font-weight: 500; }
-      .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-      @media (max-width: 800px) { .wrap { grid-template-columns: 1fr; } }
+      .wrap { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+      @media (max-width: 1000px) { .wrap { grid-template-columns: 1fr; } }
       h2 { font-size: 1.1rem; margin: 0 0 8px; font-weight: 600; }
       .tpl-row label, .date-row label { display: block; font-size: 0.9em; margin-bottom: 2px; }
       .tpl-row select { width: 100%; padding: 8px; font: inherit;
@@ -203,6 +208,14 @@ class LabelPrinterCard extends HTMLElement {
       .date-row button { background: var(--secondary-background-color); border: none;
                          border-radius: 6px; padding: 6px 8px; cursor: pointer;
                          color: var(--primary-color); font-size: 0.8em; white-space: nowrap; }
+      .group-search, .group-name, .group-keywords { width: 100%; box-sizing: border-box;
+                      padding: 6px 8px; font: inherit;
+                      background: var(--card-background-color);
+                      color: var(--primary-text-color);
+                      border: none; border-bottom: 1px solid var(--secondary-text-color);
+                      margin-bottom: 6px; }
+      .save-btn { width: 100%; margin-bottom: 10px;
+                  background: var(--secondary-background-color); border-radius: 6px; }
     `;
     const card = document.createElement("ha-card");
     card.innerHTML = `
@@ -235,9 +248,16 @@ class LabelPrinterCard extends HTMLElement {
           <div class="batch-host"></div>
           <div class="buttons">
             <ha-button class="reset-btn">Reset</ha-button>
-            <ha-button class="save-btn">Save Group</ha-button>
-            <ha-button class="print-btn">Send to Printer</ha-button>
+            <ha-button class="print-btn">Print</ha-button>
           </div>
+        </div>
+        <div class="groups-col">
+          <h2>Saved Groups</h2>
+          <input class="group-name" type="text" placeholder="Group name">
+          <input class="group-keywords" type="text" placeholder="Search keywords (optional)">
+          <ha-button class="save-btn">Save Group</ha-button>
+          <input class="group-search" type="text" placeholder="Search (name, keywords, template)">
+          <div class="groups-host"></div>
         </div>
       </div>
     `;
@@ -251,9 +271,57 @@ class LabelPrinterCard extends HTMLElement {
     card.querySelector(".tpl-next").addEventListener("click", () => this._stepTemplate(1));
     card.querySelector(".print-btn").addEventListener("click", () => this._print());
     card.querySelector(".reset-btn").addEventListener("click", () => this._reset());
-    card.querySelector(".save-btn").addEventListener("click", () => this._saveGroup());
+    // Inline save: read the name/keywords inputs in this column (no popups).
+    const nameInput = card.querySelector(".group-name");
+    const kwInput = card.querySelector(".group-keywords");
+    card.querySelector(".save-btn").addEventListener("click", async () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        this._statusEl.textContent = "Enter a group name first.";
+        this._statusEl.style.display = "";
+        nameInput.focus();
+        return;
+      }
+      await this._saveGroup(name, kwInput.value);
+      nameInput.value = "";
+      kwInput.value = "";
+    });
+    // Saved-groups search drives the auto-entities template filter (server-side).
+    const search = card.querySelector(".group-search");
+    search.addEventListener("input", () => {
+      clearTimeout(this._st);
+      this._st = setTimeout(() => {
+        this._hass?.callService("input_text", "set_value", {
+          entity_id: "input_text.label_group_search",
+          value: search.value,
+        });
+      }, 400);
+    });
     this.replaceChildren(style, card);
     this._rebuildForm();
+    this._buildGroupList();
+  }
+
+  _buildGroupList() {
+    // auto-entities does the filtering (its template power); its result list
+    // is injected into the label-group-list card via card_param.
+    const ae = document.createElement("auto-entities");
+    ae.setConfig({
+      card: { type: "custom:label-group-list" },
+      card_param: "entities",
+      filter: {
+        template: `
+{% set q = states('input_text.label_group_search') | lower | trim %}
+{% set current = state_attr('sensor.label_print_groups', 'groups') | default([], true) | map(attribute='name') | list %}
+{% for e in states.label_group %}
+  {% set a = e.attributes %}
+  {% set hay = (e.state ~ ' ' ~ a.get('search', '') ~ ' ' ~ a.get('template', '')) | lower %}
+  {% if e.state in current and (not q or q in hay) %}{{ e.entity_id }},{% endif %}
+{% endfor %}`,
+      },
+    });
+    this._ae = ae;
+    this.querySelector(".groups-host").replaceChildren(ae);
   }
 
   _stepTemplate(delta) {
@@ -273,15 +341,16 @@ class LabelPrinterCard extends HTMLElement {
       _gap_dots: this._data._gap_dots,
       _cut_every: this._data._cut_every,
       _half_cut: this._data._half_cut,
+      _autosave: this._data._autosave,
     };
     this._template = tpl;
     this._data = { ...this._defaults(), ...keep, _template: tpl };
     this._applyPrefill();
     // Icon choice carries over, and is remembered across non-icon templates.
     if (this._schema[tpl].icon) {
-      this._data.icon = keep.icon || this._lastIcon || "(none)";
+      this._data.icon = keep.icon || this._lastIcon || "";
     } else {
-      if (keep.icon && keep.icon !== "(none)") this._lastIcon = keep.icon;
+      if (keep.icon) this._lastIcon = keep.icon;
       delete this._data.icon;
     }
     this._rebuildForm();
@@ -383,7 +452,27 @@ class LabelPrinterCard extends HTMLElement {
       delete this._data.icon;
       return;
     }
-    const current = this._data.icon || "(none)";
+    // HA-native picker when available: searchable mdi: references with live
+    // icon rendering, resolved server-side from the MDI pack. Falls back to
+    // the bundled-Lucide thumbnail grid if ha-icon-picker isn't loaded.
+    if (customElements.get("ha-icon-picker")) {
+      const current = this._data.icon || "";
+      const picker = document.createElement("ha-icon-picker");
+      picker.hass = this._hass;
+      picker.label = `Icon${current ? `: ${current}` : ""}`;
+      picker.value = current.startsWith("mdi:") ? current : "";
+      picker.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        const v = ev.detail.value || "";
+        this._data = { ...this._data, icon: v };
+        if (v) this._lastIcon = v;
+        this._debouncedPreview();
+      });
+      this._iconPicker = picker;
+      area.replaceChildren(picker);
+      return;
+    }
+    const current = this._data.icon || "";
     const wrap = document.createElement("div");
     const label = document.createElement("div");
     label.className = "meta";
@@ -392,8 +481,8 @@ class LabelPrinterCard extends HTMLElement {
     grid.className = "icon-grid";
     const none = document.createElement("button");
     none.textContent = "none";
-    none.className = current === "(none)" ? "none selected" : "none";
-    none.addEventListener("click", () => this._pickIcon("(none)"));
+    none.className = !current || current === "(none)" ? "none selected" : "none";
+    none.addEventListener("click", () => this._pickIcon(""));
     grid.appendChild(none);
     for (const name of this._icons) {
       const btn = document.createElement("button");
@@ -411,7 +500,7 @@ class LabelPrinterCard extends HTMLElement {
   }
 
   _pickIcon(name) {
-    if (name !== "(none)") this._lastIcon = name;
+    if (name) this._lastIcon = name;
     this._data = { ...this._data, icon: name };
     this._renderIconPicker();
     this._debouncedPreview();
@@ -452,8 +541,15 @@ class LabelPrinterCard extends HTMLElement {
     }
   }
 
-  _print() {
-    if (window.confirm("Send this label to the printer?")) this._run(true);
+  async _print() {
+    if (!window.confirm("Send this label to the printer?")) return;
+    await this._run(true);
+    if (this._data._autosave) {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const name = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      await this._saveGroup(name);
+    }
   }
 
   _restore(data) {
@@ -475,11 +571,9 @@ class LabelPrinterCard extends HTMLElement {
     }
   }
 
-  async _saveGroup() {
-    if (!this._hass) return;
-    const name = window.prompt("Group name:");
-    if (!name || !name.trim()) return;
-    const search = window.prompt("Search keywords for auto-entities (optional):", "") ?? "";
+  async _saveGroup(name, search) {
+    if (!this._hass || !name || !name.trim()) return;
+    search = (search ?? "").trim();
     const d = this._data;
     const fields = {};
     for (const [k, v] of Object.entries(d)) {
@@ -487,7 +581,7 @@ class LabelPrinterCard extends HTMLElement {
     }
     const entry = {
       name: name.trim(),
-      search: search.trim(),
+      search,
       template: d._template,
       fields,
       batch: {
@@ -557,6 +651,9 @@ class LabelGroupList extends HTMLElement {
              cursor: pointer; border-bottom: 1px solid var(--divider-color); }
       .row:last-child { border-bottom: none; }
       .row:hover { background: var(--secondary-background-color); }
+      .row .del { margin-left: auto; background: none; border: none; cursor: pointer;
+                  color: var(--secondary-text-color); font-size: 0.95em; padding: 2px 6px; }
+      .row .del:hover { color: var(--error-color); }
       .row ha-icon { color: var(--primary-color); }
       .name { font-weight: 500; }
       .sub { color: var(--secondary-text-color); font-size: 0.85em; }
@@ -594,6 +691,12 @@ class LabelGroupList extends HTMLElement {
       row.addEventListener("click", () => {
         this._hass.callService("script", "label_restore_group", { entity_id: id });
       });
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "✕";
+      del.title = "Delete group";
+      del.addEventListener("click", (ev) => this._deleteGroup(id, ev));
+      row.appendChild(del);
       rows.push(row);
     }
     if (!rows.length) {
@@ -603,6 +706,24 @@ class LabelGroupList extends HTMLElement {
       rows.push(empty);
     }
     this._list.replaceChildren(...rows);
+  }
+
+  async _deleteGroup(id, ev) {
+    ev.stopPropagation();
+    const st = this._hass.states[id];
+    if (!st) return;
+    if (!window.confirm(`Delete group "${st.state}"?`)) return;
+    let doc = { groups: [] };
+    try {
+      const r = await fetch("/local/labels/print_groups.json", { cache: "no-store" });
+      if (r.ok) doc = await r.json();
+    } catch (e) { /* nothing to delete from */ }
+    doc.groups = (doc.groups || []).filter((g) => g.name !== st.state);
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(doc))));
+    await this._hass.callService("shell_command", "save_label_groups", { b64 });
+    await this._hass.callService("homeassistant", "update_entity", {
+      entity_id: "sensor.label_print_groups",
+    });
   }
 
   getCardSize() {
