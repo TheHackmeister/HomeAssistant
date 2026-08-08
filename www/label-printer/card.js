@@ -1,5 +1,5 @@
 // Label Printer card — helper-free dynamic form for the brother-ptouch-automation service.
-// v1.2 — bump the resource URL (?v=…) when this changes to bust browser caches.
+// v1.4 — bump the resource URL (?v=…) when this changes to bust browser caches.
 //
 // All form state is client-side. Fields regenerate per selected template from
 // the embedded schema (mirrors GET /templates). Every change debounces into a
@@ -249,7 +249,11 @@ class LabelPrinterCard extends HTMLElement {
           </div>
           <div class="form-host"></div>
           <div class="date-host"></div>
-          <div class="icon-area"></div>
+          <div class="icon-area grow"></div>
+          <div class="buttons push-bottom">
+            <ha-button class="reset-btn">Reset</ha-button>
+            <ha-button class="print-btn">Print</ha-button>
+          </div>
         </div>
         <div class="preview-col">
           <h2>Preview</h2>
@@ -261,10 +265,6 @@ class LabelPrinterCard extends HTMLElement {
           <div class="tape meta"></div>
           <h2 style="margin-top:12px">Batch</h2>
           <div class="batch-host grow"></div>
-          <div class="buttons push-bottom">
-            <ha-button class="reset-btn">Reset</ha-button>
-            <ha-button class="print-btn">Print</ha-button>
-          </div>
         </div>
         <div class="groups-col">
           <h2>Saved Groups</h2>
@@ -395,7 +395,8 @@ class LabelPrinterCard extends HTMLElement {
       ...this._templates.map((k) => {
         const opt = document.createElement("option");
         opt.value = k;
-        opt.textContent = `${k} (${this._schema[k].tape}mm default)`;
+        // Picture emoji marks templates that accept an icon.
+        opt.textContent = `${this._schema[k].icon ? "🖼️ " : ""}${k} (${this._schema[k].tape}mm default)`;
         opt.selected = k === this._template;
         return opt;
       }),
@@ -496,6 +497,11 @@ class LabelPrinterCard extends HTMLElement {
       picker.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
         const v = ev.detail.value || "";
+        // ha-combo-box emits a spurious empty value-changed while its icon
+        // items load asynchronously (e.g. right after a field change triggers
+        // a state update). Ignore empty emissions unless the user is actually
+        // interacting with the picker — that's what was unsetting the icon.
+        if (!v && !picker.matches(":focus-within")) return;
         this._data = { ...this._data, icon: v };
         if (v) this._lastIcon = v;
         this._debouncedPreview();
