@@ -77,10 +77,15 @@ class LabelPrinterCard extends HTMLElement {
     this._hass = hass;
     if (this._form) this._form.hass = hass;
     if (this._batchForm) this._batchForm.hass = hass;
-    // First hass assignment: render an initial (placeholder) preview.
+    // First hass assignment: render an initial (placeholder) preview and
+    // subscribe to restore events from the Saved Groups view.
     if (!this._initialized) {
       this._initialized = true;
       this._run(false);
+      hass.connection.subscribeEvents(
+        (ev) => this._restore(ev.data),
+        "label_printer_restore",
+      );
     }
     // Preview image follows the engine-written token (cache-buster).
     const token = hass.states[this._tokenEntity]?.state;
@@ -230,6 +235,7 @@ class LabelPrinterCard extends HTMLElement {
           <div class="batch-host"></div>
           <div class="buttons">
             <ha-button class="reset-btn">Reset</ha-button>
+            <ha-button class="save-btn">Save Group</ha-button>
             <ha-button class="print-btn">Send to Printer</ha-button>
           </div>
         </div>
@@ -245,6 +251,7 @@ class LabelPrinterCard extends HTMLElement {
     card.querySelector(".tpl-next").addEventListener("click", () => this._stepTemplate(1));
     card.querySelector(".print-btn").addEventListener("click", () => this._print());
     card.querySelector(".reset-btn").addEventListener("click", () => this._reset());
+    card.querySelector(".save-btn").addEventListener("click", () => this._saveGroup());
     this.replaceChildren(style, card);
     this._rebuildForm();
   }
@@ -449,6 +456,65 @@ class LabelPrinterCard extends HTMLElement {
     if (window.confirm("Send this label to the printer?")) this._run(true);
   }
 
+  _restore(data) {
+    if (!data) return;
+    let fields = {};
+    let batch = {};
+    try { fields = JSON.parse(data.fields_json || "{}"); } catch (e) { /* ignore */ }
+    try { batch = JSON.parse(data.batch_json || "{}"); } catch (e) { /* ignore */ }
+    if (data.template && this._schema[data.template]) this._template = data.template;
+    this._data = { ...this._defaults(), _template: this._template, ...batch, ...fields };
+    this._rebuildForm();
+    this._debouncedPreview();
+    // Prime the Saved Groups search with the group's stored keywords.
+    if (data.search) {
+      this._hass.callService("input_text", "set_value", {
+        entity_id: "input_text.label_group_search",
+        value: data.search,
+      });
+    }
+  }
+
+  async _saveGroup() {
+    if (!this._hass) return;
+    const name = window.prompt("Group name:");
+    if (!name || !name.trim()) return;
+    const search = window.prompt("Search keywords for auto-entities (optional):", "") ?? "";
+    const d = this._data;
+    const fields = {};
+    for (const [k, v] of Object.entries(d)) {
+      if (!k.startsWith("_") && v !== "" && v != null && v !== "(none)") fields[k] = v;
+    }
+    const entry = {
+      name: name.trim(),
+      search: search.trim(),
+      template: d._template,
+      fields,
+      batch: {
+        _batch_size: d._batch_size ?? 1,
+        _gap_dots: d._gap_dots ?? 0,
+        _cut_every: d._cut_every ?? 0,
+        _half_cut: d._half_cut ?? true,
+      },
+      saved_at: new Date().toISOString(),
+    };
+    // Read-modify-write the JSON doc in www/labels/ (persistent across restarts).
+    let doc = { groups: [] };
+    try {
+      const r = await fetch("/local/labels/print_groups.json", { cache: "no-store" });
+      if (r.ok) doc = await r.json();
+    } catch (e) { /* first save */ }
+    doc.groups = (doc.groups || []).filter((g) => g.name !== entry.name);
+    doc.groups.push(entry);
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(doc))));
+    await this._hass.callService("shell_command", "save_label_groups", { b64 });
+    await this._hass.callService("homeassistant", "update_entity", {
+      entity_id: "sensor.label_print_groups",
+    });
+    this._statusEl.textContent = `Saved group "${entry.name}"`;
+    this._statusEl.style.display = "";
+  }
+
   _reset() {
     this._data = this._defaults();
     this._applyPrefill();
@@ -467,4 +533,86 @@ window.customCards.push({
   type: "label-printer-card",
   name: "Label Printer Card",
   description: "Dynamic form for the label printer service (helper-free).",
+});
+
+// Companion list card for the Saved Groups view. auto-entities computes the
+// (search-filtered) entity list and injects it via card_param: entities; this
+// card renders one tap-to-restore row per label_group.* entity.
+class LabelGroupList extends HTMLElement {
+  setConfig(config) {
+    this._entities = config.entities || [];
+    this._build();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _build() {
+    const style = document.createElement("style");
+    style.textContent = `
+      ha-card { padding: 8px 16px; }
+      .row { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+             cursor: pointer; border-bottom: 1px solid var(--divider-color); }
+      .row:last-child { border-bottom: none; }
+      .row:hover { background: var(--secondary-background-color); }
+      .row ha-icon { color: var(--primary-color); }
+      .name { font-weight: 500; }
+      .sub { color: var(--secondary-text-color); font-size: 0.85em; }
+      .empty { color: var(--secondary-text-color); padding: 12px 4px; }
+    `;
+    this._card = document.createElement("ha-card");
+    this._list = document.createElement("div");
+    this._card.appendChild(this._list);
+    this.replaceChildren(style, this._card);
+  }
+
+  _render() {
+    if (!this._hass || !this._list) return;
+    const rows = [];
+    for (const entry of this._entities) {
+      const id = entry.entity || entry;
+      const st = this._hass.states[id];
+      if (!st) continue;
+      const a = st.attributes || {};
+      const row = document.createElement("div");
+      row.className = "row";
+      const icon = document.createElement("ha-icon");
+      icon.icon = "mdi:label-outline";
+      const text = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = st.state;
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      const bits = [a.template, a.search].filter(Boolean);
+      if (a.batch && a.batch._batch_size > 1) bits.push(`×${a.batch._batch_size}`);
+      sub.textContent = bits.join("  ·  ");
+      text.replaceChildren(name, sub);
+      row.replaceChildren(icon, text);
+      row.addEventListener("click", () => {
+        this._hass.callService("script", "label_restore_group", { entity_id: id });
+      });
+      rows.push(row);
+    }
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No saved groups match. Save one from the Create tab with Save Group.";
+      rows.push(empty);
+    }
+    this._list.replaceChildren(...rows);
+  }
+
+  getCardSize() {
+    return Math.max(1, this._entities.length);
+  }
+}
+
+customElements.define("label-group-list", LabelGroupList);
+window.customCards.push({
+  type: "label-group-list",
+  name: "Label Group List",
+  description: "Saved label groups with tap-to-restore (fed by auto-entities).",
 });

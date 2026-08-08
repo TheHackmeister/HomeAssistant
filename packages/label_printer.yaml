@@ -22,3 +22,24 @@ input_text:
     icon: mdi:message-text-outline
     max: 255
     initial: ''
+
+  # Search box for the Saved Groups view (auto-entities template filter).
+  label_group_search:
+    name: 'Label: Group search'
+    icon: mdi:magnify
+    max: 100
+    initial: ''
+
+automation:
+  # Group entities (label_group.*) are ephemeral — re-materialize them from the
+  # groups JSON store at startup and whenever the store changes.
+  - id: label_groups_rebuild
+    alias: 'Label: Rebuild Group Entities'
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id: sensor.label_print_groups
+    actions:
+      - action: python_script.rebuild_label_groups

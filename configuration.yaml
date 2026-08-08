@@ -954,6 +954,22 @@ shell_command:
   # template-free and the inner script regains shell features.
   save_label_preview: >-
     sh -c 'mkdir -p /config/www/labels && printf "%s" "{{ b64 }}" | base64 -d > "/config/www/labels/{{ filename }}"'
+  # Saved label groups (print history) as one JSON doc. b64 keeps quoting safe.
+  save_label_groups: >-
+    sh -c 'mkdir -p /config/www/labels && printf "%s" "{{ b64 }}" | base64 -d > /config/www/labels/print_groups.json'
+
+# Saved label groups, read back from the JSON doc the card writes via
+# shell_command.save_label_groups. Attributes carry the full group list for
+# the auto-entities card on the dashboard's Saved Groups view.
+command_line:
+  - sensor:
+      name: Label print groups
+      unique_id: label_print_groups
+      command: 'cat /config/www/labels/print_groups.json 2>/dev/null || echo ''{"groups": []}'''
+      value_template: '{{ value_json.groups | length }}'
+      json_attributes:
+        - groups
+      scan_interval: 30
 
 #compensation:
 #device_tracker:

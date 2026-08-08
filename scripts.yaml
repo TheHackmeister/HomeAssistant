@@ -7050,6 +7050,32 @@ labeled_feature_symfonisk:
 
         # All other events (*_initial_press, *_long_release) have no
         # `choose:` branch and fall through silently.
+label_restore_group:
+  alias: 'Label: Restore Group'
+  description: >-
+    Fires the label_printer_restore event carrying a saved group's template,
+    field values, and batch settings. The label-printer-card subscribes to the
+    event and repopulates the form.
+  mode: parallel
+  icon: mdi:restore
+  fields:
+    entity_id:
+      name: Group entity
+      description: 'label_group.* entity, e.g. label_group.pantry_staples'
+      required: true
+      selector:
+        text: {}
+  sequence:
+    # The label_group.* entity's attributes carry the full saved record.
+    - if: "{{ state_attr(entity_id, 'slug') is not none }}"
+      then:
+        - event: label_printer_restore
+          event_data:
+            template: "{{ state_attr(entity_id, 'template') | default('') }}"
+            fields_json: "{{ state_attr(entity_id, 'fields') | default({}) | to_json }}"
+            batch_json: "{{ state_attr(entity_id, 'batch') | default({}) | to_json }}"
+            search: "{{ state_attr(entity_id, 'search') | default('') }}"
+
 print_label:
   alias: 'Label: Print'
   description: >-
