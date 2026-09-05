@@ -770,13 +770,27 @@ frontend:
   themes: !include_dir_merge_named themes
 
 lovelace:
+  # NOTE: lovelace runs in storage mode, so resources can't be declared here.
+  # The card JS (/local/label-printer/card.js) is registered via
+  # Settings > Dashboards > Resources (JavaScript module).
   dashboards:
     label-printer:
       mode: yaml
       filename: dashboards/label-printer.yaml
       title: Label Printer
-      icon: mdi:label-printer
+      icon: mdi:label-outline
       show_in_sidebar: true
+
+# Loaded-tape / printer-status sensor backing the label printer card readout.
+rest:
+  - resource: https://brother-ptouch-automation.spencerslab.com/status
+    scan_interval: 120
+    sensor:
+      - name: Label printer status
+        value_template: "{{ value_json.tape_mm ~ ' mm' if value_json.get('ok') else 'unavailable' }}"
+        json_attributes:
+          - errors
+          - has_media
 
 # panel_iframe:
 #   router:
@@ -846,6 +860,31 @@ rest_command:
     url: https://brother-ptouch-automation.spencerslab.com/health
     method: GET
 
+  # Currently loaded tape width + printer error state (SNMP-backed).
+  # Response: {"ok": true, "tape_mm": 12, "has_media": true, "errors": []}
+  label_printer_status:
+    url: https://brother-ptouch-automation.spencerslab.com/status
+    method: GET
+
+  # Batched print (proposal 0002): one template, N copies, chained with
+  # half-cuts. cut_every must be JSON null when off — handled in the payload.
+  label_print_batch:
+    url: https://brother-ptouch-automation.spencerslab.com/batch
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: >
+      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | int }}, "labels": [{"fields": {{ fields }}, "copies": {{ copies | int }}}], "half_cut": {{ 'true' if half_cut | bool else 'false' }}, "gap_dots": {{ gap_dots | int }}, "cut_every": {{ cut_every | int if cut_every | int > 0 else 'null' }}, "send": true}
+
+  # Whole-strip preview: labels stacked vertically, same base64 shape as /render.
+  label_render_batch:
+    url: https://brother-ptouch-automation.spencerslab.com/render/batch
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: >
+      {"template": "{{ label_template }}", "tape_mm": {{ tape_mm | int }}, "labels": [{"fields": {{ fields }}, "copies": {{ copies | int }}}], "half_cut": {{ 'true' if half_cut | bool else 'false' }}, "gap_dots": {{ gap_dots | int }}, "cut_every": {{ cut_every | int if cut_every | int > 0 else 'null' }}, "format": "base64"}
+
   healthchecksio:
     url: https://hc-ping.com/89ba143b-b5bc-4074-bf95-b0897ec23102
     method: GET
@@ -909,9 +948,28 @@ rest_command:
 shell_command:
   farm_to_manual_mode: 'echo "manual_mode" > /tmp/test.txt'
   farm_to_running_mode: 'echo "running_mode" > /tmp/test.txt'
-  save_label_preview: >
-    mkdir -p /config/www/labels &&
-    printf '%s' '{{ b64 }}' | base64 -d > "/config/www/labels/{{ filename }}"
+  # Templated shell commands run WITHOUT a shell (create_subprocess_exec with
+  # shlex-split args), so pipes/redirects/&& are passed as literal argv and the
+  # command fails. Wrap in a literal `sh -c '...'`: the program (sh) stays
+  # template-free and the inner script regains shell features.
+  save_label_preview: >-
+    sh -c 'mkdir -p /config/www/labels && printf "%s" "{{ b64 }}" | base64 -d > "/config/www/labels/{{ filename }}"'
+  # Saved label groups (print history) as one JSON doc. b64 keeps quoting safe.
+  save_label_groups: >-
+    sh -c 'mkdir -p /config/www/labels && printf "%s" "{{ b64 }}" | base64 -d > /config/www/labels/print_groups.json'
+
+# Saved label groups, read back from the JSON doc the card writes via
+# shell_command.save_label_groups. Attributes carry the full group list for
+# the auto-entities card on the dashboard's Saved Groups view.
+command_line:
+  - sensor:
+      name: Label print groups
+      unique_id: label_print_groups
+      command: 'cat /config/www/labels/print_groups.json 2>/dev/null || echo ''{"groups": []}'''
+      value_template: '{{ value_json.groups | length }}'
+      json_attributes:
+        - groups
+      scan_interval: 30
 
 #compensation:
 #device_tracker:

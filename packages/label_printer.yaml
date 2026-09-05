@@ -1,0 +1,45 @@
+#######################################################################################################################
+## Package - Label Printer
+##
+## Only the engine-output helpers live here. All form state is client-side in
+## the label-printer-card (www/label-printer/card.js); script.print_label
+## (scripts.yaml) is the engine — it queries /status for the physical tape,
+## renders/prints, writes these two helpers, and bumps the preview token.
+#######################################################################################################################
+
+input_text:
+  # Cache-buster for the dashboard preview image, bumped by script.print_label
+  # after every successful dry-run render.
+  label_preview_token:
+    name: 'Label: Preview token'
+    icon: mdi:refresh
+    max: 100
+    initial: ''
+
+  # Last preview/print outcome, written by script.print_label on every path.
+  label_last_result:
+    name: 'Label: Last result'
+    icon: mdi:message-text-outline
+    max: 255
+    initial: ''
+
+  # Search box for the Saved Groups view (auto-entities template filter).
+  label_group_search:
+    name: 'Label: Group search'
+    icon: mdi:magnify
+    max: 100
+    initial: ''
+
+automation:
+  # Group entities (label_group.*) are ephemeral — re-materialize them from the
+  # groups JSON store at startup and whenever the store changes.
+  - id: label_groups_rebuild
+    alias: 'Label: Rebuild Group Entities'
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id: sensor.label_print_groups
+    actions:
+      - action: python_script.rebuild_label_groups

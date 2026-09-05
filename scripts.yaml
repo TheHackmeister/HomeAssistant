@@ -7050,6 +7050,32 @@ labeled_feature_symfonisk:
 
         # All other events (*_initial_press, *_long_release) have no
         # `choose:` branch and fall through silently.
+label_restore_group:
+  alias: 'Label: Restore Group'
+  description: >-
+    Fires the label_printer_restore event carrying a saved group's template,
+    field values, and batch settings. The label-printer-card subscribes to the
+    event and repopulates the form.
+  mode: parallel
+  icon: mdi:restore
+  fields:
+    entity_id:
+      name: Group entity
+      description: 'label_group.* entity, e.g. label_group.pantry_staples'
+      required: true
+      selector:
+        text: {}
+  sequence:
+    # The label_group.* entity's attributes carry the full saved record.
+    - if: "{{ state_attr(entity_id, 'slug') is not none }}"
+      then:
+        - event: label_printer_restore
+          event_data:
+            template: "{{ state_attr(entity_id, 'template') | default('') }}"
+            fields_json: "{{ state_attr(entity_id, 'fields') | default({}) | to_json }}"
+            batch_json: "{{ state_attr(entity_id, 'batch') | default({}) | to_json }}"
+            search: "{{ state_attr(entity_id, 'search') | default('') }}"
+
 print_label:
   alias: 'Label: Print'
   description: >-
@@ -7274,7 +7300,58 @@ print_label:
       default: {}
       selector:
         object: {}
+    copies:
+      name: Copies
+      description: >-
+        Number of copies to chain-print as one batch (proposal 0002). 1 = a
+        normal single label via /print; values > 1 route to the /batch
+        endpoints and the preview becomes a stacked strip.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    gap_dots:
+      name: Gap between labels (dots)
+      description: Extra blank feed between chained labels. Batch only.
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 200
+          mode: box
+    cut_every:
+      name: Full cut every N labels
+      description: '0 = off (half-cut between labels, full cut at end). Batch only.'
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50
+          mode: box
+    half_cut:
+      name: Half-cut between labels
+      required: false
+      default: true
+      selector:
+        boolean: {}
   sequence:
+    # Physical tape wins: preview and print target what's actually loaded.
+    # Falls back to the passed tape_mm when the status query fails.
+    - action: rest_command.label_printer_status
+      response_variable: printer_status
+      continue_on_error: true
+    - variables:
+        tape_mm: >-
+          {%- if printer_status is defined and printer_status.content is mapping and printer_status.content.get('ok') -%}
+          {{ printer_status.content.tape_mm }}
+          {%- else -%}
+          {{ tape_mm | default('24') }}
+          {%- endif %}
     - variables:
         name_map:
           kitchen/pantry_jar: name
@@ -7352,8 +7429,11 @@ print_label:
           calibration/instrument_cal: next_due
           calibration/cert_id: null
           calibration/thermometer_cal: checked
-        name_key: '{{ name_map.get(label_template) }}'
-        date_key: '{{ date_map.get(label_template) }}'
+        # `or ""` guards against null mappings: '{{ None }}' renders as the
+        # truthy string "None", which would otherwise inject a bogus "None"
+        # field into the API payload for null-mapped templates.
+        name_key: '{{ name_map.get(label_template) or "" }}'
+        date_key: '{{ date_map.get(label_template) or "" }}'
         resolved_date: >-
           {% if date is defined and date %}
             {{ date }}
@@ -7389,443 +7469,111 @@ print_label:
           {{ f }}
     - if: '{{ send }}'
       then:
-        - action: rest_command.print_label
+        # Batches (copies > 1) go to /batch; single labels keep the /print path.
+        - if: '{{ copies | default(1) | int > 1 }}'
+          then:
+            - action: rest_command.label_print_batch
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+                copies: '{{ copies | default(1) | int }}'
+                gap_dots: '{{ gap_dots | default(0) | int }}'
+                cut_every: '{{ cut_every | default(0) | int }}'
+                half_cut: '{{ half_cut | default(true) | bool }}'
+              response_variable: print_response
+          else:
+            - action: rest_command.print_label
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+              response_variable: print_response
+        # rest_command only raises on timeout/connection/decode errors — an
+        # HTTP error status (e.g. 409 printer busy) just logs a warning and
+        # returns normally. Record the outcome for the dashboard and stop
+        # hard on failure so callers see the error too.
+        - if: '{{ print_response.status >= 400 }}'
+          then:
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.label_last_result
+              data:
+                value: >-
+                  {% set c = print_response.content -%}
+                  {% if c is string -%}
+                  {% set reason = c -%}
+                  {% elif c is mapping -%}
+                  {% set reason = c.get('detail') or c.get('error') or c.get('message') or (c | to_json) -%}
+                  {% else -%}
+                  {% set reason = '' -%}
+                  {% endif -%}
+                  Print failed: HTTP {{ print_response.status }}{{ ' — ' ~ reason[:150] if reason else '' }} ({{ now().strftime('%H:%M:%S') }})
+            - stop: 'Label print failed (HTTP {{ print_response.status }})'
+              error: true
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_last_result
           data:
-            label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | default("24") | int }}'
-            fields: '{{ fields | to_json }}'
+            value: 'Printed OK{{ " — " ~ print_response.content.labels ~ " labels" if print_response.content is mapping and print_response.content.labels else "" }} ({{ now().strftime(''%H:%M:%S'') }})'
       else:
-        - action: rest_command.render_label
-          data:
-            label_template: '{{ label_template }}'
-            tape_mm: '{{ tape_mm | default("24") | int }}'
-            fields: '{{ fields | to_json }}'
-          response_variable: render_response
+        # Batches preview as a stacked strip via /render/batch.
+        - if: '{{ copies | default(1) | int > 1 }}'
+          then:
+            - action: rest_command.label_render_batch
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+                copies: '{{ copies | default(1) | int }}'
+                gap_dots: '{{ gap_dots | default(0) | int }}'
+                cut_every: '{{ cut_every | default(0) | int }}'
+                half_cut: '{{ half_cut | default(true) | bool }}'
+              response_variable: render_response
+          else:
+            - action: rest_command.render_label
+              data:
+                label_template: '{{ label_template }}'
+                tape_mm: '{{ tape_mm | default("24") | int }}'
+                fields: '{{ fields | to_json }}'
+              response_variable: render_response
+        # rest_command only raises on timeout/connection/decode errors — an
+        # HTTP error status just logs a warning and returns the error body.
+        # Guard so a failed render never zeroes out the last good preview.png,
+        # and record the outcome for the dashboard (script.label_preview_from_helpers
+        # then skips its preview-token bump).
+        - if: '{{ render_response.status >= 400 or render_response.content.png_b64 is not defined }}'
+          then:
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.label_last_result
+              data:
+                value: >-
+                  {% set c = render_response.content -%}
+                  {% if c is string -%}
+                  {% set reason = c -%}
+                  {% elif c is mapping -%}
+                  {% set reason = c.get('detail') or c.get('error') or c.get('message') or (c | to_json) -%}
+                  {% else -%}
+                  {% set reason = '' -%}
+                  {% endif -%}
+                  Preview failed: HTTP {{ render_response.status }}{{ ' — ' ~ reason[:150] if reason else '' }} ({{ now().strftime('%H:%M:%S') }})
+            - stop: 'Label render failed (HTTP {{ render_response.status }})'
+              error: true
         - action: shell_command.save_label_preview
           data:
             b64: '{{ render_response.content.png_b64 }}'
             filename: '{{ preview_path | default("preview.png") }}'
-preview_label:
-  alias: 'Label: Preview'
-  description: >-
-    Dry-run a label and save the preview PNG. Wraps script.print_label with
-    send=false. Opens the same field dialog minus the send toggle.
-  mode: single
-  icon: mdi:image-search
-  fields:
-    label_template:
-      name: Template
-      description: Label template (category/name)
-      required: true
-      selector:
-        select:
-          options:
-            - kitchen/pantry_jar
-            - kitchen/spice
-            - kitchen/leftover
-            - kitchen/freezer
-            - electronics/component_bin
-            - electronics/cable_flag
-            - electronics/psu_polarity
-            - three_d_printing/filament_spool
-            - three_d_printing/print_bin
-            - three_d_printing/tool_tag
-            - utility/qr
-            - utility/image
-            - garden/seed_packet
-            - garden/plant_tag
-            - garden/row_marker
-            - networking/patch_port
-            - networking/rack_unit
-            - networking/wap_location
-            - workshop/hazard
-            - workshop/tool_id
-            - workshop/torque_cal
-            - workshop/first_aid
-            - home_inventory/moving_box
-            - home_inventory/warranty
-            - home_inventory/storage_bin
-            - media/bookshelf_tag
-            - media/archive_box
-            - media/cd_record
-            - pet/collar_backup
-            - pet/med_schedule
-            - pet/food_bowl
-            - travel/luggage_tag
-            - travel/gear_bag
-            - travel/power_bank
-            - calibration/instrument_cal
-            - calibration/cert_id
-            - calibration/thermometer_cal
-    tape_mm:
-      name: Tape width (mm)
-      description: Loaded tape width
-      required: true
-      default: '24'
-      selector:
-        select:
-          options:
-            - '3.5'
-            - '12'
-            - '18'
-            - '24'
-    name:
-      name: Name / primary text
-      description: Generic primary text, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date:
-      name: Date
-      description: Generic date string, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date_preset:
-      name: Date preset
-      description: Used only when Date is checked but empty.
-      required: false
-      default: '(none)'
-      selector:
-        select:
-          options:
-            - '(none)'
-            - today
-            - 1 week from today
-            - 2 weeks from today
-            - 1 month from today
-            - 3 months from today
-    icon:
-      name: Icon
-      description: Lucide icon name.
-      required: false
-      selector:
-        select:
-          options:
-            - antenna
-            - apple
-            - arrow-right
-            - arrow-up-right
-            - banana
-            - barcode
-            - battery
-            - beef
-            - biohazard
-            - bluetooth
-            - book
-            - bookmark
-            - box
-            - briefcase
-            - cable
-            - calendar
-            - carrot
-            - cat
-            - check
-            - chef-hat
-            - cherry
-            - circle
-            - clipboard-check
-            - clock
-            - coffee
-            - cog
-            - compass
-            - cookie
-            - cpu
-            - croissant
-            - dog
-            - drill
-            - droplets
-            - egg
-            - file-text
-            - fish
-            - flame
-            - flower-2
-            - gauge
-            - globe
-            - grape
-            - hammer
-            - hard-drive
-            - heart
-            - info
-            - key
-            - leaf
-            - lock
-            - luggage
-            - map
-            - map-pin
-            - milk
-            - monitor
-            - network
-            - package
-            - paintbrush
-            - paw-print
-            - pill
-            - plane
-            - plug
-            - printer
-            - qr-code
-            - router
-            - ruler
-            - salad
-            - scale
-            - scissors
-            - server
-            - server-cog
-            - shield
-            - signal
-            - snowflake
-            - sprout
-            - square
-            - star
-            - sun
-            - syringe
-            - tag
-            - tent
-            - thermometer
-            - tree-pine
-            - triangle
-            - usb
-            - utensils
-            - wheat
-            - wifi
-            - wrench
-            - x
-            - zap
-    preview_path:
-      name: Preview filename
-      description: Filename for the saved preview PNG.
-      required: false
-      default: preview.png
-      selector:
-        text: {}
-    extra_fields:
-      name: Extra fields
-      description: Arbitrary dict merged into the API fields object.
-      required: false
-      default: {}
-      selector:
-        object: {}
-  sequence:
-    - action: script.print_label
-      data:
-        label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm | default("24") }}'
-        send: false
-        name: '{{ name | default("") }}'
-        date: '{{ date | default("") }}'
-        date_preset: '{{ date_preset | default("(none)") }}'
-        icon: '{{ icon | default("") }}'
-        preview_path: '{{ preview_path | default("preview.png") }}'
-        extra_fields: '{{ extra_fields | default({}) | to_json }}'
-print_label_send:
-  alias: 'Label: Print (Send)'
-  description: >-
-    Print a label. Wraps script.print_label with send=true. Opens the same
-    field dialog minus the send toggle.
-  mode: single
-  icon: mdi:printer
-  fields:
-    label_template:
-      name: Template
-      description: Label template (category/name)
-      required: true
-      selector:
-        select:
-          options:
-            - kitchen/pantry_jar
-            - kitchen/spice
-            - kitchen/leftover
-            - kitchen/freezer
-            - electronics/component_bin
-            - electronics/cable_flag
-            - electronics/psu_polarity
-            - three_d_printing/filament_spool
-            - three_d_printing/print_bin
-            - three_d_printing/tool_tag
-            - utility/qr
-            - utility/image
-            - garden/seed_packet
-            - garden/plant_tag
-            - garden/row_marker
-            - networking/patch_port
-            - networking/rack_unit
-            - networking/wap_location
-            - workshop/hazard
-            - workshop/tool_id
-            - workshop/torque_cal
-            - workshop/first_aid
-            - home_inventory/moving_box
-            - home_inventory/warranty
-            - home_inventory/storage_bin
-            - media/bookshelf_tag
-            - media/archive_box
-            - media/cd_record
-            - pet/collar_backup
-            - pet/med_schedule
-            - pet/food_bowl
-            - travel/luggage_tag
-            - travel/gear_bag
-            - travel/power_bank
-            - calibration/instrument_cal
-            - calibration/cert_id
-            - calibration/thermometer_cal
-    tape_mm:
-      name: Tape width (mm)
-      description: Loaded tape width
-      required: true
-      default: '24'
-      selector:
-        select:
-          options:
-            - '3.5'
-            - '12'
-            - '18'
-            - '24'
-    name:
-      name: Name / primary text
-      description: Generic primary text, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date:
-      name: Date
-      description: Generic date string, mapped per-template.
-      required: false
-      selector:
-        text: {}
-    date_preset:
-      name: Date preset
-      description: Used only when Date is checked but empty.
-      required: false
-      default: '(none)'
-      selector:
-        select:
-          options:
-            - '(none)'
-            - today
-            - 1 week from today
-            - 2 weeks from today
-            - 1 month from today
-            - 3 months from today
-    icon:
-      name: Icon
-      description: Lucide icon name.
-      required: false
-      selector:
-        select:
-          options:
-            - antenna
-            - apple
-            - arrow-right
-            - arrow-up-right
-            - banana
-            - barcode
-            - battery
-            - beef
-            - biohazard
-            - bluetooth
-            - book
-            - bookmark
-            - box
-            - briefcase
-            - cable
-            - calendar
-            - carrot
-            - cat
-            - check
-            - chef-hat
-            - cherry
-            - circle
-            - clipboard-check
-            - clock
-            - coffee
-            - cog
-            - compass
-            - cookie
-            - cpu
-            - croissant
-            - dog
-            - drill
-            - droplets
-            - egg
-            - file-text
-            - fish
-            - flame
-            - flower-2
-            - gauge
-            - globe
-            - grape
-            - hammer
-            - hard-drive
-            - heart
-            - info
-            - key
-            - leaf
-            - lock
-            - luggage
-            - map
-            - map-pin
-            - milk
-            - monitor
-            - network
-            - package
-            - paintbrush
-            - paw-print
-            - pill
-            - plane
-            - plug
-            - printer
-            - qr-code
-            - router
-            - ruler
-            - salad
-            - scale
-            - scissors
-            - server
-            - server-cog
-            - shield
-            - signal
-            - snowflake
-            - sprout
-            - square
-            - star
-            - sun
-            - syringe
-            - tag
-            - tent
-            - thermometer
-            - tree-pine
-            - triangle
-            - usb
-            - utensils
-            - wheat
-            - wifi
-            - wrench
-            - x
-            - zap
-    preview_path:
-      name: Preview filename
-      description: Filename for the saved preview PNG.
-      required: false
-      default: preview.png
-      selector:
-        text: {}
-    extra_fields:
-      name: Extra fields
-      description: Arbitrary dict merged into the API fields object.
-      required: false
-      default: {}
-      selector:
-        object: {}
-  sequence:
-    - action: script.print_label
-      data:
-        label_template: '{{ label_template }}'
-        tape_mm: '{{ tape_mm | default("24") }}'
-        send: true
-        name: '{{ name | default("") }}'
-        date: '{{ date | default("") }}'
-        date_preset: '{{ date_preset | default("(none)") }}'
-        icon: '{{ icon | default("") }}'
-        preview_path: '{{ preview_path | default("preview.png") }}'
-        extra_fields: '{{ extra_fields | default({}) | to_json }}'
+        # A good preview clears any stale failure message — the updated image
+        # is feedback enough, and this keeps the status line unambiguous.
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_last_result
+          data:
+            value: ''
+        # Bump the cache-buster so dashboard cards reload preview.png.
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.label_preview_token
+          data:
+            value: '{{ now().timestamp() | int }}'
