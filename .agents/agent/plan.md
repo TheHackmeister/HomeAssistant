@@ -119,6 +119,12 @@ Use today's date (`homeassistant_get_datetime` or the environment).
 ## Goal
 One paragraph: what the user gets.
 
+## Skills 
+List of skills to load for the work.
+
+## MCP Servers
+List of MCP servers to use for the work.
+
 ## Verified context
 - HA version: <from homeassistant_get_system_info, or "unknown — MCP down">
 - Entities involved: <entity_id — current state — area/device>
