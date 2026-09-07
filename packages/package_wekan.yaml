@@ -93,13 +93,6 @@ rest_command:
     headers:
       Authorization: !secret wekan_api_token
 
-  # Single checklist with its items array embedded ({_id, title, isFinished}).
-  get_checklist:
-    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/cards/{{ cardId }}/checklists/{{ checklistId }}
-    method: GET
-    headers:
-      Authorization: !secret wekan_api_token
-
   # Set a checklist item's finished state.
   update_checklist_item:
     url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/cards/{{ cardId }}/checklists/{{ checklistId }}/items/{{ itemId }}
@@ -1272,7 +1265,7 @@ script:
                       checklistId: '{{ checklist_id }}'
                     response_variable: checklist_detail
                   - variables:
-                      checked_items: '{{ checklist_detail.content.items | default([],
+                      checked_items: '{{ checklist_detail.content[''items''] | default([],
                         true) | selectattr(''isFinished'', ''eq'', true) | list }}'
                   - repeat:
                       sequence:
