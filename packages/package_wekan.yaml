@@ -148,7 +148,7 @@ automation:
       from_swimlaneId: mi4eKny3uXdGWWmYr
       to_swimlaneId: 8M8Py44KDk8A7mcj4
       boardId: TrfngHQf8PWj9mnqC
-      timeDelta: 1
+      timeDelta: 2
   mode: single
 - id: '1739830023654'
   alias: 'Boards: Move Today''s Cards'
@@ -164,7 +164,7 @@ automation:
       from_swimlaneId: 8M8Py44KDk8A7mcj4
       to_swimlaneId: diPoL2ZNgbaPj9xAh
       boardId: TrfngHQf8PWj9mnqC
-      timeDelta: 0
+      timeDelta: 1
   mode: single
 - id: '1739830178317'
   alias: 'Boards: Move Next Week''s Cards'
@@ -251,7 +251,7 @@ automation:
       from_swimlaneId: mi4eKny3uXdGWWmYr
       to_swimlaneId: 8M8Py44KDk8A7mcj4
       boardId: TrfngHQf8PWj9mnqC
-      timeDelta: 1
+      timeDelta: 2
   - action: script.boards_next_week_s_tasks
     metadata: {}
     continue_on_error: true
@@ -259,7 +259,7 @@ automation:
       from_swimlaneId: 8M8Py44KDk8A7mcj4
       to_swimlaneId: diPoL2ZNgbaPj9xAh
       boardId: TrfngHQf8PWj9mnqC
-      timeDelta: 0
+      timeDelta: 1
   mode: single
 
 script:
@@ -354,9 +354,10 @@ script:
           - if:
             - condition: template
               value_template: "{{ (full_card_details.content.startAt is defined and
-                as_datetime(full_card_details.content.startAt) > now()) or\n   (full_card_details.content.dueAt
-                is defined and full_card_details.content.dueAt != None and as_datetime(full_card_details.content.dueAt)
-                > now()) }}\n"
+                full_card_details.content.startAt != None and as_local(as_datetime(full_card_details.content.startAt)).date()
+                > now().date()) or\n   (full_card_details.content.dueAt is defined
+                and full_card_details.content.dueAt != None and as_local(as_datetime(full_card_details.content.dueAt)).date()
+                > now().date()) }}\n"
             then:
             - action: system_log.write
               metadata: {}
@@ -646,8 +647,9 @@ script:
           else:
           - if:
             - condition: template
-              value_template: '{{ repeat.item.startAt is defined and as_datetime(repeat.item.startAt)
-                - timedelta(days=1) < (now() + timedelta(days=timeDelta)) }}'
+              value_template: '{{ repeat.item.startAt is defined and repeat.item.startAt
+                != None and as_local(as_datetime(repeat.item.startAt)).date() < (now()
+                + timedelta(days=timeDelta)).date() }}'
             then:
             - action: system_log.write
               metadata: {}
@@ -702,8 +704,8 @@ script:
             - if:
               - condition: template
                 value_template: '{{ repeat.item.dueAt is defined and repeat.item.dueAt
-                  != None and as_datetime(repeat.item.dueAt) - timedelta(days=1) < (now()
-                  + timedelta(days=timeDelta)) }}'
+                  != None and as_local(as_datetime(repeat.item.dueAt)).date() < (now()
+                  + timedelta(days=timeDelta)).date() }}'
               then:
               - action: system_log.write
                 metadata: {}

@@ -69,6 +69,18 @@ Labels that drive automation:
 6–9. `boards_next_week_s_tasks` ×4 — cascade Default → Next Week →
    This Week & Weekend → Tomorrow → Today by due-date window
 
+Cascade windows are **calendar-day** comparisons, run-time independent:
+a card moves when `as_local(as_datetime(dueAt)).date() < (now() + timedelta(days=timeDelta)).date()`
+(same for `startAt`). With timeDeltas **14 / 7 / 2 / 1** the resting buckets
+are: Today = due today or overdue · Tomorrow = due tomorrow · This Week &
+Weekend = due 2–7 days out · Next Week = due 7–14 days out · Default = beyond
+14 days or undated. `boards_move_future_cards_to_default` uses the matching
+calendar-day check (`due-date > today`) so cards due later *today* are never
+shuttled to Default and back. (Before 2026-09-07 the cascade subtracted a
+day from card dates as stale timezone compensation — that over-included by a
+full day, landing tomorrow-due cards in Today, and midday manual runs made it
+worse.)
+
 Order matters: recurring bumps run **before** the reset step so a card with
 both a recurring label and Events & Waiting gets renewed instead of archived;
 the reset runs **before** future-card moves so checklists are refreshed before
@@ -161,6 +173,13 @@ Per card in `<swimlane_name>`:
 9. **Moving YAML automations/scripts between files**: keep `alias:` / script
    keys byte-identical so entity IDs survive; disabled state of YAML
    automations lives in the entity registry, keyed by entity_id.
+10. **Date cutoffs are calendar-day, not rolling-24h.** Compare
+    `as_local(as_datetime(x)).date()` against `(now() + timedelta(days=N)).date()`.
+    Rolling datetime comparisons (`dueAt < now + N days`) shift their buckets
+    with the run time — a midday run puts tomorrow-morning cards in Today.
+    Never re-add fixed offsets (like the old `- timedelta(days=1)`) as
+    timezone compensation: `as_datetime` returns tz-aware values and
+    `as_local` handles the conversion.
 
 ## Related
 
