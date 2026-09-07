@@ -11,7 +11,7 @@
 ## Nightly flow (automation.boards_daily_task_organization, 00:01):
 ##   1. boards_update_recurring_tasks       - bump due dates on labeled recurring cards (Today / Inbox-Reset)
 ##   2. boards_archive_past_unlabeled_tasks - archive past-due unlabeled cards (Today / Inbox-Reset)
-##   3. boards_reset_inbox_cards            - delete past-due "Events & Waiting" cards; uncheck all checklist
+##   3. boards_reset_inbox_cards            - archive past-due "Events & Waiting" cards; uncheck all checklist
 ##                                            items on cards labeled "Reset Checklists"
 ##   4. boards_move_future_cards_to_default - move future-dated cards Today -> Default swimlane
 ##   5. boards_organize_by_labels           - move labeled cards to same-name lists (Default swimlane)
@@ -77,18 +77,18 @@ rest_command:
       Content-Type: application/json
       Authorization: !secret wekan_api_token
 
-  # Permanently delete a card (no archive, no undo in WeKan).
-  delete_card:
-    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/lists/{{ listId }}/cards/{{ cardId }}
-    method: DELETE
-    headers:
-      Authorization: !secret wekan_api_token
-
   # All checklists on a card. NOTE (verified live 2026-09-07): this list
   # endpoint does NOT embed the checklist items array — fetch each checklist
   # via get_checklist below to get its items.
   get_card_checklists:
     url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/cards/{{ cardId }}/checklists
+    method: GET
+    headers:
+      Authorization: !secret wekan_api_token
+
+  # Single checklist with its items array embedded ({_id, title, isFinished}).
+  get_checklist:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/cards/{{ cardId }}/checklists/{{ checklistId }}
     method: GET
     headers:
       Authorization: !secret wekan_api_token
@@ -1232,20 +1232,20 @@ script:
               metadata: {}
               data:
                 level: info
-                message: 'Deleting past-due event card "{{ repeat.item.title }}" (due
+                message: 'Archiving past-due event card "{{ repeat.item.title }}" (due
                   {{ full_card_details.content.dueAt }})'
-            - action: rest_command.delete_card
+            - action: rest_command.archive_card
               metadata: {}
               data:
                 boardId: '{{ boardId }}'
                 listId: '{{ full_card_details.content.listId }}'
                 cardId: '{{ repeat.item._id }}'
-              response_variable: delete_result
+              response_variable: archive_result
             - action: system_log.write
               metadata: {}
               data:
                 level: info
-                message: 'Delete result for "{{ repeat.item.title }}": {{ delete_result
+                message: 'Archive result for "{{ repeat.item.title }}": {{ archive_result
                   }}'
             else:
             - if:
@@ -1297,7 +1297,7 @@ script:
           and swimlane_cards.content is not string else [] }}'
     alias: 'Boards: Reset Inbox Cards'
     description: Nightly cleanup of the Inbox/Reset list (the "Done" list). Past-due
-      cards labeled as events are permanently deleted; non-event cards carrying the
+      cards labeled as events are archived; non-event cards carrying the
       reset label get all checklist items unchecked so recurring work starts fresh.
     fields:
       boardId:
