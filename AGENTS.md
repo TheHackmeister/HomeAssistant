@@ -12,7 +12,7 @@ here — plan, code, or otherwise — must follow the conventions and rules belo
   (`package_<name>.yaml`): automations + scripts + helpers + template entities
   + inputs together. Existing: label_printer, house_climate, house_locks,
   house_modes, infra, room_bedroom, room_office, sports_ball,
-  unavailable_entities, vacuum.
+  unavailable_entities, vacuum, wekan.
 - `themes/` — frontend themes (`frontend: themes: !include_dir_merge_named themes`).
 - `dashboards/` — YAML-mode dashboards, each registered under
   `lovelace.dashboards:` in configuration.yaml (existing: home-farm,
