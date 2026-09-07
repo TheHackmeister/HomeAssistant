@@ -67,7 +67,9 @@ Labels that drive automation:
 4. `boards_move_future_cards_to_default` — future-dated cards Today → Default
 5. `boards_organize_by_labels` — label→list moves in the Default swimlane
 6–9. `boards_next_week_s_tasks` ×4 — cascade Default → Next Week →
-   This Week & Weekend → Tomorrow → Today by due-date window
+   This Week & Weekend → Tomorrow → Today by due-date window. Cascade moves
+   go through `script.boards_move_card_bounce` so the board email rules fire
+   (see below).
 
 Cascade windows are **calendar-day** comparisons, run-time independent:
 a card moves when `as_local(as_datetime(dueAt)).date() < (now() + timedelta(days=timeDelta)).date()`
@@ -103,6 +105,7 @@ failing step (e.g. expired token) must never abort the rest of the chain.
 | `archive_card` | PUT | `{"archive": "true"}` — recoverable |
 | `update_checklist_item` | PUT | `{"isFinished": bool}` per item |
 | `add_board_label` | PUT | Add a label `{name, color}` to the board |
+| `get_current_user` | GET | Who the token belongs to (rule-identity check) |
 
 Hard-delete was deliberately removed (archive is recoverable; the wekan MCP
 server also omits destructive ops by design).
@@ -118,6 +121,64 @@ Per card in `<swimlane_name>`:
 - no event label **and** has `<reset_label_name>` label → fetch each
   checklist, uncheck every checked item
 - otherwise → skip
+
+## Board email rules & the bounce move (added 2026-09-07)
+
+Three rules live **on the WeKan board** (created/verified via the wekan-admin
+MCP server): when the bot user moves a card INTO a swimlane, WeKan emails
+`tms@spencerslab.com`:
+
+| Rule ID | Swimlane trigger | Subject |
+|---|---|---|
+| `KaFPq7sgAmwwyEGGK` | Today | `Due Today: {cardtitle}` |
+| `awiusyKqkQLEinjoh` | This Week & Weekend | `Due This Week: {cardtitle}` |
+| `YeLdvL8wZCdKQ22L3` | Next Week | `Due Next Week: {cardtitle}` |
+
+**Identity requirement:** the rules trigger only for userId
+`w6BkHXEovmFHsH5NN` (the bot user). HA's moves only match if
+`!secret wekan_api_token` belongs to that same user — check with
+`script.boards_show_api_user` (logs `GET /api/user` output at warning level)
+after any token rotation. Different user → the rules need that userId added
+or the token swapped; escalate to the user first.
+
+**The WeKan v9.99 bug:** the REST card-move PUT logs a `moveCard` activity
+**only when the destination list differs from the current list**.
+Swimlane-only moves (payload listId unchanged) go through
+`Cards.direct.updateAsync` — no hooks, no activity — and rules only run off
+activities. This board's lists are shared across swimlanes (one `Inbox/Reset`
+list document board-wide), so every cascade swimlane move is a same-list move
+and was email-silent. Verified live: same-list move → no email; list-changing
+move → email delivered.
+
+**The workaround — `script.boards_move_card_bounce`** (3 steps, exactly one
+rule-firing activity):
+
+1. PUT with unchanged listId → park in the neutral swimlane **Default**
+   (`44anFDcaRYyswRToE`, no rule targets it). Silent — the bug, used
+   deliberately.
+2. PUT changing the list to a bounce list while still in Default → activity
+   logged with swimlaneName Default → matches no rule. Bounce lists:
+   `Inbox/Reset` (`F6zDGrwYv6mT9dHPB`) / `Spencers Lab`
+   (`aW9JT3t6xffTuvHRe`) — whichever is NOT the card's current list.
+3. PUT from the bounce list back to the destination list + target swimlane →
+   activity with swimlaneName = target → the rule fires **exactly once**.
+
+The cascade (`boards_next_week_s_tasks`) calls the bounce script for every
+move; each step's HTTP status is guarded so a failed step stops the sequence
+with an error log naming where the card is parked. Accepted side effects: two
+extra "moved" entries in card history; the card sits in the bounce list for
+milliseconds between steps 2 and 3.
+
+**Do not** route these through the bounce (stay direct PUTs, email-silent):
+`boards_move_future_cards_to_default` (target Default — no rule) and
+`boards_organize_by_labels` (list moves within Default). Any future
+sensor-style drift correction must also stay a single swimlane-only PUT: the
+bounce is async, so a verify re-fetch could observe the NEUTRAL/BOUNCE state
+mid-sequence and wrongly "restore" the card.
+
+**Long-term fix:** upstream WeKan should make the swimlane branch of the PUT
+route call `cardMove()` with `['swimlaneId']`. If that ever ships, retire the
+bounce and use direct swimlane-only PUTs again.
 
 ## How to extend
 
@@ -180,6 +241,11 @@ Per card in `<swimlane_name>`:
     Never re-add fixed offsets (like the old `- timedelta(days=1)`) as
     timezone compensation: `as_datetime` returns tz-aware values and
     `as_local` handles the conversion.
+11. **WeKan v9.99 REST moves that keep the same list log NO activity** —
+    board rules (email rules!) only run off activities, so same-list
+    swimlane moves are rule-silent. Use `script.boards_move_card_bounce`
+    for any move that must fire a rule; keep moves that need no rule direct.
+    UI drag-and-drop is unaffected (collection hooks) — only REST is.
 
 ## Related
 

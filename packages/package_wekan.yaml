@@ -16,6 +16,17 @@
 ##   4. boards_move_future_cards_to_default - move future-dated cards Today -> Default swimlane
 ##   5. boards_organize_by_labels           - move labeled cards to same-name lists (Default swimlane)
 ##   6-9. boards_next_week_s_tasks x4       - cascade cards Next Week -> This Week -> Tomorrow -> Today
+##
+## Board email rules (WeKan side, verified 2026-09-07): when the bot user
+## (userId w6BkHXEovmFHsH5NN) moves a card INTO Today / This Week & Weekend /
+## Next Week, WeKan emails tms@spencerslab.com ("Due Today/This Week/Next
+## Week: <card>"). Rules only run off logged moveCard activities, and WeKan
+## v9.99 REST logs NO activity for moves that keep the same list — so the
+## cascade moves cards via script.boards_move_card_bounce (3-step bounce
+## through the neutral Default swimlane) to make the rules fire. Moves that
+## don't target a rule swimlane (e.g. Today -> Default) stay direct PUTs.
+## Sensor-style drift corrections, if ever added, must stay swimlane-only
+## PUTs (email-silent) — the bounce is async and would race a verify re-fetch.
 #######################################################################################################################
 
 rest_command:
@@ -75,6 +86,15 @@ rest_command:
     headers:
       Accept: application/json
       Content-Type: application/json
+      Authorization: !secret wekan_api_token
+
+  # The user this token belongs to. Board email rules fire only for moves by
+  # a specific userId — check with script.boards_show_api_user after rotating
+  # the token (90-day expiry, see skill gotcha #4).
+  get_current_user:
+    url: https://wekan.spencerslab.com/api/user
+    method: GET
+    headers:
       Authorization: !secret wekan_api_token
 
   # All checklists on a card. NOTE (verified live 2026-09-07): this list
@@ -683,15 +703,16 @@ script:
               - condition: template
                 value_template: '{{ target_list_id != "" }}'
               then:
-              - action: rest_command.move_card_to_swimlane
+              # Bounce move: WeKan v9.99 REST logs no activity for same-list
+              # moves, so a direct PUT would never fire the board email rules.
+              - action: script.boards_move_card_bounce
                 metadata: {}
                 data:
+                  boardId: '{{ boardId }}'
                   cardId: '{{ repeat.item._id }}'
                   listId: '{{ repeat.item.listId }}'
-                  boardId: '{{ boardId }}'
-                  swimlaneId: '{{ to_swimlaneId }}'
-                  newListId: '{{ target_list_id }}'
-                response_variable: move_result
+                  destListId: '{{ target_list_id }}'
+                  targetSwimlaneId: '{{ to_swimlaneId }}'
               else:
               - action: system_log.write
                 metadata: {}
@@ -739,15 +760,16 @@ script:
                 - condition: template
                   value_template: '{{ target_list_id != "" }}'
                 then:
-                - action: rest_command.move_card_to_swimlane
+                # Bounce move: WeKan v9.99 REST logs no activity for same-list
+                # moves, so a direct PUT would never fire the board email rules.
+                - action: script.boards_move_card_bounce
                   metadata: {}
                   data:
+                    boardId: '{{ boardId }}'
                     cardId: '{{ repeat.item._id }}'
                     listId: '{{ repeat.item.listId }}'
-                    boardId: '{{ boardId }}'
-                    swimlaneId: '{{ to_swimlaneId }}'
-                    newListId: '{{ target_list_id }}'
-                  response_variable: move_result
+                    destListId: '{{ target_list_id }}'
+                    targetSwimlaneId: '{{ to_swimlaneId }}'
                 else:
                 - action: system_log.write
                   metadata: {}
@@ -1330,3 +1352,135 @@ script:
         description: Board label that opts a non-event card into checklist reset
         default: Reset Checklists
         required: true
+  boards_move_card_bounce:
+    sequence:
+    - variables:
+        neutral_swimlane_id: 44anFDcaRYyswRToE
+        bounce_list_a: F6zDGrwYv6mT9dHPB
+        bounce_list_b: aW9JT3t6xffTuvHRe
+        bounce_list_id: '{% if listId == bounce_list_a %}{{ bounce_list_b }}{% else
+          %}{{ bounce_list_a }}{% endif %}'
+    # Step 1: park in the neutral swimlane (Default). The list does not change,
+    # so WeKan v9.99 logs NO activity — no rule fires.
+    - action: rest_command.move_card_to_swimlane
+      metadata: {}
+      data:
+        boardId: '{{ boardId }}'
+        listId: '{{ listId }}'
+        cardId: '{{ cardId }}'
+        swimlaneId: '{{ neutral_swimlane_id }}'
+        newListId: '{{ listId }}'
+      response_variable: bounce_step1
+    - if:
+      - condition: template
+        value_template: '{% set s = (bounce_step1 | default({})).status | default(0)
+          %}{{ s != 200 }}'
+      then:
+      - action: system_log.write
+        metadata: {}
+        data:
+          level: error
+          message: 'Bounce step 1 failed for card {{ cardId }}: {{ bounce_step1 }}'
+      - stop: 'Bounce step 1 failed'
+    # Step 2: bounce to another list (still the neutral swimlane). The list
+    # change makes WeKan log a moveCard activity, but the swimlane is neutral,
+    # so no board rule matches it.
+    - action: rest_command.move_card_to_swimlane
+      metadata: {}
+      data:
+        boardId: '{{ boardId }}'
+        listId: '{{ listId }}'
+        cardId: '{{ cardId }}'
+        swimlaneId: '{{ neutral_swimlane_id }}'
+        newListId: '{{ bounce_list_id }}'
+      response_variable: bounce_step2
+    - if:
+      - condition: template
+        value_template: '{% set s = (bounce_step2 | default({})).status | default(0)
+          %}{{ s != 200 }}'
+      then:
+      - action: system_log.write
+        metadata: {}
+        data:
+          level: error
+          message: 'Bounce step 2 failed for card {{ cardId }} (card is in the neutral
+            swimlane): {{ bounce_step2 }}'
+      - stop: 'Bounce step 2 failed'
+    # Step 3: into the destination list + target swimlane. The list change makes
+    # WeKan log a moveCard activity with swimlaneName = target, so the board's
+    # email rule fires exactly once.
+    - action: rest_command.move_card_to_swimlane
+      metadata: {}
+      data:
+        boardId: '{{ boardId }}'
+        listId: '{{ bounce_list_id }}'
+        cardId: '{{ cardId }}'
+        swimlaneId: '{{ targetSwimlaneId }}'
+        newListId: '{{ destListId }}'
+      response_variable: bounce_step3
+    - if:
+      - condition: template
+        value_template: '{% set s = (bounce_step3 | default({})).status | default(0)
+          %}{{ s != 200 }}'
+      then:
+      - action: system_log.write
+        metadata: {}
+        data:
+          level: error
+          message: 'Bounce step 3 failed for card {{ cardId }} (card is parked in
+            list {{ bounce_list_id }} of the neutral swimlane): {{ bounce_step3 }}'
+      - stop: 'Bounce step 3 failed'
+    alias: 'Boards: Move Card to Swimlane (Rule-Firing Bounce)'
+    description: Three-step move that works around WeKan v9.99 logging no moveCard
+      activity for same-list REST moves, which keeps board email rules from firing.
+      Parks the card in the neutral Default swimlane (silent), bounces it through
+      another list (activity in the neutral swimlane, matches no rule), then moves
+      it into the destination list + target swimlane (activity in the target
+      swimlane -> the rule fires exactly once). See the wekan-home-assistant skill.
+    mode: queued
+    max: 10
+    fields:
+      boardId:
+        selector:
+          text:
+        name: boardId
+        description: Board ID
+        default: TrfngHQf8PWj9mnqC
+        required: false
+      cardId:
+        selector:
+          text:
+        name: Card ID
+        required: true
+      listId:
+        selector:
+          text:
+        name: List ID
+        description: The card's CURRENT list (the URL segment WeKan matches on)
+        required: true
+      destListId:
+        selector:
+          text:
+        name: Destination List ID
+        description: List the card should end up in (usually the same as listId)
+        required: true
+      targetSwimlaneId:
+        selector:
+          text:
+        name: Target Swimlane ID
+        required: true
+  boards_show_api_user:
+    sequence:
+    - action: rest_command.get_current_user
+      metadata: {}
+      response_variable: api_user
+    - action: system_log.write
+      metadata: {}
+      data:
+        level: warning
+        message: 'WeKan API identity: {{ (api_user | default({})).content }}'
+    alias: 'Boards: Show WeKan API User'
+    description: Logs the WeKan user HA's token belongs to (warning level, so it
+      shows in the system-log ring buffer). Board email rules fire only for moves
+      by a specific userId (w6BkHXEovmFHsH5NN as of 2026-09-07) — run this after
+      rotating wekan_api_token to confirm the identity still matches.
