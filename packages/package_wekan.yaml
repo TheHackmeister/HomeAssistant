@@ -12,7 +12,7 @@
 ##   1. boards_update_recurring_tasks       - bump due dates on labeled recurring cards (Today / Inbox-Reset)
 ##   2. boards_archive_past_unlabeled_tasks - archive past-due unlabeled cards (Today / Inbox-Reset)
 ##   3. boards_reset_inbox_cards            - delete past-due "Events & Waiting" cards; uncheck all checklist
-##                                            items on every other Inbox/Reset card
+##                                            items on cards labeled "Reset Checklists"
 ##   4. boards_move_future_cards_to_default - move future-dated cards Today -> Default swimlane
 ##   5. boards_organize_by_labels           - move labeled cards to same-name lists (Default swimlane)
 ##   6-9. boards_next_week_s_tasks x4       - cascade cards Next Week -> This Week -> Tomorrow -> Today
@@ -84,10 +84,18 @@ rest_command:
     headers:
       Authorization: !secret wekan_api_token
 
-  # All checklists on a card; each checklist document embeds its items
-  # array ({_id, title, isFinished}). Verify embedding on first live run.
+  # All checklists on a card. NOTE (verified live 2026-09-07): this list
+  # endpoint does NOT embed the checklist items array — fetch each checklist
+  # via get_checklist below to get its items.
   get_card_checklists:
     url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/cards/{{ cardId }}/checklists
+    method: GET
+    headers:
+      Authorization: !secret wekan_api_token
+
+  # Single checklist with its items array embedded ({_id, title, isFinished}).
+  get_checklist:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/cards/{{ cardId }}/checklists/{{ checklistId }}
     method: GET
     headers:
       Authorization: !secret wekan_api_token
@@ -98,6 +106,19 @@ rest_command:
     method: PUT
     payload: >
       {"isFinished": {{ 'true' if isFinished | bool else 'false' }}}
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Authorization: !secret wekan_api_token
+
+  # Add a label to the board. Labels drive this board's automation
+  # (organize-by-label, recurring due dates, events, checklist reset).
+  add_board_label:
+    url: https://wekan.spencerslab.com/api/boards/{{ boardId }}/labels
+    method: PUT
+    payload: >
+      {"label": {"name": "{{ label_name }}", "color": "{{ label_color | default('sky',
+      true) }}"}}
     headers:
       Accept: application/json
       Content-Type: application/json
@@ -176,37 +197,47 @@ automation:
     at: 00:01:00
   conditions: []
   actions:
+  # continue_on_error: each step is independent maintenance — one failing
+  # script (e.g. expired WeKan token, API hiccup) must not abort the rest
+  # of the nightly chain.
   - action: script.boards_update_recurring_tasks
     metadata: {}
+    continue_on_error: true
     data:
       boardId: TrfngHQf8PWj9mnqC
       from_swimlane_name: Today
       from_list_name: Inbox/Reset
   - action: script.boards_archive_past_unlabeled_tasks
     metadata: {}
+    continue_on_error: true
     data:
       boardId: TrfngHQf8PWj9mnqC
       swimlane_name: Today
   - action: script.boards_reset_inbox_cards
     metadata: {}
+    continue_on_error: true
     data:
       boardId: TrfngHQf8PWj9mnqC
       swimlane_name: Today
       list_name: Inbox/Reset
       event_label_name: Events & Waiting
+      reset_label_name: Reset Checklists
   - action: script.boards_move_future_cards_to_default
     metadata: {}
+    continue_on_error: true
     data:
       boardId: TrfngHQf8PWj9mnqC
       from_swimlane_name: Today
       to_swimlane_name: Default
   - action: script.boards_organize_by_labels
     metadata: {}
+    continue_on_error: true
     data:
       boardId: TrfngHQf8PWj9mnqC
       swimlane_name: Default
   - action: script.boards_next_week_s_tasks
     metadata: {}
+    continue_on_error: true
     data:
       from_swimlaneId: 44anFDcaRYyswRToE
       to_swimlaneId: M4ep8PQ4ooQzxrMAy
@@ -214,6 +245,7 @@ automation:
       timeDelta: 14
   - action: script.boards_next_week_s_tasks
     metadata: {}
+    continue_on_error: true
     data:
       from_swimlaneId: M4ep8PQ4ooQzxrMAy
       to_swimlaneId: mi4eKny3uXdGWWmYr
@@ -221,6 +253,7 @@ automation:
       timeDelta: 7
   - action: script.boards_next_week_s_tasks
     metadata: {}
+    continue_on_error: true
     data:
       from_swimlaneId: mi4eKny3uXdGWWmYr
       to_swimlaneId: 8M8Py44KDk8A7mcj4
@@ -228,6 +261,7 @@ automation:
       timeDelta: 1
   - action: script.boards_next_week_s_tasks
     metadata: {}
+    continue_on_error: true
     data:
       from_swimlaneId: 8M8Py44KDk8A7mcj4
       to_swimlaneId: diPoL2ZNgbaPj9xAh
@@ -1091,6 +1125,24 @@ script:
       data:
         boardId: '{{ boardId }}'
       response_variable: all_swimlanes
+    # Fail fast with a clear diagnostic when the WeKan API returns an error
+    # object instead of a list (expired/invalid wekan_api_token, WITH_API
+    # off, server down). Without this, the error body silently renders as
+    # "swimlane not found" or aborts a downstream repeat with a TypeError.
+    - if:
+      - condition: template
+        value_template: '{% set c = (all_swimlanes | default({})).content %}{{ not
+          (c is defined and c is iterable and c is not string and c is not mapping)
+          }}'
+      then:
+      - action: system_log.write
+        metadata: {}
+        data:
+          level: error
+          message: 'WeKan API error fetching swimlanes for board {{ boardId }} (expired/invalid
+            wekan_api_token, or WITH_API off on the server?): {{ (all_swimlanes |
+            default({})).content }}'
+      - stop: 'WeKan API error'
     - variables:
         swimlane_match: '{{ all_swimlanes.content | selectattr(''title'', ''eq'',
           swimlane_name) | list }}
@@ -1169,6 +1221,7 @@ script:
                 set names.items = names.items + [matching[0].name | lower] %}\n  {%
                 endif %}\n{% endfor %} {{ names.items }}"
               is_event: '{{ event_label_name | lower in card_label_names }}'
+              has_reset_label: '{{ reset_label_name | lower in card_label_names }}'
               is_past_due: '{{ full_card_details.content.dueAt is defined and full_card_details.content.dueAt
                 != None and as_datetime(full_card_details.content.dueAt) < now() }}'
           - if:
@@ -1197,7 +1250,7 @@ script:
             else:
             - if:
               - condition: template
-                value_template: '{{ not is_event }}'
+                value_template: '{{ not is_event and has_reset_label }}'
               then:
               - action: rest_command.get_card_checklists
                 metadata: {}
@@ -1209,8 +1262,18 @@ script:
                   sequence:
                   - variables:
                       checklist_id: '{{ repeat.item._id }}'
-                      checked_items: '{{ repeat.item.items | default([], true) | selectattr(''isFinished'',
-                        ''eq'', true) | list }}'
+                  # The list-checklists endpoint does NOT embed items, so fetch
+                  # this one checklist to read its items array.
+                  - action: rest_command.get_checklist
+                    metadata: {}
+                    data:
+                      boardId: '{{ boardId }}'
+                      cardId: '{{ full_card_details.content._id }}'
+                      checklistId: '{{ checklist_id }}'
+                    response_variable: checklist_detail
+                  - variables:
+                      checked_items: '{{ checklist_detail.content.items | default([],
+                        true) | selectattr(''isFinished'', ''eq'', true) | list }}'
                   - repeat:
                       sequence:
                       - action: system_log.write
@@ -1228,12 +1291,14 @@ script:
                           itemId: '{{ repeat.item._id }}'
                           isFinished: false
                       for_each: '{{ checked_items }}'
-                  for_each: '{{ card_checklists.content }}'
-        for_each: '{{ swimlane_cards.content }}'
+                  for_each: '{{ card_checklists.content if card_checklists.content
+                    is sequence and card_checklists.content is not string else [] }}'
+        for_each: '{{ swimlane_cards.content if swimlane_cards.content is sequence
+          and swimlane_cards.content is not string else [] }}'
     alias: 'Boards: Reset Inbox Cards'
     description: Nightly cleanup of the Inbox/Reset list (the "Done" list). Past-due
-      cards labeled as events are permanently deleted; every other card's checklist
-      items are all unchecked so recurring work starts fresh.
+      cards labeled as events are permanently deleted; non-event cards carrying the
+      reset label get all checklist items unchecked so recurring work starts fresh.
     fields:
       boardId:
         selector:
@@ -1262,4 +1327,11 @@ script:
         name: Event Label Name
         description: Board label that marks a card as an event
         default: Events & Waiting
+        required: true
+      reset_label_name:
+        selector:
+          text:
+        name: Reset Label Name
+        description: Board label that opts a non-event card into checklist reset
+        default: Reset Checklists
         required: true
