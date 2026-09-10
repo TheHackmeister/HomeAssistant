@@ -18,7 +18,7 @@ WeKan-related belongs in `configuration.yaml`, `automations.yaml`, or
 - Auth: `Authorization: !secret wekan_api_token`. The secret stores the **full
   header value including the `Bearer ` prefix**. Long-lived token; see gotchas.
 - Live board inspection during development: the **wekan MCP tools**
-  (`global-admin-wekan_*` / `global-readonly-wekan_*`) — prefer these over
+  (`admin-global-wekan_*` / `readonly-global-wekan_*`) — prefer these over
   adding throwaway REST plumbing just to look at the board.
 
 ## Board topology (verified live 2026-09-07)
@@ -252,4 +252,4 @@ bounce and use direct swimlane-only PUTs again.
 - `/home/coder/SpencersLab/skills/wekan-api/` — full WeKan REST API reference
   and standalone Python scripts (auth, CRUD, checklists, webhooks).
 - `/home/coder/SpencersLab/containers/wekan-mcp/` — the wekan MCP server
-  source; its tool surface is what the `global-admin-wekan_*` tools expose.
+  source; its tool surface is what the `admin-global-wekan_*` tools expose.

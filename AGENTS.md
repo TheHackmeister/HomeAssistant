@@ -52,9 +52,10 @@ guessing:
   entries, `homeassistant_manage_trace` for automation/script execution
   traces, `homeassistant_get_logbook` for the event history.
 - **MCP server logs** (the homeassistant MCP server itself, or any other MCP
-  server running in the cluster): use the kubernetes MCP server. The ha-mcp
+  server running in the cluster): use the `readonly-home-kubernetes` MCP
+  server (servers are named `readonly|admin-<cluster>-<service>`). The ha-mcp
   workload is pod `homeassistant-0` in namespace `default` (proxy deployment
-  `homeassistant`); fetch logs with `kubernetes_pods_log`.
+  `homeassistant`); fetch logs with `readonly-home-kubernetes_pods_log`.
 
 **Troubleshooting MCP auth:** ha-mcp gets its HA long-lived access token
 either from the client request (`Authorization: Bearer <token>` header in the
