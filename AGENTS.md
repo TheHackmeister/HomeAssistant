@@ -3,6 +3,19 @@
 This repo is a full Home Assistant configuration directory. Any agent working
 here — plan, code, or otherwise — must follow the conventions and rules below.
 
+## Hard rules
+
+- **Always load referenced skills first.** The first thing agents do is load
+  any referenced or relevant skills, then the plan file (if one), immediately
+  followed by the skills referenced there.
+- **Never push to `main` — only the user does that.** Agents work on their own
+  branch/worktree and commit there. To pick up changes, merge `main` *into*
+  your worktree (`git merge main`); never merge your branch into `main` and
+  never run `git push origin main`. Landing work on `main` is the user's
+  decision alone.
+- Plans are `yyyy-mm-dd-<type>-<short-desc>.md` in `.kilo/plans/`
+  (`<type>` = `feat`|`bug`|`debug`|`dep`|…).
+
 ## Repository layout
 
 - `configuration.yaml` — root config. Includes `automations.yaml`,
@@ -20,8 +33,8 @@ here — plan, code, or otherwise — must follow the conventions and rules belo
   resources and cards there are managed via UI/API, never by writing files.
 - `blueprints/`, `custom_components/` (incl. `labeled_features`),
   `python_scripts/`, `esphome/`, `www/`.
-- `.kilo/plans/` — plan documents, named `yyyy-mm-dd-short-description.md`
-  (date prefix, never unix epoch).
+- `.kilo/plans/` — plan documents, named `yyyy-mm-dd-<type>-short-description.md`
+  (date prefix, never unix epoch; `<type>` = `feat`|`bug`|`debug`|`dep`|…).
 - Secrets live in `secrets.yaml` (gitignored) and are referenced with
   `!secret`. Never write real credentials anywhere else.
 

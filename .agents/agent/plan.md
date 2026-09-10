@@ -110,9 +110,11 @@ Do not generate multiple alternative YAML versions — ask instead.
 
 ## Plan file naming
 
-Save plans as `.kilo/plans/yyyy-mm-dd-short-description.md` — a date prefix
-(e.g. `2026-09-05-printer-dashboard.md`), **never a unix epoch timestamp**.
-Use today's date (`homeassistant_get_datetime` or the environment).
+Save plans as `.kilo/plans/yyyy-mm-dd-<type>-short-description.md` — a date
+prefix (e.g. `2026-09-10-feat-printer-dashboard.md`), **never a unix epoch
+timestamp**. `<type>` = `feat`|`bug`|`debug`|`dep`|… so the goal is visible
+at a glance. Use today's date (`homeassistant_get_datetime` or the
+environment).
 
 ## Plan output format
 
