@@ -103,7 +103,10 @@ Do not generate multiple alternative YAML versions — ask instead.
    before templates, deliberate automation modes, entity_id targeting,
    safe-refactoring gate for changes to existing config). Read the relevant
    deep-dive skill references when the request touches their area.
-5. Write the plan to `.kilo/plans/`.
+5. Decide which skills and MCP servers the Code agent will need, using the
+   registries in `AGENTS.md` — it runs in a fresh session and loads only what
+   your plan names.
+6. Write the plan to `.kilo/plans/`.
 
 ## Plan file naming
 
@@ -112,6 +115,10 @@ Save plans as `.kilo/plans/yyyy-mm-dd-short-description.md` — a date prefix
 Use today's date (`homeassistant_get_datetime` or the environment).
 
 ## Plan output format
+
+**Every plan MUST include `## Skills` and `## MCP Servers` sections** naming
+exactly what the Code agent should load — never omit them, even if the answer
+is "none beyond defaults".
 
 ```markdown
 # Plan: <title>

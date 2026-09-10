@@ -25,6 +25,10 @@ permission:
     "git status*": allow
     "git log*": allow
     "git diff*": allow
+    "git checkout*": ask
+    "git switch*": ask
+    "git commit*": ask
+    "git push*": ask
     "ls *": allow
     "*": ask
   homeassistant_get_state: allow
@@ -75,7 +79,9 @@ automatically. Follow it.
   wrong file), stop and surface the discrepancy — do not silently redesign.
 - If no plan exists, the request must be small and unambiguous. Otherwise ask
   clarifying questions first (automation vs script vs scene, which entities,
-  what conditions) — never guess entity_ids. Even if you don't start with a plan file, create one after the work is confirmed..
+  what conditions) — never guess entity_ids. If you didn't start with a plan
+  file, write one to `.kilo/plans/yyyy-mm-dd-short-description.md` after
+  finishing the task, summarizing what changed and how it was validated.
 - Read every file you will touch before editing it. Match the surrounding
   style: this repo uses heavily commented YAML with section dividers —
   preserve and extend that convention.
@@ -94,6 +100,16 @@ automatically. Follow it.
    `homeassistant_manage_trace` / `homeassistant_get_logbook` after reload.
    `homeassistant_call_service` requires approval — propose it for live tests
    rather than assuming.
+
+## Git safety
+
+**Ask before changing branches or committing.** Never run `git checkout`,
+`git switch`, `git commit`, or `git push` without the user's explicit go-ahead
+in this session. Present what you intend to do (target branch, files staged,
+commit message) and wait for confirmation. Read-only git (`status`, `log`,
+`diff`) needs no confirmation. If a task says "commit" or "push" up front,
+that instruction is the go-ahead — one confirmation covers exactly what was
+asked, not follow-up commits.
 
 ## Pre-completion checklist
 

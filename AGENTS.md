@@ -156,3 +156,35 @@ For Markdown, directly under the H1:
   image-prompts.
 
 (`.kilo/skills/` is the same directory as `.agents/skills/`.)
+
+## Skills registry
+
+Load with the `skill` tool. Everything here is task-triggered. Skills an agent
+loads unconditionally live in that agent's file (`.agents/agent/`), not here.
+
+| Skill | Load when | Notes |
+|---|---|---|
+| `home-assistant-yaml` | General HA YAML work — automations, scripts, scenes, templates, packages, helpers, Lovelace | most common skill; has the 2026 official syntax references |
+| `home-assistant-best-practices` | Automation/helper choices, safe refactoring of existing config, dashboards, blueprints | load before restructuring anything existing |
+| `ha-dashboard-design` | Dashboard styling — card-mod CSS, button-card templates, visual themes | nine ready-made styles |
+| `ha-integration-dev` | Custom integration development in Python (`custom_components/`) | |
+| `esphome` | ESPHome device configs and firmware (`esphome/`) | |
+| `node-red` | Node-RED flows and visual automation | |
+| `api-catalog` | Connecting external APIs (energy, weather, transport, cloud services) to HA | reference with working examples |
+| `aurora` | Routing layer when a task spans multiple skills | rarely needed directly |
+| `wekan-api` | WeKan REST API or kanban automation work | self-managed in `./skills/` |
+
+## MCP servers
+
+Named `readonly|admin-<cluster>-<service>` (defined in `~/.config/kilo/kilo.jsonc`).
+
+| Server | Use when |
+|---|---|
+| `readonly-global-homeassistant` / `admin-global-homeassistant` | Nearly always — every live-instance check, validation, trace, and entity verification goes through it |
+| `readonly\|admin-<cluster>-kubernetes` | MCP server / cluster pod logs (e.g. ha-mcp in pod `homeassistant-0`) |
+| `global-searxng` | Web search: HA docs, integration docs, card references |
+| `global-playwright` | JS-heavy doc sites, UI verification |
+
+**Keep these lists current:** when a task uses a skill or MCP server not listed
+above, add a line to this file (or the relevant agent file) as part of your
+change.
