@@ -111,6 +111,12 @@ commit message) and wait for confirmation. Read-only git (`status`, `log`,
 that instruction is the go-ahead — one confirmation covers exactly what was
 asked, not follow-up commits.
 
+**Never push to `main` — only the user does that.** Work on your own
+branch/worktree and commit there. To pick up changes, merge `main` *into*
+your worktree (`git merge main`); never merge your branch into `main` and
+never run `git push origin main`. Landing work on `main` is the user's
+decision alone.
+
 ## Pre-completion checklist
 
 Before declaring work done, verify:
