@@ -2411,7 +2411,10 @@ labeled_feature_sleep_timeout:
       _now_ts: '{{ now().timestamp() }}'
       _stale_threshold_seconds: '{{ ((sleep_timeout_minutes | default(15) | int) + 5) * 60 }}'
       _snapshot_age_seconds: '{{ _now_ts - _snapshot_ts }}'
-      _snapshot_is_stale: '{{ _snapshot_ts > 0 and _snapshot_age_seconds > _stale_threshold_seconds }}'
+      # A snapshot without a usable `__ts__` is treated as stale: legacy
+      # Step-2 writes omitted it, and ts=0 would otherwise make the age
+      # check unreachable, pinning a phantom baseline forever.
+      _snapshot_is_stale: '{{ (_snapshot_ts <= 0) or (_snapshot_age_seconds > _stale_threshold_seconds) }}'
   # Build original_volumes by filtering out the __ts__ key, and
   # clearing the whole thing if the snapshot is stale.
   - variables:
@@ -2504,15 +2507,22 @@ labeled_feature_sleep_timeout:
   #            Must happen BEFORE any delay or fade so that every
   #            dispatch — including re-triggers mid-fade — has a valid
   #            baseline to restore from.
+  #
+  #            Gated on `_should_run`: dispatches arriving while the
+  #            session is inactive (Night off or media not playing)
+  #            must NOT create a baseline, or Branch B / Step 3 would
+  #            later "restore" that phantom value over the user's
+  #            manual volume changes. The payload carries `__ts__` so
+  #            Step 0's staleness check can always retire it.
   - if:
     - condition: template
-      value_template: '{{ _mp != "" and original_volumes | length == 0 }}'
+      value_template: '{{ _should_run and _mp != "" and original_volumes | length == 0 }}'
     then:
     - action: script.labeled_feature_generics
       data:
         feature: Set Snapshot
         snapshot_name: sleep_timeout
-        payload: '{{ {_mp: state_attr(_mp, "volume_level") | float(0.5)} }}'
+        payload: '{{ {"__ts__": now().timestamp(), _mp: state_attr(_mp, "volume_level") | float(0.5)} }}'
 
   # ── Step 1b: Re-trigger prelude — two branches.
   #
@@ -2673,9 +2683,15 @@ labeled_feature_sleep_timeout:
     # (e.g., another button press during fade), the restarted instance
     # can read the original volume and restore it. The snapshot is only
     # cleared when the gate cancels (Step 3) or the fade completes (Step 6).
+    #
+    # Gated on `_should_run`: when the session is inactive (Night off or
+    # media not playing), restoring here would yank the player back to a
+    # stale baseline on every stray dispatch (e.g. each volume-button
+    # press), undoing the user's manual volume changes. Inactive-session
+    # handling is left entirely to Step 3 (restore-once-then-clear).
     - conditions:
       - condition: template
-        value_template: '{{ original_volumes | length > 0 }}'
+        value_template: '{{ original_volumes | length > 0 and _should_run }}'
       sequence:
       # ── Diagnostic: log Branch B entry. Remove after confirming the fix.
       - action: system_log.write
