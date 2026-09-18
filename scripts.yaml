@@ -2504,9 +2504,21 @@ labeled_feature_sleep_timeout:
   #            Must happen BEFORE any delay or fade so that every
   #            dispatch — including re-triggers mid-fade — has a valid
   #            baseline to restore from.
+  #
+  #            Gated on `_should_run`: dispatches arriving while the
+  #            session is inactive (Night off or media not playing)
+  #            must NOT create a baseline, or Branch B / Step 3 would
+  #            later "restore" that phantom value over the user's
+  #            manual volume changes. The payload carries `__ts__` so
+  #            Step 0's staleness check can always retire it.
+  #
+  #            Also gated on volume > 0.01: capturing a muted/near-zero
+  #            player as the baseline corrupts every later restore into
+  #            "restore to silence". A muted player at arm time means
+  #            there is no meaningful baseline to preserve.
   - if:
     - condition: template
-      value_template: '{{ _mp != "" and original_volumes | length == 0 }}'
+      value_template: '{{ _should_run and _mp != "" and original_volumes | length == 0 and (state_attr(_mp, "volume_level") | float(0)) > 0.01 }}'
     then:
     - action: script.labeled_feature_generics
       data:
@@ -2755,6 +2767,15 @@ labeled_feature_sleep_timeout:
             data:
               volume_level: '{{ original_volumes[repeat.item] }}'
             continue_on_error: true
+    # Clear the persisted snapshot (mirrors Step 6). The restore above already
+    # put the player back to baseline, so the next arm will re-capture the
+    # correct level. The zero-volume guard in Steps 2/4 prevents re-capturing
+    # a muted player if the restore was dropped by a paused integration.
+    - action: script.labeled_feature_generics
+      data:
+        feature: Set Snapshot
+        snapshot_name: sleep_timeout
+        payload: {}
     - variables:
         original_volumes: {}
     - stop: >-
@@ -2778,11 +2799,25 @@ labeled_feature_sleep_timeout:
   #            tests. The `__ts__` key is filtered out at Step 0 so it
   #            never reaches the volume restore loops.
   #
+  #            A muted/near-zero player is never captured as a baseline
+  #            (same guard as Step 2): if no usable baseline exists at
+  #            this point there is nothing to fade or restore, so the
+  #            run stops instead of pinning the volume at silence.
+  #
   - variables:
       original_volumes: >-
         {{ original_volumes
            if (original_volumes | length > 0)
-           else {_mp: state_attr(_mp, 'volume_level') | float(0.5)} }}
+           else ({_mp: state_attr(_mp, 'volume_level') | float(0.5)}
+                 if (state_attr(_mp, 'volume_level') | float(0)) > 0.01
+                 else {}) }}
+  - if:
+    - condition: template
+      value_template: '{{ original_volumes | length == 0 }}'
+    then:
+    - stop: >-
+        Sleep Timeout: no usable baseline volume (player muted or silent);
+        skipping fade instead of snapshotting silence.
   - variables:
       _snapshot_payload: >-
         {% set ns = namespace(out={'__ts__': now().timestamp()}) %}
