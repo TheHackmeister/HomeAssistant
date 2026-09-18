@@ -2540,8 +2540,8 @@ labeled_feature_sleep_timeout:
   #     The snapshot is NOT cleared here — it survives until the fade
   #     completes naturally (Step 6) so the fade sequence can restore
   #     to the original volume. If the gate cancels (Step 3), the
-  #     restored volume is set but the snapshot persists for the next
-  #     full run.
+  #     restored volume is set and the snapshot is cleared there, so
+  #     the next arm starts from a fresh baseline.
   #
   # The classifier is `_is_stepping`, which matches the canonical
   # hold-in-progress / just-released event names emitted by the IKEA
@@ -2726,9 +2726,12 @@ labeled_feature_sleep_timeout:
 
   # ── Step 3: Cancel-restore branch.
   #            Idempotent — if no snapshot exists this is a no-op.
-  #            The snapshot is NOT cleared here — it must survive until
-  #            the fade completes naturally (Step 6) so that the fade
-  #            sequence can restore to the original volume.
+  #            A gate cancel ends this session: restore the snapshotted
+  #            volume, then CLEAR the persisted snapshot so the next arm
+  #            re-snapshots from the current volume instead of restoring
+  #            a stale baseline. (Mid-fade restarts with the gate still
+  #            true never reach this branch, so Step 5's restore keeps
+  #            its baseline.)
   - if:
     - condition: template
       value_template: '{{ not _should_run }}'
@@ -2755,6 +2758,13 @@ labeled_feature_sleep_timeout:
             data:
               volume_level: '{{ original_volumes[repeat.item] }}'
             continue_on_error: true
+    # Clear the persisted snapshot (mirrors Step 6). Idempotent: clearing
+    # a name with no stored entry is a no-op on the component side.
+    - action: script.labeled_feature_generics
+      data:
+        feature: Set Snapshot
+        snapshot_name: sleep_timeout
+        payload: {}
     - variables:
         original_volumes: {}
     - stop: >-
@@ -2768,7 +2778,8 @@ labeled_feature_sleep_timeout:
   #            `original_volumes` is already non-empty and this is a no-op.
   #            On a discrete re-trigger (Branch B), the snapshot is kept
   #            intact so the restarted instance preserves the original
-  #            volume baseline. Only cleared on natural completion (Step 6).
+  #            volume baseline. Cleared on gate cancel (Step 3) or
+  #            natural completion (Step 6).
   #            Otherwise we capture the current volume_level for _mp,
   #            publish it via `Set Snapshot` so the next `mode: restart`
   #            re-entry can read it back, and update the local var for
