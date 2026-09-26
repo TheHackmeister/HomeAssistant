@@ -73,7 +73,7 @@ script:
         required: false
         default: ''
         selector:
-          entity: {}
+          entity:
       leader_entity_id:
         name: Leader Entity ID (the button)
         description: >
@@ -84,14 +84,14 @@ script:
         required: false
         default: ''
         selector:
-          entity: {}
+          entity:
       leader_enabled:
         name: Leader Enabled
         description: Pass-through from the leader. Not used directly by the styrbar mapping.
         required: false
         default: true
         selector:
-          boolean: {}
+          boolean:
       leader_feature:
         name: Leader Feature Name
         description: >
@@ -103,7 +103,7 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       toggle:
         name: Toggle
         description: >
@@ -112,7 +112,7 @@ script:
         required: false
         default: false
         selector:
-          boolean: {}
+          boolean:
       scope:
         name: Scope
         description: Scope of the feature (area, floor, or none).
@@ -130,7 +130,7 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       error_mode:
         name: Error Mode
         description: silent | log | alert | stop. Default 'log'.

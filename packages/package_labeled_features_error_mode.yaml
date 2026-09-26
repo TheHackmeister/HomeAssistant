@@ -55,7 +55,7 @@ script:
         required: false
         default: Labeled Feature
         selector:
-          text: {}
+          text:
       severity:
         name: Severity
         description: Severity for the alert tier (low | medium | high).

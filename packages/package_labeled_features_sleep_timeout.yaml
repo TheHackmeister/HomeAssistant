@@ -105,7 +105,7 @@ script:
         required: false
         default: Night
         selector:
-          text: {}
+          text:
       feature_media_playing:
         name: Media Playing Feature Name
         description: >
@@ -115,7 +115,7 @@ script:
         required: false
         default: Media Playing
         selector:
-          text: {}
+          text:
       sleep_timeout_minutes:
         name: Sleep Timeout Minutes
         description: How long to wait before beginning the fade-out
@@ -148,21 +148,21 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       leader_entity_id:
         name: Leader Entity ID
         description: Pass-through; informational only.
         required: false
         default: ''
         selector:
-          entity: {}
+          entity:
       follower_entity_id:
         name: Follower Entity ID
         description: Pass-through; informational only.
         required: false
         default: ''
         selector:
-          entity: {}
+          entity:
       feature:
         name: Feature
         description: Pass-through; the dispatched feature name
@@ -171,7 +171,7 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       leader_feature:
         name: Leader Feature
         description: Pass-through; same as `feature` in this dispatch
@@ -179,7 +179,7 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       leader_enabled:
         name: Leader Enabled
         description: Pass-through. Intentionally NOT used as the gate —
@@ -188,14 +188,14 @@ script:
         required: false
         default: true
         selector:
-          boolean: {}
+          boolean:
       toggle:
         name: Toggle
         description: Pass-through; ignored (not meaningful here).
         required: false
         default: false
         selector:
-          boolean: {}
+          boolean:
       error_mode:
         name: Error Mode
         description: silent | log | alert | stop. Used for the
@@ -227,7 +227,7 @@ script:
         required: false
         default: '1_short_release'
         selector:
-          text: {}
+          text:
       screen_off_feature:
         name: Screen-Off Feature
         description: >
@@ -240,7 +240,7 @@ script:
         required: false
         default: Screen
         selector:
-          text: {}
+          text:
     sequence:
     # ── Step 0: read the previously-stored snapshot from
     #            `sensor.labeled_features_state.snapshots.sleep_timeout`.

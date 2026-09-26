@@ -750,26 +750,26 @@ script:
         description: The follower entity to act on
         required: true
         selector:
-          entity: {}
+          entity:
       feature:
         name: Feature
         description: The feature name (e.g. 'night', 'screen')
         required: true
         selector:
-          text: {}
+          text:
       leader_entity_id:
         name: Leader Entity ID
         description: The leader that triggered this (optional, for reference)
         required: false
         default: ''
         selector:
-          entity: {}
+          entity:
       leader_enabled:
         name: Leader Enabled
         description: Post-evaluated leader enabled boolean, passed from the automation
         required: true
         selector:
-          boolean: {}
+          boolean:
       error_mode:
         name: Error Mode
         description: 'Default error mode when the follower entity has no `<feature>
@@ -800,7 +800,7 @@ script:
         required: false
         default: false
         selector:
-          boolean: {}
+          boolean:
       scope:
         name: Scope
         description: Scope of the feature (area, floor, or none).
@@ -817,7 +817,7 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
     sequence:
     # ─────────────────────────────────────────────────────────────────────
     # Step 0 — Setup

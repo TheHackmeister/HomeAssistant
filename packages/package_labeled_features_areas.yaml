@@ -261,13 +261,13 @@ script:
           name like 'Audio Mode' / 'Media Player'.
         required: true
         selector:
-          text: {}
+          text:
       scope_id:
         name: Scope ID
         description: The resolved area_id or floor_id for this feature.
         required: true
         selector:
-          text: {}
+          text:
       scope:
         name: Scope
         description: Scope of the feature (area, floor, or none).
@@ -292,7 +292,7 @@ script:
         required: false
         default: {}
         selector:
-          object: {}
+          object:
       delete:
         name: Delete
         description: >
@@ -308,7 +308,7 @@ script:
         required: false
         default: false
         selector:
-          boolean: {}
+          boolean:
       error_mode:
         name: Error Mode
         description: silent | log | alert | stop. Default 'log'.
@@ -810,7 +810,7 @@ script:
           device or user.
         required: true
         selector:
-          text: {}
+          text:
       delete:
         name: Delete
         description: >
@@ -819,7 +819,7 @@ script:
         required: false
         default: false
         selector:
-          boolean: {}
+          boolean:
       create_mode:
         name: Create Mode
         description: >
@@ -879,14 +879,14 @@ script:
         required: false
         default: {}
         selector:
-          object: {}
+          object:
       ha_topic:
         name: HA Discovery Topic Prefix
         description: Defaults to `homeassistant` (matches MQTT's discovery_prefix).
         required: false
         default: homeassistant
         selector:
-          text: {}
+          text:
       device_topic:
         name: Device Topic Base
         description: >
@@ -895,21 +895,21 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       name:
         name: Display Name
         description: Friendly entity name (required when delete is false).
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       unique_id:
         name: Unique ID
         description: Overrides the default unique_id (= object_id).
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       device:
         name: Device Block
         description: >
@@ -919,27 +919,27 @@ script:
         required: false
         default: {}
         selector:
-          object: {}
+          object:
       state_topic:
         name: State Topic
         description: Override; defaults to `<device_topic>/state`.
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       command_topic:
         name: Command Topic
         description: Override; defaults to `<device_topic>/set`.
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       availability_topic:
         name: Availability Topic
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       value_template:
         name: Value Template
         required: false
@@ -959,7 +959,7 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       json_attributes_template:
         name: JSON Attributes Template
         required: false
@@ -971,94 +971,94 @@ script:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       payload_off:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       state_on:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       state_off:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       payload_press:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       device_class:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       unit_of_measurement:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       state_class:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       icon:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       entity_category:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       suggested_display_precision:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       expire_after:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       optimistic:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       min:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       max:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       step:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       mode:
         required: false
         default: ''
         selector:
-          text: {}
+          text:
       options:
         name: Options
         description: List of strings for select components.
         required: false
         default: []
         selector:
-          object: {}
+          object:
       extra:
         name: Extra Config Fields
         description: >
@@ -1067,7 +1067,7 @@ script:
         required: false
         default: {}
         selector:
-          object: {}
+          object:
       error_mode:
         name: Error Mode
         description: silent | log | alert | stop. Default 'log'.

@@ -100,6 +100,18 @@ skipped. (Resolved 2026-09-05 after server update; HA 2026.7.4 confirmed.)
   multi-trigger automations need a per-trigger `id:`.
 - Templates: filter `states` by domain (`states.sensor`, not bare `states`),
   add `| default(...)` for entities that may be unavailable.
+- **Package merges drop empty dicts** — HA's packages merge
+  (`_recursive_merge` in `homeassistant/config.py`) silently skips any
+  `key: {}` value while still creating the parent key. Inside `packages/`,
+  `selector:` + `text: {}` reaches HA as `selector: {}` → "Only one type can
+  be specified" → **the whole script is disabled** (bit all 9 Label Based
+  Features scripts on 2026-09-26 after the move from `scripts.yaml` into
+  packages). In package files write config-less selectors in null form
+  (`selector:` + `text:` / `boolean:` / `entity:` / `object:` — null is
+  accepted by every selector CONFIG_SCHEMA), never `<type>: {}`.
+  `scripts.yaml` is a direct include, so `{}` is fine there. Empty
+  `data: {}` / `metadata: {}` / `default: {}` are dropped too, but
+  harmlessly (templates must guard with `| default({})`).
 
 ## Hard design rules (native first)
 
