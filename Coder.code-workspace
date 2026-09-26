@@ -41,7 +41,9 @@
 			"titleBar.activeBackground": "#972b70",
 			"titleBar.activeForeground": "#e7e7e7",
 			"titleBar.inactiveBackground": "#972b7099",
-			"titleBar.inactiveForeground": "#e7e7e799"
+			"titleBar.inactiveForeground": "#e7e7e799",
+			"activityBar.activeBorder": "#e7e7e7",
+			"activityBarTop.activeBorder": "#e7e7e7"
 		},
 		"peacock.remoteColor": "#972b70"
 	}
