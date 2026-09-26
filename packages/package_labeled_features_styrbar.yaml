@@ -21,25 +21,31 @@ script:
       `script.labeled_feature_generics`. Reads the raw button event from the
       `feature` field (e.g. 'on', 'brightness_move_up', 'arrow_right_click').
 
-      Initial implementation is **lights-only** — the four `arrow_*` events are
-      reserved for future use and currently no-op (their `choose:` branches are
-      empty stubs so the script does not Error Mode on them). `*_release` and
-      `brightness_stop` events are ignored (no `choose:` branch); the hold loop
-      inside `labeled_feature_generics` already exits on the leader's state
-      change, so the explicit "release" event is not needed.
+      `*_release` and `brightness_stop` events are ignored (no `choose:`
+      branch); the hold loop inside `labeled_feature_generics` already exits
+      on the leader's state change, so the explicit "release" event is not
+      needed.
 
-      Event → generic-feature mapping (all area-scoped):
+      Event → generic-feature mapping (scopes mixed — area default; Night
+      global; Bright floor):
         on                    Lights On            (one-shot)
         off                   Lights Off           (one-shot)
         brightness_move_up    Lights Up            (hold loop via leader_entity_id)
         brightness_move_down  Lights Down          (hold loop)
         brightness_stop       ignored
-        arrow_left_click      TODO
-        arrow_left_hold       TODO
+        arrow_left_click      Night                (toggle:true, scope: none — house-wide)
+        arrow_left_hold       Lights Off           (one-shot, area)
         arrow_left_release    ignored
-        arrow_right_click     TODO
-        arrow_right_hold      TODO
+        arrow_right_click     Eating               (area, label-only user feature)
+        arrow_right_hold      Bright               (floor, label-only user feature)
         arrow_right_release   ignored
+
+      `Eating` and `Bright` are user-defined label-only features: they have no
+      `feature_meta` entry and resolve entirely via `(Area |Floor |)Follower:
+      Eating` / `(Area |Floor |)Follower: Bright` labels on target entities.
+      The script still does not compute `media_playing` (no media-dependent
+      branches), but the prologue resolves the leader's area and floor ids so
+      the floor-scoped `Bright` branch has a scope_id to dispatch with.
     mode: parallel
     max: 50
     fields:
@@ -146,10 +152,52 @@ script:
           _err_mode: '{{ (error_mode | default("log") | lower) }}'
           _leader_feature: '{{ leader_feature | default("") | trim }}'
           _event: '{{ (feature | default("") | trim) }}'
+          _resolved_area_id: >-
+            {%- if _scope == 'area' and scope_id is defined and scope_id != '' -%}
+              {{ scope_id }}
+            {%- elif follower_entity_id is defined and follower_entity_id != '' -%}
+              {{ area_id(follower_entity_id) | default('') }}
+            {%- elif leader_entity_id is defined and leader_entity_id != '' -%}
+              {{ area_id(leader_entity_id) | default('') }}
+            {%- else -%}{{ '' }}{%- endif -%}
+          _resolved_floor_id: >-
+            {%- if _scope == 'floor' and scope_id is defined and scope_id != '' -%}
+              {{ scope_id }}
+            {%- elif _scope == 'floor' and follower_entity_id is defined and follower_entity_id != '' -%}
+              {%- set aid = area_id(follower_entity_id) -%}
+              {%- set ns = namespace(found='') -%}
+              {%- for fid in floors() -%}
+                {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+              {%- endfor -%}{{ ns.found }}
+            {%- elif _scope == 'floor' and leader_entity_id is defined and leader_entity_id != '' -%}
+              {%- set aid = area_id(leader_entity_id) -%}
+              {%- set ns = namespace(found='') -%}
+              {%- for fid in floors() -%}
+                {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+              {%- endfor -%}{{ ns.found }}
+            {%- else -%}
+              {# Derive the floor id even for non-floor scopes so the
+                 arrow_right_hold Floor Bright branch has a scope_id. #}
+              {%- set aid = _resolved_area_id -%}
+              {%- if aid == '' and follower_entity_id is defined and follower_entity_id != '' -%}
+                {%- set aid = area_id(follower_entity_id) | default('') -%}
+              {%- endif -%}
+              {%- if aid == '' and leader_entity_id is defined and leader_entity_id != '' -%}
+                {%- set aid = area_id(leader_entity_id) | default('') -%}
+              {%- endif -%}
+              {%- set ns = namespace(found='') -%}
+              {%- if aid != '' -%}
+                {%- for fid in floors() -%}
+                  {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+                {%- endfor -%}
+              {%- endif -%}
+              {{ ns.found }}
+            {%- endif -%}
 
       # ── Step 2: Branch by event ─────────────────────────────────────────────
-      # All dispatched generic features are area-scoped (lights-only initial
-      # implementation). The brightness_move_* branches forward
+      # Scopes are mixed: the light branches use the caller's scope (area by
+      # default), arrow_left_click forces global Night, and arrow_right_hold
+      # forces floor-scoped Bright. The brightness_move_* branches forward
       # `leader_entity_id` so generics' built-in hold loop runs.
       - choose:
           # ────────────── on ──────────────
@@ -223,32 +271,80 @@ script:
                   error_mode: '{{ _err_mode }}'
 
           # ────────────── arrow_left_click ──────────────
-          # TODO: implement (Media Previous / Ads / etc).
+          # Toggle house-wide night mode: generic Night at global scope,
+          # forced toggle:true (mirrors symfonisk dots_2_double_press).
           - conditions:
               - condition: template
                 value_template: '{{ _event == "arrow_left_click" }}'
-            sequence: []
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Night
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: none
+                  scope_id: ''
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: true
+                  error_mode: '{{ _err_mode }}'
 
           # ────────────── arrow_left_hold ──────────────
-          # TODO: implement (Media Seek Back / Fan Off / etc).
+          # Area Lights Off, one-shot.
           - conditions:
               - condition: template
                 value_template: '{{ _event == "arrow_left_hold" }}'
-            sequence: []
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Lights Off
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
 
           # ────────────── arrow_right_click ──────────────
-          # TODO: implement (Media Next / Night / etc).
+          # User-defined label-only feature Eating (area scope) — resolves
+          # via (Area )Follower: Eating labels; enable semantics (toggle
+          # pass-through).
           - conditions:
               - condition: template
                 value_template: '{{ _event == "arrow_right_click" }}'
-            sequence: []
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Eating
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
 
           # ────────────── arrow_right_hold ──────────────
-          # TODO: implement (Media Seek Forward / Fan On toggle / etc).
+          # User-defined label-only feature Bright — floor-scoped, the same
+          # floor-wide Bright symfonisk dots_1_long_press dispatches.
           - conditions:
               - condition: template
                 value_template: '{{ _event == "arrow_right_hold" }}'
-            sequence: []
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Bright
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: floor
+                  scope_id: '{{ _resolved_floor_id }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
 
           # All other events (brightness_stop, *_release, *_initial_press)
           # have no `choose:` branch and fall through silently — no Error
