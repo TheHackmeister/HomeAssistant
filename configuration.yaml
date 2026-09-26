@@ -131,7 +131,7 @@ template:
 
 http:
   ip_ban_enabled: true
-  login_attempts_threshold: 5
+  login_attempts_threshold: 50
   use_x_forwarded_for: true
   trusted_proxies:
     - 172.30.33.0/24
@@ -181,6 +181,7 @@ homeassistant:
 recorder:
   db_url: !secret recorder_url
   #purge_keep_days: 7
+  auto_purge: false
 ltss:
   db_url: !secret ltss_url
   chunk_time_interval: 86400000000

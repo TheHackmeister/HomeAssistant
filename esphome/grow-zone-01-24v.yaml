@@ -1,0 +1,23 @@
+substitutions:
+  name: grow_zone_24v
+  friendly_name: Grow Zone 24v
+packages:
+  Athom_Technology.Smart_Plug_V3: github://athom-tech/esp32-configs/athom-smart-plug.yaml
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+api:
+  encryption:
+    key: gwCT/+B1r5BaHpbd3zuzezIzgjNg4dxIETTOrp+G3iU=
+
+
+wifi:
+  ssid: !secret wifi_ssid_farm
+  password: !secret wifi_password
+  domain: .spencerslab.com
+  use_address: "athom-smart-plug-v3-50b670"
+
+ota:
+  - platform: esphome
+  

@@ -10,7 +10,7 @@
         "id": "3dad27db8da94fb59f8313d28147cf48"
       },
       {
-        "url": "/hacsfiles/scheduler-card/scheduler-card.js?hacstag=2862701574017",
+        "url": "/hacsfiles/scheduler-card/scheduler-card.js?hacstag=2862701574019",
         "type": "module",
         "id": "15836a4a20c74d5d95ecdfac45f62325"
       },
@@ -25,7 +25,7 @@
         "id": "99b5ab29ce08479e8e6faa37293fa205"
       },
       {
-        "url": "/hacsfiles/mini-media-player/mini-media-player-bundle.js?hacstag=14852083811611",
+        "url": "/hacsfiles/mini-media-player/mini-media-player-bundle.js?hacstag=14852083811612",
         "type": "module",
         "id": "c667e3b10d0b411c83756950becccde4"
       },
@@ -111,17 +111,37 @@
       },
       {
         "id": "2edb355ccc15434f938ce6b4c0f82c1d",
-        "url": "/hacsfiles/light-entity-card/light-entity-card.js?hacstag=168744428631",
+        "url": "/hacsfiles/light-entity-card/light-entity-card.js?hacstag=168744428640",
         "type": "module"
       },
       {
         "id": "e63c449f90e34035ac2e915d507d24d5",
-        "url": "/hacsfiles/lovelace-multiple-entity-row/multiple-entity-row.js?hacstag=178921037451",
+        "url": "/hacsfiles/lovelace-multiple-entity-row/multiple-entity-row.js?hacstag=1789210374111",
         "type": "module"
       },
       {
         "id": "902eb35c1e514114904c5ff91912e7c9",
-        "url": "/hacsfiles/hass-alert2-ui/alert2.js?hacstag=8533699481195",
+        "url": "/hacsfiles/hass-alert2-ui/alert2.js?hacstag=853369948121",
+        "type": "module"
+      },
+      {
+        "id": "653c33e3c9994dcfb20d7c4773e34ae6",
+        "url": "/hacsfiles/config-template-card/config-template-card.js?hacstag=172177543136",
+        "type": "module"
+      },
+      {
+        "id": "c41a0dc894304c1ca5f11ce6f8084860",
+        "url": "/hacsfiles/lovelace-card-mod/card-mod.js?hacstag=190927524421",
+        "type": "module"
+      },
+      {
+        "id": "5df1679918de4e57bcb5a18fcd1eb6b4",
+        "url": "/hacsfiles/lovelace-mushroom/mushroom.js?hacstag=444350375523",
+        "type": "module"
+      },
+      {
+        "id": "91cc884287604ea1bf1f26a5859a155a",
+        "url": "/local/label-printer/card.js",
         "type": "module"
       }
     ]
