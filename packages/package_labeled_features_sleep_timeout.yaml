@@ -13,7 +13,8 @@
 ##   package_labeled_features_dispatch.yaml (calls
 ##   script.labeled_feature_follower),
 ##   package_labeled_features_error_mode.yaml,
-##   package_labeled_features_state.yaml (snapshot persistence).
+##   sensor.labeled_features_state (snapshot persistence; provided by the
+##   `labeled_features` custom component since the 2026-09-26 cutover).
 ## External: the alert tier calls script.send_alert (defined outside these
 ##   packages). Invoked non-blocking (`script.turn_on`) from the dispatch
 ##   layer so its 15-minute delay never blocks the queued leader run.

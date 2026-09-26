@@ -9,7 +9,8 @@
 ##     and Script Call Mode meta-features; writes manual overrides into
 ##     sensor.labeled_features_state via the `labeled_feature_set` event.
 ##
-## Depends on: package_labeled_features_state.yaml,
+## Depends on: sensor.labeled_features_state (provided by the
+##   `labeled_features` custom component since the 2026-09-26 cutover),
 ##   package_labeled_features_dispatch.yaml (calls
 ##   script.labeled_feature_follower),
 ##   package_labeled_features_error_mode.yaml.

@@ -26,10 +26,10 @@ template:
   # sensor.house_home_count
   #
   # Count of persons currently in state `home`. Own trigger-based entry
-  # (decoupled from the Labeled Feature state sensors, which now live in
-  # packages/package_labeled_features_state.yaml). Re-renders on every
-  # person entity state change; the event filter is robust to roster
-  # changes.
+  # (decoupled from the Labeled Feature state sensors, which are now
+  # provided by the `labeled_features` custom component). Re-renders on
+  # every person entity state change; the event filter is robust to
+  # roster changes.
   # ─────────────────────────────────────────────────────────────────────
   - trigger:
       - trigger: event

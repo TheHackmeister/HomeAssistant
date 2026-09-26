@@ -12,13 +12,15 @@
 ##   * script.labeled_feature_entities - MQTT-discovery publisher for the
 ##     area-stack entities.
 ##
-## Depends on: package_labeled_features_state.yaml (driving sensor),
+## Depends on: sensor.labeled_feature_areas_state - provided by the
+##   `labeled_features` custom component since the 2026-09-26 cutover
+##   (the YAML template package was removed then),
 ##   package_labeled_features_error_mode.yaml.
 ## External: the alert tier calls script.send_alert (defined outside these
 ##   packages). NOTE: the Areas automation's description still says the
 ##   sensor is "computed in configuration.yaml" - left stale deliberately
-##   (pure-move); the sensor now lives in
-##   package_labeled_features_state.yaml.
+##   (pure-move); the sensor is now provided by the `labeled_features`
+##   custom component.
 ######################################################################################################################
 
 automation:

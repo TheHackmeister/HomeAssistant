@@ -9,7 +9,9 @@
 ##     every (feature, scope, scope_id) triple whose `enabled` flipped.
 ##   * script.labeled_feature_follower - the shared follower dispatch loop.
 ##
-## Depends on: package_labeled_features_state.yaml (driving sensor),
+## Depends on: sensor.labeled_features_state - provided by the
+##   `labeled_features` custom component since the 2026-09-26 cutover
+##   (the YAML template package was removed then),
 ##   package_labeled_features_generics.yaml,
 ##   package_labeled_features_error_mode.yaml.
 ## External: the alert error tier calls script.send_alert, which is defined
