@@ -11,7 +11,7 @@
       "source": "tonylofgren/aurora-smart-home",
       "sourceType": "github",
       "skillPath": "esphome/SKILL.md",
-      "computedHash": "65b8f9903a476d80332213c34d9276189520916d9b5713fce22a7e11df3dc4ef"
+      "computedHash": "44630ac301fec18b9d227707f87308b0d816624ee4a8d1cdf9b37ff07e3dd43c"
     },
     "HA Dashboard Design": {
       "source": "tonylofgren/aurora-smart-home",
@@ -37,17 +37,23 @@
       "skillPath": "node-red/SKILL.md",
       "computedHash": "a4bd8f0a153413cba6b0feef30b8866edee2dae207c9a273ba31cb2d326bf4f1"
     },
+    "agent-rules": {
+      "source": "netresearch/agent-rules-skill",
+      "sourceType": "github",
+      "skillPath": "skills/agent-rules/SKILL.md",
+      "computedHash": "89e92b6bed021d8467f1c3d6632365c0c20a2916eaa31e5aac6f4f640d919123"
+    },
     "aurora": {
       "source": "tonylofgren/aurora-smart-home",
       "sourceType": "github",
       "skillPath": "aurora/SKILL.md",
-      "computedHash": "abfb27c6b9f1695a476702bb964c1bfa3d07d28d0e211f8599809e36430b9a71"
+      "computedHash": "88c2564963a337711c7967a7dffa533c5b0c9e021be5641328d8a1e9a62770d7"
     },
     "home-assistant-best-practices": {
       "source": "homeassistant-ai/skills",
       "sourceType": "github",
       "skillPath": "skills/home-assistant-best-practices/SKILL.md",
-      "computedHash": "e694ed2c17dfd58242aa4036f0ad718e44a37e4b229a796d32f9098168ee7a25"
+      "computedHash": "a602e60b682f9d4d81eaa841517e0252d59214dc07bd7f20d8d9acbe92e71161"
     }
   }
 }
