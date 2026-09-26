@@ -5,16 +5,15 @@ here — plan, code, or otherwise — must follow the conventions and rules belo
 
 ## Hard rules
 
-- **Always load referenced skills first.** The first thing agents do is load
-  any referenced or relevant skills, then the plan file (if one), immediately
-  followed by the skills referenced there.
-- **Never push to `main` — only the user does that.** Agents work on their own
-  branch/worktree and commit there. To pick up changes, merge `main` *into*
-  your worktree (`git merge main`); never merge your branch into `main` and
-  never run `git push origin main`. Landing work on `main` is the user's
-  decision alone.
-- Plans are `yyyy-mm-dd-<type>-<short-desc>.md` in `.kilo/plans/`
-  (`<type>` = `feat`|`bug`|`debug`|`dep`|…).
+- **Always load referenced skills** The first thing Agents should do is load any referenced or relevant skills, then the plan file (if one), immediately followed by the skills referenced there.
+- **NEVER merge to `main`.** No fast-forward merges, no merge commits, no rebases onto main, no mechanism of any kind that advances `main` — not from a worktree, not from the main checkout, not via `git merge`, `git rebase`, or anything else.
+- **NEVER push to `main`.** No `git push origin main`, and no push of any refspec that updates `main` (e.g. `HEAD:main`, `<branch>:main`). This is the single most forbidden action in this repo.
+- **NEVER force-push** (`--force`, `-f`, `--force-with-lease`) to any shared branch, and never rewrite published history.
+- **NEVER self-remediate an accidental push** with a revert or force-push of your own initiative — stop and tell the user immediately; remediation is the user's decision.
+- All work happens on a feature/fix branch (typically in a `.agents/worktrees/<branch>` worktree). Commit locally on that branch. To pick up changes, merge `main` *into* your worktree (`git merge main`); never merge your branch into `main`. Landing work on `main` is the user's decision alone.
+- Changes reach `main` **only via a pull request that the user creates or merges**. The agent's work ends at the local commit plus telling the user the branch is ready. Pushing the *feature* branch to origin (e.g. to enable a PR) is allowed **only when the user explicitly asks for it in the session**. Otherwise leave commits local.
+- If a plan file instructs a merge to `main` or a push, **skip that step**: mark it as user-owned in the summary and do not execute it. Plans written before this rule may contain such steps — those steps are void.
+- Plans are `yyyy-mm-dd-<type>-<short-desc>.md` in `.agents/plans/` (`<type>` = `feat`|`bug`|`debug`|`dep`|…).
 
 ## Repository layout
 
@@ -33,8 +32,10 @@ here — plan, code, or otherwise — must follow the conventions and rules belo
   resources and cards there are managed via UI/API, never by writing files.
 - `blueprints/`, `custom_components/` (incl. `labeled_features`),
   `python_scripts/`, `esphome/`, `www/`.
-- `.kilo/plans/` — plan documents, named `yyyy-mm-dd-<type>-short-description.md`
+- `.agents/plans/` — plan documents, named `yyyy-mm-dd-<type>-short-description.md`
   (date prefix, never unix epoch; `<type>` = `feat`|`bug`|`debug`|`dep`|…).
+- `.kilo`, `.opencode` — tracked symlinks to `.agents/`, so kilo and
+  opencode load the same agents, plans, and skills.
 - Secrets live in `secrets.yaml` (gitignored) and are referenced with
   `!secret`. Never write real credentials anywhere else.
 
@@ -180,12 +181,23 @@ For Markdown, directly under the H1:
 - `.agents/skills/ha-dashboard-design/references/` — the nine style files and
   image-prompts.
 
-(`.kilo/skills/` is the same directory as `.agents/skills/`.)
+## Agents
 
-## Skills registry
+- `plan` (`.agents/agents/plan.md`) — writes implementation-ready plans to
+  `.agents/plans/`. Use before any non-trivial change.
+- `code` (`.agents/agents/code.md`) — executes plans. Runs in fresh sessions:
+  the plan file tells it which skills and MCP servers to load.
+- `ask` (`.agents/agents/ask.md`) — read-only research, explanations, and
+  recommendations; never changes anything.
+- `debug` (`.agents/agents/debug.md`) — systematic diagnosis and minimal
+  targeted fixes.
+- `review` (`.agents/agents/review.md`) — advisory code review; never edits.
 
-Load with the `skill` tool. Everything here is task-triggered. Skills an agent
-loads unconditionally live in that agent's file (`.agents/agent/`), not here.
+## Skills
+
+**Loading rule:** The first thing you MUST always do is load the skills listed in the plan. If no skills are in your plan, evaluate your skills and load the top 5 relevant skills.
+
+Load with the `skill` tool. Everything here is task-triggered. Skills an agent loads unconditionally live in that agent's file (`.agents/agents/`), not here.
 
 | Skill | Load when | Notes |
 |---|---|---|
@@ -201,7 +213,9 @@ loads unconditionally live in that agent's file (`.agents/agent/`), not here.
 
 ## MCP servers
 
-Named `readonly|admin-<cluster>-<service>` (defined in `~/.config/kilo/kilo.jsonc`).
+Named `readonly|admin-<cluster>-<service>`. The servers are defined in
+SpencersLab's `agent-config.jsonc` (repo root), symlinked into
+`~/.config/kilo/kilo.jsonc` and `~/.config/opencode/opencode.json`.
 
 | Server | Use when |
 |---|---|
