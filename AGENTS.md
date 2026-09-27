@@ -34,8 +34,10 @@ here — plan, code, or otherwise — must follow the conventions and rules belo
   `python_scripts/`, `esphome/`, `www/`.
 - `.agents/plans/` — plan documents, named `yyyy-mm-dd-<type>-short-description.md`
   (date prefix, never unix epoch; `<type>` = `feat`|`bug`|`debug`|`dep`|…).
-- `.kilo`, `.opencode` — tracked symlinks to `.agents/`, so kilo and
-  opencode load the same agents, plans, and skills.
+- `.kilo` — tracked symlink to `.agents/`, so kilo loads the same agents,
+  plans, and skills.
+- `.opencode/` — real tracked dir: `agents` and `skills` symlink back into
+  `.agents/`; opencode-only content lives here (`plugin/`, `opencode.json`).
 - Secrets live in `secrets.yaml` (gitignored) and are referenced with
   `!secret`. Never write real credentials anywhere else.
 
