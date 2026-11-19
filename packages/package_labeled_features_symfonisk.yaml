@@ -153,8 +153,8 @@ script:
               - stop
     sequence:
       # ── Step 1: Resolve scope ids and scope entity set ──────────────────────
-      # Mirrors labeled_feature_somrig's prologue verbatim because the
-      # volume_*_hold branches need the same `media_playing` signal somrig
+      # Mirrors labeled_feature_somrig_sleep's prologue verbatim because the
+      # volume_*_hold branches need the same `media_playing` signal that script
       # uses for its long-press branches.
       - variables:
           _scope: '{{ (scope | default("area") | lower) }}'

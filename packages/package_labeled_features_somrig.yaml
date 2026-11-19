@@ -5,7 +5,10 @@
 ## Package - Label Based Features - Somrig button mapping
 ##
 ##   * script.labeled_feature_somrig - translates SOMRIG-style controller
-##     events into generic-feature calls.
+##     events into light / fan / night-mode generic-feature calls.
+##   * script.labeled_feature_somrig_sleep - the audio-aware variant: every
+##     branch consults `media_playing` and the Lights Off press also stops
+##     media (house-wide pause + floor-wide lights off).
 ##
 ## Depends on: package_labeled_features_generics.yaml (which transitively
 ##   pulls state / dispatch / error_mode).
@@ -14,11 +17,12 @@
 ######################################################################################################################
 
 script:
-  labeled_feature_somrig:
+  labeled_feature_somrig_sleep:
 
-    alias: Labeled Feature Somrig
+    alias: Labeled Feature Somrig Sleep
     description: >
-      Maps IKEA Somrig (and other 2-button) device events into one or more calls
+      Audio-aware SOMRIG mapping. Maps IKEA Somrig (and other 2-button) device
+      events into one or more calls
       to `script.labeled_feature_generics`. Reads the raw button event from the
       `feature` field (e.g. '1_short_release', '2_double_press'); also accepts
       `dots_N_*` (IKEA E2123) variants by stripping the 'dots_' prefix.
@@ -444,6 +448,301 @@ script:
               - action: script.labeled_feature_generics
                 data:
                   feature: '{{ "Volume Down" if media_playing else "Ads" }}'
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
+
+  labeled_feature_somrig:
+
+    alias: Labeled Feature Somrig
+    description: >
+      Maps IKEA Somrig (and other 2-button) device events into one or more calls
+      to `script.labeled_feature_generics` for light / fan / night-mode control.
+      Reads the raw button event from the `feature` field (e.g.
+      '1_short_release', '2_double_press'); also accepts `dots_N_*` (IKEA E2123)
+      variants by stripping the 'dots_' prefix.
+
+      Only canonical "user did the thing" events are tracked:
+        *_short_release, *_double_press, *_long_press
+      All other events (initial_press, long_release, etc.) are ignored.
+
+      Unlike `labeled_feature_somrig_sleep`, no branch consults `media_playing`
+      — the buttons control lights, fan and night mode regardless of whether
+      anything is currently playing.
+
+      Event → generic-feature mapping:
+        1_short_release  Lights On    (caller scope — the area)
+        1_double_press   Fan On       (toggle:true)
+        1_long_press     Lights Up    (hold loop via leader_entity_id)
+        2_short_release  Lights Off   (forced floor scope, no media pause)
+        2_double_press   Night        (toggle:true)
+        2_long_press     Lights Down  (hold loop)
+    mode: parallel
+    max: 50
+    fields:
+      feature:
+        name: Feature (Button Event)
+        description: >
+          The raw button event string from the button entity, e.g.
+          '1_short_release', '2_double_press', '1_long_press', or the
+          'dots_'-prefixed variants for IKEA E2123.
+        required: true
+        selector:
+          select:
+            custom_value: true
+            options:
+              - 1_short_release
+              - 1_double_press
+              - 1_long_press
+              - 2_short_release
+              - 2_double_press
+              - 2_long_press
+              - dots_1_short_release
+              - dots_1_double_press
+              - dots_1_long_press
+              - dots_2_short_release
+              - dots_2_double_press
+              - dots_2_long_press
+      follower_entity_id:
+        name: Follower Entity ID
+        description: Used for area lookup. Passed automatically by labeled_feature_follower.
+        required: false
+        default: ''
+        selector:
+          entity:
+      leader_entity_id:
+        name: Leader Entity ID (the button)
+        description: >
+          Used as fallback for area and floor lookup, and — critically —
+          forwarded to `labeled_feature_generics` for the stepping features
+          (Lights Up / Lights Down) so the hold-while-held loop runs until the
+          button emits its next event.
+        required: false
+        default: ''
+        selector:
+          entity:
+      leader_enabled:
+        name: Leader Enabled
+        description: Pass-through from the leader. Not used directly by the somrig mapping.
+        required: false
+        default: true
+        selector:
+          boolean:
+      leader_feature:
+        name: Leader Feature Name
+        description: >
+          The leader's labeled feature name (e.g. 'Light Buttons'), passed by
+          the leader automation alongside `feature`. Forwarded as
+          `exclude_feature` on every downstream `labeled_feature_generics` call
+          so that `(Area |Floor |)<leader_feature> Exclude: True` opts entities
+          out of every action this script dispatches.
+        required: false
+        default: ''
+        selector:
+          text:
+      toggle:
+        name: Toggle
+        description: >
+          Pass-through toggle flag from the leader. Forwarded to every
+          labeled_feature_generics call. The 1_double_press (Fan On) and
+          2_double_press (Night) branches always override this with toggle:true.
+        required: false
+        default: false
+        selector:
+          boolean:
+      scope:
+        name: Scope
+        description: Scope of the feature (area, floor, or none).
+        required: false
+        default: area
+        selector:
+          select:
+            options:
+              - area
+              - floor
+              - none
+      scope_id:
+        name: Scope ID
+        description: The resolved area_id or floor_id passed by the automation.
+        required: false
+        default: ''
+        selector:
+          text:
+      error_mode:
+        name: Error Mode
+        description: silent | log | alert | stop. Default 'log'.
+        required: false
+        default: log
+        selector:
+          select:
+            custom_value: true
+            options:
+              - silent
+              - log
+              - alert
+              - stop
+    sequence:
+      # ── Step 1: Resolve normalized inputs, scope ids and mapped event ───────
+      # No media_playing / scope_entity_set / Exclude prologue here (that lives
+      # in labeled_feature_somrig_sleep): this mapping has no media-dependent
+      # branch and Exclude resolution is owned by generics via exclude_feature.
+      - variables:
+          _scope: '{{ (scope | default("area") | lower) }}'
+          _toggle_in: '{{ (toggle | default(false)) | bool(false) }}'
+          _err_mode: '{{ (error_mode | default("log") | lower) }}'
+          _leader_feature: '{{ leader_feature | default("") | trim }}'
+          _resolved_area_id: >-
+            {%- if _scope == 'area' and scope_id is defined and scope_id != '' -%}
+              {{ scope_id }}
+            {%- elif follower_entity_id is defined and follower_entity_id != '' -%}
+              {{ area_id(follower_entity_id) | default('') }}
+            {%- elif leader_entity_id is defined and leader_entity_id != '' -%}
+              {{ area_id(leader_entity_id) | default('') }}
+            {%- else -%}{{ '' }}{%- endif -%}
+          _resolved_floor_id: >-
+            {%- if _scope == 'floor' and scope_id is defined and scope_id != '' -%}
+              {{ scope_id }}
+            {%- else -%}
+              {# Derive the floor id even for non-floor scopes so the
+                 floor-scoped 2_short_release Lights Off branch always has a
+                 scope_id to dispatch with. #}
+              {%- set aid = _resolved_area_id -%}
+              {%- if aid == '' and follower_entity_id is defined and follower_entity_id != '' -%}
+                {%- set aid = area_id(follower_entity_id) | default('') -%}
+              {%- endif -%}
+              {%- if aid == '' and leader_entity_id is defined and leader_entity_id != '' -%}
+                {%- set aid = area_id(leader_entity_id) | default('') -%}
+              {%- endif -%}
+              {%- set ns = namespace(found='') -%}
+              {%- if aid != '' -%}
+                {%- for fid in floors() -%}
+                  {%- if aid in floor_areas(fid) -%}{%- set ns.found = fid -%}{%- endif -%}
+                {%- endfor -%}
+              {%- endif -%}
+              {{ ns.found }}
+            {%- endif -%}
+          # Strip the dots_ prefix so both device families share the same
+          # branches below.
+          mapped_event: >-
+            {{ (feature | trim) | regex_replace('^dots_', '') }}
+
+      # ── Step 2: Branch by event ─────────────────────────────────────────────
+      # The light branches use the caller's scope (area for an Area Leader
+      # button); the 2_short_release Lights Off is forced to the leader's floor;
+      # the stepping branches forward leader_entity_id so generics' hold loop
+      # runs while the button is held.
+      - choose:
+          # ────────────── 1_short_release ──────────────
+          # Turn on the lights in the button's area.
+          - conditions:
+              - condition: template
+                value_template: '{{ mapped_event == "1_short_release" }}'
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Lights On
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
+
+          # ────────────── 1_double_press ──────────────
+          # Fan toggle: force toggle:true regardless of caller-passed value.
+          - conditions:
+              - condition: template
+                value_template: '{{ mapped_event == "1_double_press" }}'
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Fan On
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: true
+                  error_mode: '{{ _err_mode }}'
+
+          # ────────────── 1_long_press ──────────────
+          # Lights Up stepping: the repeat-while-held loop lives inside
+          # `labeled_feature_generics` — forwarding `leader_entity_id` is what
+          # opts into it (generics exits when the button emits its next event;
+          # with an empty leader_entity_id it falls back to one step).
+          - conditions:
+              - condition: template
+                value_template: '{{ mapped_event == "1_long_press" }}'
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Lights Up
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
+
+          # ────────────── 2_short_release ──────────────
+          # Turn off every light on the leader's floor — same contract as
+          # labeled_feature_somrig_sleep's Lights Off branch (that one fires on
+          # 1_short_release), minus the house-wide Media Pause: this mapping
+          # deliberately touches no audio.
+          - conditions:
+              - condition: template
+                value_template: '{{ mapped_event == "2_short_release" }}'
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Lights Off
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: floor
+                  scope_id: '{{ _resolved_floor_id }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: '{{ _toggle_in }}'
+                  error_mode: '{{ _err_mode }}'
+
+          # ────────────── 2_double_press ──────────────
+          # Night toggle: always toggle:true — the press semantics are
+          # explicitly "flip night mode", not "set to enabled".
+          - conditions:
+              - condition: template
+                value_template: '{{ mapped_event == "2_double_press" }}'
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Night
+                  exclude_feature: '{{ _leader_feature }}'
+                  scope: '{{ _scope }}'
+                  scope_id: '{{ scope_id | default("") }}'
+                  follower_entity_id: '{{ follower_entity_id | default("") }}'
+                  leader_entity_id: '{{ leader_entity_id | default("") }}'
+                  leader_enabled: '{{ leader_enabled | default(true) }}'
+                  toggle: true
+                  error_mode: '{{ _err_mode }}'
+
+          # ────────────── 2_long_press ──────────────
+          # Lights Down stepping: hold loop in generics (see 1_long_press).
+          - conditions:
+              - condition: template
+                value_template: '{{ mapped_event == "2_long_press" }}'
+            sequence:
+              - action: script.labeled_feature_generics
+                data:
+                  feature: Lights Down
                   exclude_feature: '{{ _leader_feature }}'
                   scope: '{{ _scope }}'
                   scope_id: '{{ scope_id | default("") }}'
