@@ -104,30 +104,28 @@ template:
       state: '{% if states.sensor.nhl_sensor.attributes is defined and states.sensor.nhl_sensor.attributes.home_score
         is defined %}{{ states.sensor.nhl_sensor.attributes.home_score }}{%- endif %}'
 
-
-
   - light:
-      - unique_id: scene_night_bathroom_main
-        #friendly_name: "Scene Night (Bathroom Main)"
-        #value_template: |-
-        state: |-
-          {% for entity_ids in state_attr('scene.night_bathroom_main', 'entity_id') %}
-            {% if is_state(entity_ids, 'on') %}
-              {% if loop.index == 1 %}
-                true
-              {% endif %}
-            {% else %}
-              false
+    - unique_id: scene_night_bathroom_main
+      #friendly_name: "Scene Night (Bathroom Main)"
+      #value_template: |-
+      state: |-
+        {% for entity_ids in state_attr('scene.night_bathroom_main', 'entity_id') %}
+          {% if is_state(entity_ids, 'on') %}
+            {% if loop.index == 1 %}
+              true
             {% endif %}
-          {% endfor %}
-        turn_on:
-          action: scene.turn_on
-          target:
-            entity_id: scene.night_bathroom_main
-        turn_off:
-          action: homeassistant.turn_off
-          target:
-            entity_id: "{{ state_attr('scene.night_bathroom_main', 'entity_id') }}"
+          {% else %}
+            false
+          {% endif %}
+        {% endfor %}
+      turn_on:
+        action: scene.turn_on
+        target:
+          entity_id: scene.night_bathroom_main
+      turn_off:
+        action: homeassistant.turn_off
+        target:
+          entity_id: "{{ state_attr('scene.night_bathroom_main', 'entity_id') }}"
 
 http:
   ip_ban_enabled: true

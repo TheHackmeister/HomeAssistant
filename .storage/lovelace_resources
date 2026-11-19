@@ -35,7 +35,7 @@
         "id": "ed9c47ae7a604170bc963d1c88a2ca11"
       },
       {
-        "url": "/hacsfiles/flex-table-card/flex-table-card.js?hacstag=15629205814",
+        "url": "/hacsfiles/flex-table-card/flex-table-card.js?hacstag=15629205815",
         "type": "module",
         "id": "3a9ea86280844a688bea518f4d83cddd"
       },
@@ -111,17 +111,17 @@
       },
       {
         "id": "2edb355ccc15434f938ce6b4c0f82c1d",
-        "url": "/hacsfiles/light-entity-card/light-entity-card.js?hacstag=168744428640",
+        "url": "/hacsfiles/light-entity-card/light-entity-card.js?hacstag=168744428641",
         "type": "module"
       },
       {
         "id": "e63c449f90e34035ac2e915d507d24d5",
-        "url": "/hacsfiles/lovelace-multiple-entity-row/multiple-entity-row.js?hacstag=1789210374111",
+        "url": "/hacsfiles/lovelace-multiple-entity-row/multiple-entity-row.js?hacstag=1789210374131",
         "type": "module"
       },
       {
         "id": "902eb35c1e514114904c5ff91912e7c9",
-        "url": "/hacsfiles/hass-alert2-ui/alert2.js?hacstag=853369948121",
+        "url": "/hacsfiles/hass-alert2-ui/alert2.js?hacstag=8533699481221",
         "type": "module"
       },
       {
@@ -142,6 +142,11 @@
       {
         "id": "91cc884287604ea1bf1f26a5859a155a",
         "url": "/local/label-printer/card.js",
+        "type": "module"
+      },
+      {
+        "id": "1719663d135946e9901bf9861e7996fd",
+        "url": "/alert2/frontend/alert2.js?v=1.23.2",
         "type": "module"
       }
     ]

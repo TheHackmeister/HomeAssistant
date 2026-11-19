@@ -3,7 +3,8 @@ substitutions:
   #room: "master-bathroom"
   friendly_name: Hall (Bedroom Main) mmWave
 packages:
-  athom.epo-ble: github://everythingsmarthome/presence-one/everything-presence-one-ble.yaml@v1.2.3
+  #athom.epo-ble: github://everythingsmarthome/presence-one/everything-presence-one-ble.yaml@v1.2.3
+  athom.epo-ble: github://everythingsmarthome/presence-one/everything-presence-one-ble.yaml
 #packages:
 #  athom.smart-plug-v2: github://EverythingSmartHome/everything-presence-one/everything-presence-one-st.yaml
 #  ble-tracking: github://EverythingSmartHome/everything-presence-one/common/bluetooth-base.yaml
