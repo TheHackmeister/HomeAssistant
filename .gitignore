@@ -55,3 +55,11 @@ home-assistant_v2.db-shm
 home-assistant_v2.db-wal
 zigbee.db
 .agents/worktrees/
+
+# rulesync fetch cache — re-fetched on demand, never committed
+.rulesync/skills/.curated/
+
+# pipeline-locks runtime state (.opencode/plugin/pipeline-locks/): lease locks
+# and audit log live at the CANONICAL repo root so worktree sessions share
+# them (D10) — derived, machine-local, and never committed.
+.pipeline/

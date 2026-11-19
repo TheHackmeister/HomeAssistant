@@ -1,0 +1,1066 @@
+{
+  // Project-level OpenCode config for the HomeAssistant repo, ported from
+  // SpencersLab's by cf-93 C07 (replicating the C06 reference port):
+  // the "dev" half of the agent tool config. Merges over the machine-global
+  // config (project entries win; non-conflicting global settings are
+  // preserved), so this repo also sees the regular MCP fleet defined
+  // globally.
+  //
+  // Version-controlled here: the dev-cluster MCP servers
+  // (mcp.dev.scifi.farm — incl. dev-boards, required for board pipeline
+  // runs) and the gpu-ai provider (the lab's llama endpoint,
+  // llama.spencerslab.com; kept repo-uniform per the C06 ruling). The
+  // regular MCP fleet, the gpu-moe provider, agents and global permissions
+  // live in the machine-local global config (~/.config/opencode/opencode.json,
+  // NOT version-controlled); ~/.config/kilo/kilo.jsonc keeps its own older
+  // fleet copy.
+  //
+  // The permissions array below is last-match-wins and load-bearing: the
+  // universal default `* * ask` MUST stay FIRST, blanket allows next,
+  // exceptions (*.env asks, the redirect guard) LAST — see the agents-sync
+  // skill reference "Hand-managed global policy arrays".
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "readonly-dev-kubernetes": {
+        "type": "remote",
+        "url": "https://mcp.dev.scifi.farm/kubernetes-readonly/mcp",
+        "disabled": false,
+        "timeout": {
+          "catalog": 60000,
+          "execution": 60000
+        }
+      },
+      "admin-dev-kubernetes": {
+        "type": "remote",
+        "url": "https://mcp.dev.scifi.farm/kubernetes-admin/mcp",
+        "disabled": true,
+        "timeout": {
+          "catalog": 60000,
+          "execution": 60000
+        }
+      },
+      // Dev-cluster utility fleet (ticket 2026-10-feat-dev-mcp-fleet): tier-less
+      // by user choice, so pipeline agents need the `dev*` allow rule in
+      // .rulesync/subagents/ — unlisted tier-less names fall through to ask.
+      "dev-playwright": {
+        "type": "remote",
+        "url": "https://mcp.dev.scifi.farm/playwright/mcp",
+        "disabled": false,
+        "timeout": {
+          "catalog": 60000,
+          "execution": 60000
+        }
+      },
+      "dev-renovate": {
+        "type": "remote",
+        "url": "https://mcp.dev.scifi.farm/renovate/mcp",
+        "disabled": false,
+        "timeout": {
+          "catalog": 60000,
+          "execution": 60000
+        }
+      },
+      "dev-searxng": {
+        "type": "remote",
+        "url": "https://mcp.dev.scifi.farm/searxng/mcp",
+        "disabled": false,
+        "timeout": {
+          "catalog": 60000,
+          "execution": 60000
+        }
+      },
+      "dev-boards": {
+        "type": "remote",
+        "url": "https://mcp.dev.scifi.farm/boards/mcp",
+        "disabled": false,
+        "timeout": {
+          "catalog": 60000,
+          "execution": 60000
+        }
+      }
+    }
+  },
+  "providers": {
+    "gpu-ai": {
+      "name": "GPU-AI",
+      "package": "aisdk:@ai-sdk/openai-compatible",
+      "settings": {
+        "baseURL": "https://llama.spencerslab.com/v1",
+        // Deep-context prefills exceed OpenCode's 300s default
+        // headerTimeout (llama-server sends no headers until prefill
+        // ends; 60k+ tokens takes ~5min at ~220 t/s -> 499 aborts).
+        // 2h header budget; 2h between-chunk stall guard (fires
+        // -> auto-retry on genuinely dead streams). Raised from
+        // 60min/15min on 2026-10-15: dense-27B cold prefills of 90k+
+        // tokens can take 10min+, and -np 1 queuing delays headers
+        // further (see 2026-10-15-debug-gpu-ai-opencode-499 plan).
+        "headerTimeout": 7200000,
+        "chunkTimeout": 7200000
+      },
+      "models": {
+        "home-3b-v3": {
+          "modelID": "home-3b-v3",
+          "name": "Home 3B v3 (Q4_K_M) - CPU",
+          "limit": {
+            "context": 8192
+          }
+        },
+        "home-3b-v3-gpu": {
+          "modelID": "home-3b-v3-gpu",
+          "name": "Home 3B v3 (Q8_0) - GPU",
+          "limit": {
+            "context": 8192
+          }
+        },
+        "kat-coder-q4": {
+          "modelID": "kat-coder-q4",
+          "name": "KAT Coder V2.5 Dev (Q4_K_M)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "kat-coder-q6": {
+          "modelID": "kat-coder-q6",
+          "name": "KAT Coder V2.5 Dev (Q6_K)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "kat-coder-q8": {
+          "modelID": "kat-coder-q8",
+          "name": "KAT Coder V2.5 Dev (Q8_0)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "kat-coder-q4-1m": {
+          "modelID": "kat-coder-q4-1m",
+          "name": "KAT Coder V2.5 Dev (Q4_K_M) - 1M",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 1010000
+          }
+        },
+        "kat-coder-q6-1m": {
+          "modelID": "kat-coder-q6-1m",
+          "name": "KAT Coder V2.5 Dev (Q6_K) - 1M",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 1010000
+          }
+        },
+        "kat-coder-q8-1m": {
+          "modelID": "kat-coder-q8-1m",
+          "name": "KAT Coder V2.5 Dev (Q8_0) - 1M",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 1010000
+          }
+        },
+        "local/qwen3.8-27b": {
+          "modelID": "local/qwen3.8-27b",
+          "name": "Qwen3.8 27B Uncensored (Orca Q6_K, MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3-30b-a3b-q4": {
+          "modelID": "qwen3-30b-a3b-q4",
+          "name": "Qwen 3 30B A3B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3-30b-a3b-q8": {
+          "modelID": "qwen3-30b-a3b-q8",
+          "name": "Qwen 3 30B A3B Instruct (Q8_0)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3-8b-q4": {
+          "modelID": "qwen3-8b-q4",
+          "name": "Qwen 3 8B (Q4_K_M)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3-8b-q8": {
+          "modelID": "qwen3-8b-q8",
+          "name": "Qwen 3 8B (Q8_0)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3-coder-next-q6": {
+          "modelID": "qwen3-coder-next-q6",
+          "name": "Qwen 3 Coder Next (Q6_K)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3-coder-next-q8": {
+          "modelID": "qwen3-coder-next-q8",
+          "name": "Qwen 3 Coder Next (Q8_0)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3-vl-2b-bf16": {
+          "modelID": "qwen3-vl-2b-bf16",
+          "name": "Qwen3 VL 2B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-bf16:caption": {
+          "modelID": "qwen3-vl-2b-bf16:caption",
+          "name": "Qwen3 VL 2B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-bf16:tags": {
+          "modelID": "qwen3-vl-2b-bf16:tags",
+          "name": "Qwen3 VL 2B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-q4": {
+          "modelID": "qwen3-vl-2b-q4",
+          "name": "Qwen3 VL 2B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-q4:caption": {
+          "modelID": "qwen3-vl-2b-q4:caption",
+          "name": "Qwen3 VL 2B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-q4:tags": {
+          "modelID": "qwen3-vl-2b-q4:tags",
+          "name": "Qwen3 VL 2B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-q8": {
+          "modelID": "qwen3-vl-2b-q8",
+          "name": "Qwen3 VL 2B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-q8:caption": {
+          "modelID": "qwen3-vl-2b-q8:caption",
+          "name": "Qwen3 VL 2B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-2b-q8:tags": {
+          "modelID": "qwen3-vl-2b-q8:tags",
+          "name": "Qwen3 VL 2B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b": {
+          "modelID": "qwen3-vl-30b-a3b",
+          "name": "Qwen3 VL 30B A3B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-bf16": {
+          "modelID": "qwen3-vl-30b-a3b-bf16",
+          "name": "Qwen3 VL 30B A3B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-bf16:caption": {
+          "modelID": "qwen3-vl-30b-a3b-bf16:caption",
+          "name": "Qwen3 VL 30B A3B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-bf16:tags": {
+          "modelID": "qwen3-vl-30b-a3b-bf16:tags",
+          "name": "Qwen3 VL 30B A3B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-q4": {
+          "modelID": "qwen3-vl-30b-a3b-q4",
+          "name": "Qwen3 VL 30B A3B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-q4:caption": {
+          "modelID": "qwen3-vl-30b-a3b-q4:caption",
+          "name": "Qwen3 VL 30B A3B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-q4:tags": {
+          "modelID": "qwen3-vl-30b-a3b-q4:tags",
+          "name": "Qwen3 VL 30B A3B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-q8": {
+          "modelID": "qwen3-vl-30b-a3b-q8",
+          "name": "Qwen3 VL 30B A3B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-q8:caption": {
+          "modelID": "qwen3-vl-30b-a3b-q8:caption",
+          "name": "Qwen3 VL 30B A3B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-q8:tags": {
+          "modelID": "qwen3-vl-30b-a3b-q8:tags",
+          "name": "Qwen3 VL 30B A3B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-thinking-bf16": {
+          "modelID": "qwen3-vl-30b-a3b-thinking-bf16",
+          "name": "Qwen3 VL 30B A3B Thinking (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-thinking-q4": {
+          "modelID": "qwen3-vl-30b-a3b-thinking-q4",
+          "name": "Qwen3 VL 30B A3B Thinking (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-30b-a3b-thinking-q8": {
+          "modelID": "qwen3-vl-30b-a3b-thinking-q8",
+          "name": "Qwen3 VL 30B A3B Thinking (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b": {
+          "modelID": "qwen3-vl-4b",
+          "name": "Qwen3 VL 4B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-bf16": {
+          "modelID": "qwen3-vl-4b-bf16",
+          "name": "Qwen3 VL 4B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-bf16:caption": {
+          "modelID": "qwen3-vl-4b-bf16:caption",
+          "name": "Qwen3 VL 4B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-bf16:tags": {
+          "modelID": "qwen3-vl-4b-bf16:tags",
+          "name": "Qwen3 VL 4B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-q4": {
+          "modelID": "qwen3-vl-4b-q4",
+          "name": "Qwen3 VL 4B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-q4:caption": {
+          "modelID": "qwen3-vl-4b-q4:caption",
+          "name": "Qwen3 VL 4B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-q4:tags": {
+          "modelID": "qwen3-vl-4b-q4:tags",
+          "name": "Qwen3 VL 4B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-q8": {
+          "modelID": "qwen3-vl-4b-q8",
+          "name": "Qwen3 VL 4B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-q8:caption": {
+          "modelID": "qwen3-vl-4b-q8:caption",
+          "name": "Qwen3 VL 4B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-q8:tags": {
+          "modelID": "qwen3-vl-4b-q8:tags",
+          "name": "Qwen3 VL 4B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-thinking-bf16": {
+          "modelID": "qwen3-vl-4b-thinking-bf16",
+          "name": "Qwen3 VL 4B Thinking (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-thinking-q4": {
+          "modelID": "qwen3-vl-4b-thinking-q4",
+          "name": "Qwen3 VL 4B Thinking (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-4b-thinking-q8": {
+          "modelID": "qwen3-vl-4b-thinking-q8",
+          "name": "Qwen3 VL 4B Thinking (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b": {
+          "modelID": "qwen3-vl-8b",
+          "name": "Qwen3 VL 8B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-bf16": {
+          "modelID": "qwen3-vl-8b-bf16",
+          "name": "Qwen3 VL 8B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-bf16:caption": {
+          "modelID": "qwen3-vl-8b-bf16:caption",
+          "name": "Qwen3 VL 8B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-bf16:tags": {
+          "modelID": "qwen3-vl-8b-bf16:tags",
+          "name": "Qwen3 VL 8B Instruct (BF16)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-q4": {
+          "modelID": "qwen3-vl-8b-q4",
+          "name": "Qwen3 VL 8B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-q4:caption": {
+          "modelID": "qwen3-vl-8b-q4:caption",
+          "name": "Qwen3 VL 8B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-q4:tags": {
+          "modelID": "qwen3-vl-8b-q4:tags",
+          "name": "Qwen3 VL 8B Instruct (Q4_K_M)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-q8": {
+          "modelID": "qwen3-vl-8b-q8",
+          "name": "Qwen3 VL 8B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-q8:caption": {
+          "modelID": "qwen3-vl-8b-q8:caption",
+          "name": "Qwen3 VL 8B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3-vl-8b-q8:tags": {
+          "modelID": "qwen3-vl-8b-q8:tags",
+          "name": "Qwen3 VL 8B Instruct (Q8_0)",
+          "limit": {
+            "context": 16384
+          }
+        },
+        "qwen3.6-27b-q6": {
+          "modelID": "qwen3.6-27b-q6",
+          "name": "Qwen 3.6 27B (Q6_K)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.6-27b-q8": {
+          "modelID": "qwen3.6-27b-q8",
+          "name": "Qwen 3.6 27B (Q8_0)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.6-35b-a3b-1m": {
+          "modelID": "qwen3.6-35b-a3b-1m",
+          "name": "Qwen 3.6 35B A3B (Q8_0) - 1M",
+          "limit": {
+            "context": 1010000
+          }
+        },
+        "qwen3.6-35b-a3b-bf16": {
+          "modelID": "qwen3.6-35b-a3b-bf16",
+          "name": "Qwen 3.6 35B A3B (BF16)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.6-35b-a3b-q6": {
+          "modelID": "qwen3.6-35b-a3b-q6",
+          "name": "Qwen 3.6 35B A3B (UD-Q6_K)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.6-35b-a3b-q8": {
+          "modelID": "qwen3.6-35b-a3b-q8",
+          "name": "Qwen 3.6 35B A3B (Q8_0)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.6-35b-a3b-q8-visual": {
+          "modelID": "qwen3.6-35b-a3b-q8-visual",
+          "name": "Qwen 3.6 35B A3B (Q8_0) - Visual",
+          "capabilities": {
+            "tools": true,
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8": {
+          "modelID": "qwen3.8",
+          "name": "Qwen3.8 27B Uncensored (Orca Q6_K, MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-27b-bf16": {
+          "modelID": "qwen3.8-27b-bf16",
+          "name": "Qwen 3.8 27B (BF16, MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-27b-q4": {
+          "modelID": "qwen3.8-27b-q4",
+          "name": "Qwen 3.8 27B (UD-Q4_K_XL, MTP)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-27b-q6": {
+          "modelID": "qwen3.8-27b-q6",
+          "name": "Qwen 3.8 27B (UD-Q6_K_XL, MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-27b-q8": {
+          "modelID": "qwen3.8-27b-q8",
+          "name": "Qwen 3.8 27B (Q8_0, MTP)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-27b-q8-visual": {
+          "modelID": "qwen3.8-27b-q8-visual",
+          "name": "Qwen 3.8 27B (Q8_0, MTP) - Visual",
+          "capabilities": {
+            "tools": true,
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-27b-q8-1m": {
+          "modelID": "qwen3.8-27b-q8-1m",
+          "name": "Qwen 3.8 27B (Q8_0) - 1M",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 1010000
+          }
+        },
+        "qwen3.8-flash-next-q3": {
+          "modelID": "qwen3.8-flash-next-q3",
+          "name": "Qwen 3.8 Flash Next (UD-Q3_K_XL, MTP)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-flash-next-q4": {
+          "modelID": "qwen3.8-flash-next-q4",
+          "name": "Qwen 3.8 Flash Next (UD-Q4_K_XL, MTP)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen3.8-flash-next-strata": {
+          "modelID": "qwen3.8-flash-next-strata",
+          "name": "Qwen 3.8 Flash Next (Strata IQ3_S arena, R9700)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          // Trained ceiling 262144; the engine refuses past it without rope
+          // scaling (experimental toggle documented in SpencersLab's
+          // charts/llama-swap).
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen38-ara": {
+          "modelID": "qwen38-ara",
+          "name": "Qwen3.8 27B heretic-ara (Q6_K-MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen38-humanlike": {
+          "modelID": "qwen38-humanlike",
+          "name": "Qwen3.8 27B Humanlike-Chat 2.0 (Q6_K)",
+          "limit": {
+            "context": 131072
+          }
+        },
+        "qwen38-orca": {
+          "modelID": "qwen38-orca",
+          "name": "Qwen3.8 27B Uncensored (Orca Q6_K, MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen38-orca-f16": {
+          "modelID": "qwen38-orca-f16",
+          "name": "Qwen3.8 27B Uncensored (Orca F16 reference, MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen38-rana": {
+          "modelID": "qwen38-rana",
+          "name": "Qwen3.8 27B RANA abliterated (Q6_K, MTP)",
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen36-heretic": {
+          "modelID": "qwen36-heretic",
+          "name": "Qwen3.6 35B A3B heretic (Q4_K_M, MTP)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "qwen36-huihui": {
+          "modelID": "qwen36-huihui",
+          "name": "Qwen3.6 35B A3B huihui abliterated (Q4_K, MTP)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "coder-next-ablit": {
+          "modelID": "coder-next-ablit",
+          "name": "Qwen3-Coder-Next 80B A3B abliterated (Q4_K_M)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "limit": {
+            "context": 262144
+          }
+        },
+        "whisper-large-v3": {
+          "modelID": "whisper-large-v3",
+          "name": "Whisper Large v3"
+        }
+      }
+    }
+  },
+  "permissions": [
+    {
+      "action": "*",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "read",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "read",
+      "resource": "*.env",
+      "effect": "ask"
+    },
+    {
+      "action": "read",
+      "resource": "*.env.*",
+      "effect": "ask"
+    },
+    {
+      "action": "read",
+      "resource": "*.env.example",
+      "effect": "allow"
+    },
+    {
+      "action": "edit",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "glob",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grep",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "list",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "printenv *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "whoami *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "uname *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "which *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "date *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "diff *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "echo *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "file *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "find *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "grep *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "head *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "less *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "sort *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "tail *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "tree *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "type *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "uniq *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "cat *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "cut *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "man *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "pwd *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "ag *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "df *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "du *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "jq *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "ls *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "rg *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "tr *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "wc *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "*>*",
+      "effect": "ask"
+    },
+    {
+      "action": "external_directory",
+      "resource": "/home/coder/CuratedForest.com/assets/sass/*",
+      "effect": "allow"
+    },
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "question",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "webfetch",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "websearch",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "doom_loop",
+      "resource": "*",
+      "effect": "ask"
+    },
+    // Playwright browser tools (2026-10-27 re-spell): the 23 bare
+    // `playwright_browser_*` actions that stood here matched nothing —
+    // permission actions name the normalized <server>_<tool> id, and the
+    // real servers are `dev-playwright` (this file) and `global-playwright`
+    // (machine fleet). The two prefix allows replace them; newly covered
+    // vs the old list: browser_emulate_media, browser_find.
+    {
+      "action": "dev-playwright_browser_*",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "global-playwright_browser_*",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "codesearch",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "skill",
+      "resource": "*",
+      "effect": "allow"
+    }
+  ],
+  "disabled_providers": [
+    "kilo",
+    "llama",
+    "opencode",
+    "spencerslab"
+  ],
+  "default_agent": "plan",
+  "skills": [
+    "./.agents/skills",
+    "skills/"
+  ]
+}

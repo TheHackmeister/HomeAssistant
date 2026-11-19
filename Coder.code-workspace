@@ -2,15 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../../config"
-		},
-		{
-			"path": "../addons"
-		},
-		{
-			"path": "../../addons"
 		}
 	],
 	"settings": {
@@ -43,7 +34,8 @@
 			"titleBar.inactiveBackground": "#972b7099",
 			"titleBar.inactiveForeground": "#e7e7e799",
 			"activityBar.activeBorder": "#e7e7e7",
-			"activityBarTop.activeBorder": "#e7e7e7"
+			"activityBarTop.activeBorder": "#e7e7e7",
+			"statusBar.inactiveBackground": "#972b70"
 		},
 		"peacock.remoteColor": "#972b70"
 	}

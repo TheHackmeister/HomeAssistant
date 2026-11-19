@@ -1,0 +1,44 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/config-schema.json",
+  // HomeAssistant rulesync setup (cf-93 C07 port of the C06 reference, 2026-11-01):
+  // .rulesync/ is the single source of truth for rules (AGENTS.md),
+  // subagents (.opencode/agents/), commands (.opencode/commands/) and
+  // skills (.opencode/skills/). Edit the sources there, then run
+  // `rulesync generate` — never hand-edit the generated surfaces.
+  //
+  // Port recipe per C06 (the reference port), replicated by C07:
+  // targets/features mirror the canonical home (SpencersLab); the
+  // MCP/permissions/hooks features stay OFF there and here — the hand-managed
+  // .opencode/opencode.jsonc carries the dev-cluster servers + gpu-ai
+  // provider + project permissions.
+  //
+  // `delete: false` until a re-run at the repo root proves the orphan sweep
+  // is safe with this repo's symlink layout (R2.4.1: the swap order reversed
+  // .opencode/agents|skills into .agents/ — an orphan sweep running through
+  // a wrong-direction symlink would operate on tracked content).
+  // Generate at the REPO ROOT only, never from inside a .agents/worktrees/
+  // checkout (R2.4.2: worktrees materialize their own tracked symlinks).
+  "targets": [
+    "opencode"
+  ],
+  "features": [
+    "rules",
+    "subagents",
+    "commands",
+    "skills"
+  ],
+  "outputRoots": [
+    "."
+  ],
+  "delete": false,
+  "verbose": false,
+  "silent": false,
+  "global": false,
+  "simulateCommands": false,
+  "simulateSubagents": false,
+  "simulateSkills": false,
+  // Never run `rulesync gitignore` here: it would add AGENTS.md and the
+  // generated .opencode/ surfaces to .gitignore, but those files must stay
+  // tracked (Kilo and fresh worktrees read them via symlinks).
+  "gitignoreTargetsOnly": true
+}

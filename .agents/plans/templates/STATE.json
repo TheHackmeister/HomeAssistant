@@ -1,0 +1,21 @@
+{
+  "feature": "",
+  "plan_status": "draft",
+  "coord_session": null,
+  "test_session": null,
+  "current_wave": 1,
+  "updated_at": "",
+  "chunks": {
+    "C01": {
+      "status": "pending",
+      "wave": 1,
+      "depends_on": [],
+      "dev_rounds": 0,
+      "review_rounds": 0,
+      "last_verdict": null,
+      "handoffs": []
+    }
+  },
+  "blocked": [],
+  "deferred": []
+}

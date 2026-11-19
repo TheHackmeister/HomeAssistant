@@ -1,0 +1,21 @@
+{
+  "name": "group-costs",
+  "version": "1.0.0",
+  "private": true,
+  "openchamber": {
+    "apiVersion": 1,
+    "engines": {
+      "openchamber": ">=2.0.0"
+    },
+    "contributes": {
+      "panel": {
+        "id": "group-costs",
+        "name": "Group Costs",
+        "icon": "bar-chart-2",
+        "entry": "panel/index.html"
+      },
+      "page": true,
+      "capabilities": ["sessions"]
+    }
+  }
+}

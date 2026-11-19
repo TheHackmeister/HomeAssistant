@@ -1,0 +1,228 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Group Costs</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background: #ffffff;
+        --elevated: #f7f7f8;
+        --foreground: #111111;
+        --muted: #666666;
+        --border: rgba(0, 0, 0, 0.12);
+        --primary: #2563eb;
+        --primary-foreground: #ffffff;
+        --success: #15803d;
+        --warning: #b45309;
+        --error: #b91c1c;
+        --info: #1d4ed8;
+        --radius: 10px;
+        --font: system-ui, -apple-system, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: var(--font);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      #root {
+        height: 100%;
+        overflow-y: auto;
+        padding: 12px;
+        box-sizing: border-box;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      select {
+        max-width: 220px;
+        width: 100%;
+        padding: 5px 8px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--elevated);
+        color: var(--foreground);
+        font: inherit;
+      }
+
+      .summary {
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--elevated);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+
+      .section-title {
+        margin: 14px 0 8px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .hint,
+      .empty,
+      .error {
+        padding: 10px;
+        border: 1px dashed var(--border);
+        border-radius: var(--radius);
+        color: var(--muted);
+      }
+
+      .error {
+        border-color: color-mix(in srgb, var(--error) 45%, transparent);
+        color: var(--error);
+      }
+
+      .group {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--elevated);
+        margin-bottom: 10px;
+        overflow: hidden;
+      }
+
+      .group-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .group-name {
+        font-weight: 650;
+        word-break: break-word;
+      }
+
+      .group-total {
+        flex-shrink: 0;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 8px;
+        align-items: center;
+        width: 100%;
+        padding: 8px 10px;
+        border: 0;
+        border-bottom: 1px solid var(--border);
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .row:last-child {
+        border-bottom: 0;
+      }
+
+      .row:hover {
+        background: var(--hover);
+      }
+
+      .row-main {
+        min-width: 0;
+      }
+
+      .row-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .row-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 550;
+      }
+
+      .row-meta {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .value {
+        font-family: var(--mono);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        flex-shrink: 0;
+        background: var(--muted);
+      }
+
+      .dot.running,
+      .dot.retrying {
+        background: var(--warning);
+      }
+
+      .dot.waiting {
+        background: var(--info);
+      }
+
+      .dot.completed {
+        background: var(--success);
+      }
+
+      .dot.failed {
+        background: var(--error);
+      }
+
+      .dot.idle {
+        background: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="hint">Connecting to OpenChamber…</div>
+    </div>
+    <script src="main.js"></script>
+  </body>
+</html>
