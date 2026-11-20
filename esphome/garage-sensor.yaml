@@ -6,6 +6,13 @@ esp32:
   framework:
     type: arduino
   #build_path: ./build/${system}
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [esp32_hall]
+
 # Enable logging
 logger:
 
